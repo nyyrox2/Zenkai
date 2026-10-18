@@ -1,4 +1,4 @@
-import { tmdbDirect, tmdbEpisodesDirect } from './tmdbDirect'
+import { tmdbDirect, tmdbEpisodesDirect, tmdbEpisodeGroupDirect, tmdbAllSeasonsDirect } from './tmdbDirect'
 
 /** Client for the Zenkai API (Cloudflare Pages Functions in production, Vite middleware in dev). */
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? ''
@@ -62,6 +62,8 @@ export interface Tmdb {
   runtime: number | null
   cast: { name: string; character: string; photo: string | null }[]
   trailer: string | null
+  episodeGroupId?: string | null
+  seasonsList?: { season: number; episodeCount: number }[] | null
 }
 
 export interface TmdbBundle {
@@ -77,7 +79,7 @@ export function fetchTmdb(anilistId: number, title: string, format?: string | nu
   const hit = tmdbMem.get(key)
   if (hit) return hit
 
-  const lsKey = `zk:tmdb:v1:${key}`
+  const lsKey = `zk:tmdb:v2:${key}`
   try {
     const raw = localStorage.getItem(lsKey)
     if (raw) {
@@ -128,13 +130,59 @@ export interface EpInfo {
 }
 
 const epMem = new Map<string, Promise<EpInfo[]>>()
-export function fetchTmdbEpisodes(tmdbId: number, season: number): Promise<EpInfo[]> {
-  const key = `${tmdbId}:${season}`
+export function fetchTmdbEpisodes(target: Tmdb | number, explicitSeason?: number): Promise<EpInfo[]> {
+  const isObj = typeof target === 'object' && target !== null
+  const tmdbId = isObj ? target.id : target
+  const tmdb = isObj ? target : null
+  const season = explicitSeason ?? tmdb?.season ?? 1
+
+  const isSpecificSeason = !!(tmdb?.season && tmdb.season > 1)
+  const episodeGroupId = !isSpecificSeason ? tmdb?.episodeGroupId : null
+  const hasMultipleSeasons = !isSpecificSeason && ((tmdb?.seasons ?? 0) > 1 || (tmdb?.seasonsList?.length ?? 0) > 1)
+
+  const key = episodeGroupId ? `grp:${episodeGroupId}` : hasMultipleSeasons ? `all:${tmdbId}` : `${tmdbId}:${season}`
   const hit = epMem.get(key)
   if (hit) return hit
+
   type Raw = { n: number; name: string | null; overview: string | null; still: string | null; runtime: number | null; air: string | null }
-  const p = (tmdbEpisodesDirect(tmdbId, season) as Promise<Raw[]>)
-    .catch(() => getJson<{ episodes: Raw[] }>(`/api/tmdb/episodes?id=${tmdbId}&season=${season}`).then((r) => r.episodes))
+
+  const fetchRaw = async (): Promise<Raw[]> => {
+    // 1. Episode group gives all episodes for anime in continuous absolute order
+    if (episodeGroupId) {
+      try {
+        const rows = await tmdbEpisodeGroupDirect(episodeGroupId)
+        if (rows && rows.length > 0) return rows
+      } catch {
+        /* fallback to server group route */
+      }
+      try {
+        const r = await getJson<{ episodes: Raw[] }>(`/api/tmdb/episodes?group=${episodeGroupId}`)
+        if (r.episodes && r.episodes.length > 0) return r.episodes
+      } catch {
+        /* fallback to seasons */
+      }
+    }
+
+    // 2. If show has multiple seasons in TMDB (and no episode group), fetch all seasons
+    if (hasMultipleSeasons) {
+      const seasonNums = tmdb?.seasonsList?.map((s) => s.season) ?? Array.from({ length: tmdb?.seasons ?? 1 }, (_, i) => i + 1)
+      if (seasonNums.length > 1) {
+        try {
+          const rows = await tmdbAllSeasonsDirect(tmdbId, seasonNums)
+          if (rows && rows.length > 0) return rows
+        } catch {
+          /* fallback to season */
+        }
+      }
+    }
+
+    // 3. Fallback to single season (season 1 or mapped season)
+    return (tmdbEpisodesDirect(tmdbId, season) as Promise<Raw[]>).catch(() =>
+      getJson<{ episodes: Raw[] }>(`/api/tmdb/episodes?id=${tmdbId}&season=${season}`).then((r) => r.episodes),
+    )
+  }
+
+  const p = fetchRaw()
     .then((rows) => rows.map((e) => ({ n: e.n, name: e.name, overview: e.overview, image: tmdbImg(e.still, 'w500'), runtime: e.runtime, air: e.air })))
     .catch(() => {
       epMem.delete(key)
