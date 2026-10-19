@@ -1,6 +1,6 @@
 // Bundled AniList -> AnimeSalt mapping (public/anime-mapping.json, same file the Android app ships).
 // Imported (not fetched) so it works inside Cloudflare Pages Functions and the Vite dev server alike.
-import mappingData from "../public/anime-mapping.json" with { type: "json" };
+import mappingData from "../public/anime-mapping.json";
 
 export const ANIME_MAPPING = mappingData;
 
