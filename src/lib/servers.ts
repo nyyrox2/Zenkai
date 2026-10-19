@@ -30,6 +30,8 @@ const tv = (c: EmbedCtx, movie: (id: number) => string, show: (id: number, s: nu
 export const SERVERS: ServerDef[] = [
   { id: 'megaplay', name: 'MegaPlay', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true },
   { id: 'vidstream', name: 'Vidstream', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true },
+  { id: 'flixcloud-1', name: 'FlixCloud 1', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true },
+  { id: 'flixcloud-2', name: 'FlixCloud 2', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true },
   { id: 'acdn', name: 'ACDN', note: 'Direct HLS · Multi audio', kind: 'direct', audio: false, multi: true },
   { id: 'animesalt-1', name: 'AnimeSalt 1', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '1' },
   { id: 'animesalt-2', name: 'AnimeSalt 2', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '2' },
@@ -45,7 +47,10 @@ export const SERVERS: ServerDef[] = [
   { id: '2embed', name: '2Embed', note: 'Embed · TMDB', kind: 'embed', audio: false, url: (c) => tv(c, (i) => `https://www.2embed.stream/embed/movie/${i}`, (i, s) => `https://www.2embed.stream/embed/tv/${i}/${s}/${c.episode}`) },
 ]
 
-export const serverById = (id: string) => SERVERS.find((s) => s.id === id) ?? SERVERS[0]
+export const serverById = (id: string) =>
+  SERVERS.find((s) => s.id === id) ??
+  (id === 'flixcloud' ? SERVERS.find((s) => s.id === 'flixcloud-1') : undefined) ??
+  SERVERS[0]
 
 /** Direct (Zenkai player) servers; all are offered for both SUB and DUB. */
 export const DIRECT = SERVERS.filter((s) => s.kind === 'direct')

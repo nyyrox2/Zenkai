@@ -1,6 +1,7 @@
 // One Web-standard handler shared by Cloudflare Pages Functions and the Vite dev server.
 // handle(request) -> Response | null (null = not an API route)
 import { resolveDirectStreamWorker } from "./direct-stream.js";
+import { resolveFlixCloud } from "./flixcloud.js";
 import { extractAnimeSaltPlayer } from "./animesalt.js";
 import { resolveAcdn } from "./acdn.js";
 import { validateProxyUrl } from "./ssrf.js";
@@ -192,7 +193,7 @@ function refererFor(host, requested) {
   if (/animeapps|nukitashi|playeng/.test(host)) return "https://playeng.animeapps.top/";
   if (/nexabloom|stellarfrontier|phantomharbor|shadowharbor|hiddenvertex|emeralddrift|eclipseharbor|megaplay|megap|shiora|akirax|imgnex/.test(host)) return "https://megaplay.buzz/";
   if (/animesalt|as-cdn|acdn\.top|ravok/.test(host)) return "https://animesalt.cx/";
-  if (/flixcloud|atomic4cdn|rundowncdn/.test(host)) return "https://flixcloud.cc/";
+  if (/flixcloud|atomic4cdn|rundowncdn|enc-dec/.test(host)) return "https://flixcloud.cc/";
   return requested || null;
 }
 
@@ -216,17 +217,24 @@ async function proxy(request, url) {
 
   const out = new Headers(CORS);
   const type = up.headers.get("Content-Type") || "";
-  const isPlaylist = /mpegurl/i.test(type) || /\.m3u8?$/i.test(t.pathname);
+  const isPlaylist =
+    /mpegurl/i.test(type) ||
+    /\.m3u8?$/i.test(t.pathname) ||
+    t.pathname.includes("parse-flixcloud") ||
+    (t.searchParams.get("url") || "").includes(".m3u8");
 
   if (up.ok && isPlaylist) {
     const text = await up.text();
     if (/^\s*</.test(text)) return new Response(text, { status: up.status, headers: out });
     const direct = url.searchParams.get("seg") === "1"; // segments straight from the CDN, only playlists/keys use the Worker
+    const base = t.hostname.includes("enc-dec.app") && t.searchParams.get("url")
+      ? new URL(t.searchParams.get("url"))
+      : t;
     const wrap = (u, keep) => {
       try {
-        const abs = new URL(u, t);
-        if (!abs.search && t.search) abs.search = t.search;
-        if (direct && keep) return abs.href;
+        const abs = new URL(u, base);
+        if (!abs.search && base.search && !u.includes("?")) abs.search = base.search;
+        if (direct && keep && !/rundowncdn|flixcloud/.test(abs.hostname)) return abs.href;
         return `/proxy?url=${encodeURIComponent(abs.href)}&referer=${encodeURIComponent(referer)}${direct ? "&seg=1" : ""}`;
       } catch {
         return u;
@@ -242,7 +250,7 @@ async function proxy(request, url) {
           variant = s.startsWith("#EXT-X-STREAM-INF");
           return s.replace(/URI=["']([^"']+)["']/g, (_, u) => `URI="${wrap(u, s.startsWith("#EXT-X-MAP"))}"`);
         }
-        const plist = variant || /\.m3u8?(\?|$)/i.test(s);
+        const plist = variant || /\.m3u8?(\?|$)/i.test(s) || s.includes("parse-flixcloud");
         variant = false;
         return wrap(s, !plist);
       })
@@ -257,7 +265,7 @@ async function proxy(request, url) {
     const v = up.headers.get(h);
     if (v) out.set(h, v);
   }
-  if (up.ok && /\.(ts|m4s|mp4|aac|key)$/i.test(t.pathname)) out.set("Cache-Control", "public, max-age=3600");
+  if (up.ok && /\.(ts|m4s|mp4|aac|key|png|webp)$/i.test(t.pathname)) out.set("Cache-Control", "public, max-age=3600");
   return new Response(up.body, { status: up.status, headers: out });
 }
 
@@ -391,6 +399,28 @@ export async function handle(request, env) {
         });
       } catch (e) {
         return json({ error: e.message || "ACDN resolution failed" }, 502);
+      }
+    }
+
+    // FlixCloud: direct HLS from Re:Anime / FlixCloud (enc-dec / Web Crypto decrypted)
+    if (server.startsWith("flixcloud") || server === "reanime") {
+      const preferredServer = server.includes("2") ? "2" : q("preferredServer", "1");
+      try {
+        const r = await cached(`flixcloud:${anilistId}:${episode}:${audio}:${preferredServer}:${title}`, 10 * 60e3, () =>
+          resolveFlixCloud({ anilistId, episode, audio, title, preferredServer })
+        );
+        if (!r?.streamUrl) return json({ error: `No ${audio.toUpperCase()} stream found on FlixCloud ${preferredServer}` }, 404);
+        return json({
+          success: true,
+          server: r.server || (preferredServer === "2" ? "FlixCloud 2" : "FlixCloud 1"),
+          audio: r.audio,
+          streamUrl: `/proxy?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://flixcloud.cc/")}`,
+          subtitles: r.subtitles || [],
+          intro: r.intro,
+          outro: r.outro,
+        });
+      } catch (e) {
+        return json({ error: e.message || "FlixCloud resolution failed" }, 502);
       }
     }
 
