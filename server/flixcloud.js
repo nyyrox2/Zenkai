@@ -463,11 +463,11 @@ async function resolveSingleServer(serverObj, targetAudio) {
   const manifestUrl = `${ENC_DEC}/api/parse-flixcloud?url=${encodeURIComponent(dec.streamUrl)}&w_payload=${encodeURIComponent(dec.wPayload)}`;
 
   const isServer2 = serverObj.serverName?.includes("2") || dataLink.includes("v=2");
-  const sName = isServer2 ? "FlixCloud 2" : "FlixCloud 1";
+  const sName = "FlixCloud";
 
   return {
     server: sName,
-    serverId: isServer2 ? `flixcloud-2` : `flixcloud-1`,
+    serverId: isServer2 ? `flixcloud-2` : `flixcloud`,
     streamUrl: manifestUrl,
     audio: targetAudio,
     subtitles,
@@ -545,4 +545,42 @@ export async function resolveFlixCloud({ anilistId, episode = 1, audio = "sub", 
   }
 
   return null;
+}
+
+/**
+ * Resolves Re:Anime iframe embed player URL (HD-2 / Server 2).
+ */
+export async function resolveReanimeEmbed({ anilistId, episode = 1, audio = "sub" }) {
+  if (!anilistId) return null;
+  const targetAudio = audio.toLowerCase() === "dub" ? "dub" : "sub";
+  try {
+    const flixRes = await fetch(`${BASE}/api/flix/${anilistId}/${episode}`, {
+      headers: { "User-Agent": UA, Accept: "application/json" }
+    });
+    if (!flixRes.ok) return null;
+    const flixJson = await flixRes.json();
+    if (!flixJson?.success || !Array.isArray(flixJson.servers) || flixJson.servers.length === 0) return null;
+
+    const matchingServers = [];
+    for (const s of flixJson.servers) {
+      const dt = (s.dataType || "").toLowerCase();
+      if (targetAudio === "dub" && dt.includes("dub")) {
+        matchingServers.push(s);
+      } else if (targetAudio === "sub" && (dt.includes("sub") || dt.includes("raw"))) {
+        matchingServers.push(s);
+      }
+    }
+
+    if (matchingServers.length === 0 && targetAudio !== "dub") {
+      matchingServers.push(flixJson.servers[0]);
+    }
+
+    // Prefer HD-2 as it uses the dedicated embed player
+    const isSrv2 = (s) => (s.serverName || "").includes("2") || (s.dataLink || "").includes("v=2");
+    const server = matchingServers.find(isSrv2) || matchingServers[0] || flixJson.servers[0];
+    return server?.dataLink || null;
+  } catch (e) {
+    console.warn("resolveReanimeEmbed error:", e.message);
+    return null;
+  }
 }

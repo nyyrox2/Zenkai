@@ -1,7 +1,7 @@
 // One Web-standard handler shared by Cloudflare Pages Functions and the Vite dev server.
 // handle(request) -> Response | null (null = not an API route)
 import { resolveDirectStreamWorker } from "./direct-stream.js";
-import { resolveFlixCloud } from "./flixcloud.js";
+import { resolveFlixCloud, resolveReanimeEmbed } from "./flixcloud.js";
 import { extractAnimeSaltPlayer } from "./animesalt.js";
 import { resolveAcdn } from "./acdn.js";
 import { validateProxyUrl } from "./ssrf.js";
@@ -193,7 +193,7 @@ function refererFor(host, requested) {
   if (/animeapps|nukitashi|playeng/.test(host)) return "https://playeng.animeapps.top/";
   if (/nexabloom|stellarfrontier|phantomharbor|shadowharbor|hiddenvertex|emeralddrift|eclipseharbor|megaplay|megap|shiora|akirax|imgnex/.test(host)) return "https://megaplay.buzz/";
   if (/animesalt|as-cdn|acdn\.top|ravok/.test(host)) return "https://animesalt.cx/";
-  if (/flixcloud|atomic4cdn|rundowncdn|enc-dec/.test(host)) return "https://flixcloud.cc/";
+  if (/flixcloud|atomic4cdn|rundowncdn|vividcdn|fallencdn|enc-dec/.test(host)) return "https://flixcloud.cc/";
   return requested || null;
 }
 
@@ -234,7 +234,7 @@ async function proxy(request, url) {
       try {
         const abs = new URL(u, base);
         if (!abs.search && base.search && !u.includes("?")) abs.search = base.search;
-        if (direct && keep && !/rundowncdn|flixcloud/.test(abs.hostname)) return abs.href;
+        if (direct && keep && !/rundowncdn|flixcloud|vividcdn|fallencdn/.test(abs.hostname)) return abs.href;
         return `/proxy?url=${encodeURIComponent(abs.href)}&referer=${encodeURIComponent(referer)}${direct ? "&seg=1" : ""}`;
       } catch {
         return u;
@@ -261,11 +261,12 @@ async function proxy(request, url) {
   }
 
   if (type) out.set("Content-Type", type);
+  if (/\.(bin|key)$/i.test(t.pathname)) out.set("Content-Type", "application/octet-stream");
   for (const h of ["Content-Length", "Content-Range", "Accept-Ranges"]) {
     const v = up.headers.get(h);
     if (v) out.set(h, v);
   }
-  if (up.ok && /\.(ts|m4s|mp4|aac|key|png|webp)$/i.test(t.pathname)) out.set("Cache-Control", "public, max-age=3600");
+  if (up.ok && /\.(ts|m4s|mp4|aac|key|bin|png|webp)$/i.test(t.pathname)) out.set("Cache-Control", "public, max-age=3600");
   return new Response(up.body, { status: up.status, headers: out });
 }
 
@@ -403,16 +404,15 @@ export async function handle(request, env) {
     }
 
     // FlixCloud: direct HLS from Re:Anime / FlixCloud (enc-dec / Web Crypto decrypted)
-    if (server.startsWith("flixcloud") || server === "reanime") {
-      const preferredServer = server.includes("2") ? "2" : q("preferredServer", "1");
+    if (server.startsWith("flixcloud")) {
       try {
-        const r = await cached(`flixcloud:${anilistId}:${episode}:${audio}:${preferredServer}:${title}`, 10 * 60e3, () =>
-          resolveFlixCloud({ anilistId, episode, audio, title, preferredServer })
+        const r = await cached(`flixcloud:${anilistId}:${episode}:${audio}:1:${title}`, 10 * 60e3, () =>
+          resolveFlixCloud({ anilistId, episode, audio, title, preferredServer: "1" })
         );
-        if (!r?.streamUrl) return json({ error: `No ${audio.toUpperCase()} stream found on FlixCloud ${preferredServer}` }, 404);
+        if (!r?.streamUrl) return json({ error: `No ${audio.toUpperCase()} stream found on FlixCloud` }, 404);
         return json({
           success: true,
-          server: r.server || (preferredServer === "2" ? "FlixCloud 2" : "FlixCloud 1"),
+          server: "FlixCloud",
           audio: r.audio,
           streamUrl: `/proxy?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://flixcloud.cc/")}`,
           subtitles: r.subtitles || [],
@@ -593,6 +593,37 @@ export async function handle(request, env) {
       const two = ["2", "abyss"].includes(q("server", "1").toLowerCase());
       const embedUrl = r.success ? (two ? r.abyssUrl || r.myStreamUrl || r.embedUrl : r.myStreamUrl || r.abyssUrl || r.embedUrl) : null;
       return embedUrl ? json({ success: true, embedUrl }, 200, 1800) : json({ success: false, error: r.error || "Not found on AnimeSalt" }, 404);
+    } catch (e) {
+      return json({ success: false, error: e.message }, 500);
+    }
+  }
+
+  if (path === "/api/embed/reanime") {
+    const anilistId = parseInt(q("id", "0"), 10);
+    const episode = parseInt(q("ep", "1"), 10) || 1;
+    const audio = q("audio", "sub").toLowerCase();
+    try {
+      const embedUrl = await cached(`embed:reanime:${anilistId}:${episode}:${audio}`, 30 * 60e3, () =>
+        resolveReanimeEmbed({ anilistId, episode, audio })
+      );
+      if (embedUrl) {
+        if (q("format") === "json" || request.headers.get("accept")?.includes("application/json")) {
+          return json({ success: true, embedUrl }, 200, 1800);
+        }
+        return new Response(
+          `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${embedUrl}"><script>location.replace(${JSON.stringify(embedUrl)})</script></head><body>Redirecting to <a href="${embedUrl}">ReAnime player</a>...</body></html>`,
+          {
+            status: 302,
+            headers: {
+              ...CORS,
+              Location: embedUrl,
+              "Content-Type": "text/html; charset=utf-8",
+              "Cache-Control": "public, max-age=1800",
+            },
+          }
+        );
+      }
+      return json({ success: false, error: "No ReAnime embed found for this episode" }, 404);
     } catch (e) {
       return json({ success: false, error: e.message }, 500);
     }

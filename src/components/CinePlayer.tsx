@@ -356,30 +356,30 @@ export default function CinePlayer({
       hls.current = h
       h.loadSource(noSeg ? streamUrl.replace('&seg=1', '') : streamUrl)
       h.attachMedia(v)
-      h.on(Hls.Events.MANIFEST_PARSED, (_, d) => {
+      h.on(Hls.Events.MANIFEST_PARSED, (_: any, d: any) => {
         setLevels(
           (d.levels || [])
-            .map((l, i) => ({ i, h: l.height || 0, label: l.height ? `${l.height}p` : `Level ${i + 1}` }))
-            .sort((a, b) => b.h - a.h),
+            .map((l: any, i: number) => ({ i, h: l.height || 0, label: l.height ? `${l.height}p` : `Level ${i + 1}` }))
+            .sort((a: any, b: any) => b.h - a.h),
         )
         // Profile → "Max quality": auto-switching stays on, it just never goes above the chosen height
         const cap = readMaxQuality()
-        const ok = cap ? (d.levels || []).map((l, i) => ({ i, h: l.height || 0 })).filter((l) => l.h && l.h <= cap).sort((a, b) => b.h - a.h) : []
+        const ok = cap ? (d.levels || []).map((l: any, i: number) => ({ i, h: l.height || 0 })).filter((l: any) => l.h && l.h <= cap).sort((a: any, b: any) => b.h - a.h) : []
         if (ok.length && h) h.autoLevelCapping = ok[0].i
         v.play().catch(() => {})
       })
       // Multi-audio streams (ACDN): list the renditions, restore the language picked last time
-      h.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, d) => {
-        const list = (d.audioTracks || []).map((t, i) => ({ i, label: t.name || t.lang || `Track ${i + 1}`, lang: t.lang || '' }))
+      h.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_: any, d: any) => {
+        const list = (d.audioTracks || []).map((t: any, i: number) => ({ i, label: t.name || t.lang || `Track ${i + 1}`, lang: t.lang || '' }))
         setAudioTracks(list)
         const want = readAlang().toLowerCase()
         const name = want.length === 2 ? (new Intl.DisplayNames(['en'], { type: 'language' }).of(want) ?? '').toLowerCase() : ''
-        const at = want ? list.find((t) => t.lang.toLowerCase() === want || t.label.toLowerCase() === want || (name && t.label.toLowerCase().includes(name))) : null
+        const at = want ? list.find((t: any) => t.lang.toLowerCase() === want || t.label.toLowerCase() === want || (name && t.label.toLowerCase().includes(name))) : null
         if (at && h && h.audioTrack !== at.i) h.audioTrack = at.i
         setAudioIdx(h ? h.audioTrack : 0)
       })
       h.on(Hls.Events.AUDIO_TRACK_SWITCHED, () => setAudioIdx(h ? h.audioTrack : 0))
-      h.on(Hls.Events.ERROR, (_, d) => {
+      h.on(Hls.Events.ERROR, (_: any, d: any) => {
         if (d.type === Hls.ErrorTypes.NETWORK_ERROR && h && !noSeg && streamUrl.includes('&seg=1')) {
           noSeg = true // ponytail: any network error on direct segments (referer/CORS) -> proxy everything, for the rest of the session
           h.loadSource(streamUrl.replace('&seg=1', ''))
