@@ -11,6 +11,7 @@ import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { Toaster } from './components/Toaster'
 import { MovieSearchModal } from './components/MovieSearchModal'
 import { SearchModal } from './components/SearchModal'
+import { ChangelogModal } from './components/ChangelogModal'
 import { useTrackHistory } from './lib/backToDetails'
 import { initAniListSync } from './lib/anilist'
 import { useApplyTvMode } from './lib/keys'
@@ -111,6 +112,7 @@ export default function App() {
       <Toaster />
       <ShortcutsHelp />
       <ShieldGate />
+      <ChangelogModal />
     </>
   )
 }
