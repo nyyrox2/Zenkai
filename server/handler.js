@@ -120,7 +120,7 @@ async function tmdbFor(anilistId, title, format) {
   if (!ref) return { map, tmdb: null };
 
   const d = await getJson(
-    `${TMDB}/${ref.type}/${ref.id}?language=en-US&append_to_response=images,videos,credits,external_ids,content_ratings,release_dates,episode_groups&include_image_language=en,null`,
+    `${TMDB}/${ref.type}/${ref.id}?language=en-US&append_to_response=images,videos,credits,external_ids,content_ratings,release_dates&include_image_language=en,null`,
   );
 
   const pngs = (d.images?.logos || []).filter((l) => l.file_path && !l.file_path.toLowerCase().endsWith(".svg"));
@@ -133,19 +133,6 @@ async function tmdbFor(anilistId, title, format) {
     d.release_dates?.results?.find((r) => r.iso_3166_1 === "US")?.release_dates?.find((x) => x.certification)?.certification ||
     null;
   const yt = (d.videos?.results || []).find((v) => v.site === "YouTube" && /trailer|teaser/i.test(v.type));
-
-  const rawGroups = d.episode_groups?.results || [];
-  const bestGroup =
-    rawGroups.find((g) => g.type === 2 && /no specials/i.test(g.name)) ||
-    rawGroups.find((g) => g.type === 2 && /absolute/i.test(g.name)) ||
-    rawGroups.find((g) => g.type === 2) ||
-    rawGroups.find((g) => /absolute/i.test(g.name)) ||
-    rawGroups.find((g) => /correct order/i.test(g.name)) ||
-    null;
-  const episodeGroupId = bestGroup?.id ?? null;
-  const seasonsList = (d.seasons || [])
-    .filter((s) => s.season_number > 0)
-    .map((s) => ({ season: s.season_number, episodeCount: s.episode_count }));
 
   return {
     map,
@@ -172,8 +159,6 @@ async function tmdbFor(anilistId, title, format) {
       runtime: d.episode_run_time?.[0] || d.runtime || null,
       cast: (d.credits?.cast || []).slice(0, 10).map((c) => ({ name: c.name, character: c.character, photo: c.profile_path })),
       trailer: yt ? yt.key : null,
-      episodeGroupId,
-      seasonsList,
     },
   };
 }
@@ -500,39 +485,49 @@ export async function handle(request, env) {
   if (path === "/api/tmdb/episodes") {
     const id = parseInt(q("id", "0"), 10);
     const season = parseInt(q("season", "1"), 10) || 1;
-    const group = q("group");
+    if (!id) return json({ error: "Missing id" }, 400);
 
-    if (group) {
+    if (season === 1) {
       try {
-        const d = await cached(`tmdb-eps-grp:${group}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/episode_group/${group}?language=en-US`));
-        const groups = d.groups || [];
-        const nonSpecials = groups.filter((g) => !/special/i.test(g.name || "") && g.order !== 0);
-        const pool = nonSpecials.length ? nonSpecials : groups;
-        let chosen = [];
-        if (pool.length === 1) {
-          chosen = pool[0].episodes || [];
-        } else {
-          const sorted = [...pool].sort((a, b) => (b.episodes?.length || 0) - (a.episodes?.length || 0));
-          const largest = sorted[0];
-          const second = sorted[1];
-          if (largest && (!second || (largest.episodes?.length || 0) > (second.episodes?.length || 0) * 2)) {
-            chosen = largest.episodes || [];
-          } else {
-            const inOrder = [...pool].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-            chosen = inOrder.flatMap((g) => g.episodes || []);
+        const eg = await cached(`tmdb-eg:${id}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/${id}/episode_groups`));
+        const groups = eg?.results || [];
+        const best =
+          groups.find((g) => g.type === 2 && /no specials/i.test(g.name)) ||
+          groups.find((g) => g.type === 2 && /absolute/i.test(g.name)) ||
+          groups.find((g) => g.type === 2) ||
+          groups.find((g) => /absolute|correct order/i.test(g.name));
+
+        if (best) {
+          const d = await cached(`tmdb-eps-grp:${best.id}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/episode_group/${best.id}?language=en-US`));
+          const pool = (d.groups || []).filter((g) => !/special/i.test(g.name || "") && g.order !== 0);
+          const list = pool.length ? pool : d.groups || [];
+          let chosen = [];
+          if (list.length === 1) {
+            chosen = list[0].episodes || [];
+          } else if (list.length > 1) {
+            const sorted = [...list].sort((a, b) => (b.episodes?.length || 0) - (a.episodes?.length || 0));
+            const largest = sorted[0];
+            const second = sorted[1];
+            if (largest && (!second || (largest.episodes?.length || 0) > (second.episodes?.length || 0) * 2)) {
+              chosen = largest.episodes || [];
+            } else {
+              const inOrder = [...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+              chosen = inOrder.flatMap((g) => g.episodes || []);
+            }
+          }
+          if (chosen.length > 0) {
+            const episodes = chosen.map((e) => {
+              const n = typeof e.order === "number" && e.order >= 0 ? e.order + 1 : Number(e.episode_number);
+              return { n, name: e.name || null, overview: e.overview || null, still: e.still_path || null, runtime: e.runtime || null, air: e.air_date || null };
+            });
+            return json({ success: true, episodes }, 200, 86400);
           }
         }
-        const episodes = chosen.map((e) => {
-          const n = typeof e.order === "number" && e.order >= 0 ? e.order + 1 : Number(e.episode_number);
-          return { n, name: e.name || null, overview: e.overview || null, still: e.still_path || null, runtime: e.runtime || null, air: e.air_date || null };
-        });
-        return json({ success: true, episodes }, 200, 86400);
       } catch {
-        return json({ success: false, episodes: [] }, 200, 300);
+        /* fallback to season 1 */
       }
     }
 
-    if (!id) return json({ error: "Missing id" }, 400);
     try {
       const d = await cached(`tmdb-eps:${id}:${season}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/${id}/season/${season}?language=en-US`));
       const episodes = (d.episodes || []).map((e) => ({ n: e.episode_number, name: e.name || null, overview: e.overview || null, still: e.still_path || null, runtime: e.runtime || null, air: e.air_date || null }));
