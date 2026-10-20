@@ -44,7 +44,6 @@ const PAGES: Array<[path: string, freq: string, priority: string]> = [
   ['/manga/browse', 'daily', '0.7'],
   ['/novel', 'daily', '0.9'],
   ['/app', 'monthly', '0.5'],
-  ['/self-host', 'monthly', '0.5'],
 ]
 
 /**

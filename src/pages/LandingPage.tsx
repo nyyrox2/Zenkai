@@ -5,7 +5,6 @@ import { cn } from '../lib/utils'
 import { AuroraBackground } from '../components/AuroraBackground'
 import { BlurText } from '../components/BlurText'
 import { DotPattern } from '../components/DotPattern'
-import { FreePlanNotice } from '../components/FreePlanNotice'
 import { FadeSlideshow } from '../components/FadeSlideshow'
 import { Logo } from '../components/Logo'
 import { ThemeToggle } from '../components/ThemeToggle'
@@ -77,8 +76,6 @@ export default function LandingPage() {
       </header>
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 py-5 sm:px-8 sm:py-8 lg:py-12">
-        <FreePlanNotice />
-
         <div className="text-center">
           <BlurText
             text="What are you in the mood for?"

@@ -91,7 +91,7 @@ npm run dev        # http://localhost:5173
 | `npm run build`   | Type-checks, then builds to `dist/`         |
 | `npm run preview` | Serves the production build locally         |
 
-`npm run dev` serves `/api/*` and `/proxy` through a Vite middleware, so there is nothing else to run. A step-by-step guide for phones, PCs and hosting lives at `/self-host` in the app.
+`npm run dev` serves `/api/*` and `/proxy` through a Vite middleware, so there is nothing else to run.
 
 ## Deploy your own
 
@@ -139,7 +139,7 @@ Copy `.env.example` to `.env` and adjust.
 
 ```
 src/
-  pages/        Landing, Home, Details, Catalog, Schedule, Watch, Manga, Novel, Movies, Profile, App, Self-host
+  pages/        Landing, Home, Details, Catalog, Schedule, Watch, Manga, Novel, Movies, Profile, App
   components/   Flat. CinePlayer.tsx + cineplayer.css is the video player
   services/     anilist.ts (GraphQL) · jikan.ts (MyAnimeList) · api.ts (Zenkai API client)
   hooks/        useAsync · useTmdb · useEpisodes · ...
@@ -204,7 +204,6 @@ Five servers, same as the Android app (`src/lib/mangaModels.ts` is a port of `Ma
 | `/novel` · `/novel/:source/:slug` | Novel browse and details, reader under `/read/:chapter` |
 | `/list` · `/profile`            | Your library and profile |
 | `/app`                          | Android app page: live release notes, APK download, install guide |
-| `/self-host`                    | Self-hosting guide |
 
 ## Contributing
 

@@ -3,13 +3,13 @@ import { useLocation } from 'react-router-dom'
 
 /**
  * Red page-load line (NProgress / YouTube style).
- * Runs on first load and on every route change: creeps toward ~85%, then snaps to 100% and fades out.
+ * Runs on every route change (the first load has the opening screen instead): creeps toward ~85%, then snaps to 100% and fades out.
  * Transform/opacity only, so it never causes layout work.
  */
 export function TopLoader() {
   const { pathname } = useLocation()
   const [w, setW] = useState(0)
-  const [show, setShow] = useState(true)
+  const [show, setShow] = useState(false) // the opening screen covers the very first load
   const timers = useRef<number[]>([])
   const first = useRef(true)
 
@@ -21,6 +21,11 @@ export function TopLoader() {
     const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms))
     clear()
 
+    if (first.current) {
+      first.current = false
+      return clear
+    }
+
     setShow(true)
     setW(0)
     at(30, () => setW(0.3))
@@ -28,23 +33,12 @@ export function TopLoader() {
     at(600, () => setW(0.75))
     at(1100, () => setW(0.85))
 
-    // finish once the page is ready (first load) or shortly after the route settles
-    const finish = () => {
+    // finish shortly after the route settles
+    at(700, () => {
       clear()
       setW(1)
       at(260, () => setShow(false))
-    }
-    if (first.current && document.readyState !== 'complete') {
-      first.current = false
-      window.addEventListener('load', finish, { once: true })
-      at(4000, finish)
-      return () => {
-        window.removeEventListener('load', finish)
-        clear()
-      }
-    }
-    first.current = false
-    at(700, finish)
+    })
     return clear
   }, [pathname])
 
