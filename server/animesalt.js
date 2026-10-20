@@ -94,9 +94,20 @@ export function getCandidateSlugs({
   if (mapped) {
     if (mapped.isMovie) {
       candidates.push(mapped.saltId);
+      candidates.push(`${mapped.saltId}-the-movie`);
+      candidates.push(`${mapped.saltId}-movie`);
     } else {
-      candidates.push(`${mapped.saltId}-${mapped.season}x${mapped.finalEp}`);
+      if (mapped.finalEp !== episode) {
+        candidates.push(`${mapped.saltId}-${mapped.season}x${episode}`);
+        candidates.push(`${mapped.saltId}-${mapped.season}x${mapped.finalEp}`);
+      } else {
+        candidates.push(`${mapped.saltId}-${mapped.season}x${episode}`);
+      }
       candidates.push(`${mapped.saltId}-1x${episode}`);
+      if (mapped.season > 1 && mapped.finalEp !== episode) {
+        candidates.push(`${mapped.saltId}-1x${mapped.finalEp}`);
+      }
+      candidates.push(`${mapped.saltId}-${episode}`);
       candidates.push(mapped.saltId);
     }
   }

@@ -271,11 +271,15 @@ async function findDekhoEpisodePage(title, season, episode, isMovie) {
   }
 }
 
-async function fromAnimeDekho({ title, season, episode, isMovie, saltId, slug }, lang) {
+async function fromAnimeDekho({ title, season, episode, finalEp = episode, isMovie, saltId, slugs = [] }, lang) {
   try {
     let epUrl = await findDekhoEpisodePage(title, season, episode, isMovie);
+    if (!epUrl && finalEp !== episode) {
+      epUrl = await findDekhoEpisodePage(title, season, finalEp, isMovie);
+    }
     if (!epUrl) {
-      for (const cand of [`${DEKHO}/epi/${saltId}-${season}x${episode}/`, `${DEKHO}/epi/${saltId}-1x${episode}/`, `${DEKHO}/epi/${slug}/`]) {
+      const candidates = slugs.map((s) => `${DEKHO}/epi/${s}/`);
+      for (const cand of candidates) {
         const html = await httpGet(cand, `${DEKHO}/`, DEKHO_COOKIE);
         if (html && html.length > 500) {
           epUrl = cand;
@@ -292,7 +296,7 @@ async function fromAnimeDekho({ title, season, episode, isMovie, saltId, slug },
     const iframes = [...epHtml.matchAll(/<iframe[^>]+src="([^"]+)"/gi)].map((m) => m[1].trim()).filter(usable);
     for (const src of iframes) {
       const r = await resolvePlayer(abs(src, epUrl), epUrl, lang);
-      if (r) return r;
+      if (r) return { ...r, slug: epUrl.match(/\/epi\/([^/]+)/)?.[1] || slugs[0] };
     }
 
     // post id from the body class, then the trdekho=0..4 player slots
@@ -306,7 +310,7 @@ async function fromAnimeDekho({ title, season, episode, isMovie, saltId, slug },
         const src = html?.match(/<iframe[^>]+src="([^"]+)"/i)?.[1]?.trim();
         if (!usable(src)) continue;
         const r = await resolvePlayer(abs(src, trUrl), trUrl, lang);
-        if (r) return r;
+        if (r) return { ...r, slug: epUrl.match(/\/epi\/([^/]+)/)?.[1] || slugs[0] };
       }
     }
   } catch {
@@ -322,32 +326,34 @@ function optionIframe(html, id, base) {
   return usable(u) ? abs(u, base) : null;
 }
 
-async function fromAnimeSalt({ saltId, slug, isMovie }, lang) {
-  const path = isMovie ? `/movies/${saltId}/` : `/episode/${slug}/`;
-  for (const mirror of SALT_MIRRORS) {
-    try {
-      const html = await httpGet(`${mirror}${path}`, `${mirror}/`);
-      if (!html) continue;
+async function fromAnimeSalt({ saltId, slugs = [], isMovie }, lang) {
+  for (const s of slugs) {
+    const path = isMovie ? `/movies/${s}/` : `/episode/${s}/`;
+    for (const mirror of SALT_MIRRORS) {
+      try {
+        const html = await httpGet(`${mirror}${path}`, `${mirror}/`);
+        if (!html) continue;
 
-      for (const opt of ["options-0", "options-1"]) {
-        const u = optionIframe(html, opt, mirror);
-        if (!u) continue;
-        const r = await resolvePlayer(u, `${mirror}/`, lang);
-        if (r) return r;
-      }
-
-      for (const m of html.matchAll(/loadMi\(\{\s*value:\s*'([^']+)'/gi)) {
-        try {
-          const src = decodeB64(m[1]).match(/<iframe[^>]*(?:data-src|src)=["']([^"']+)["']/i)?.[1]?.trim();
-          if (!usable(src)) continue;
-          const r = await resolvePlayer(abs(src, mirror), `${mirror}/`, lang);
-          if (r) return r;
-        } catch {
-          /* next button */
+        for (const opt of ["options-0", "options-1"]) {
+          const u = optionIframe(html, opt, mirror);
+          if (!u) continue;
+          const r = await resolvePlayer(u, `${mirror}/`, lang);
+          if (r) return { ...r, slug: s };
         }
+
+        for (const m of html.matchAll(/loadMi\(\{\s*value:\s*'([^']+)'/gi)) {
+          try {
+            const src = decodeB64(m[1]).match(/<iframe[^>]*(?:data-src|src)=["']([^"']+)["']/i)?.[1]?.trim();
+            if (!usable(src)) continue;
+            const r = await resolvePlayer(abs(src, mirror), `${mirror}/`, lang);
+            if (r) return { ...r, slug: s };
+          } catch {
+            /* next button */
+          }
+        }
+      } catch {
+        /* next mirror */
       }
-    } catch {
-      /* next mirror */
     }
   }
   return null;
@@ -363,6 +369,26 @@ export function resolveCandidate({ anilistId, episode = 1, title = "", isMovie =
   return { saltId, season: extractSeason(title), finalEp: episode, isMovie: !!isMovie, mapped: false };
 }
 
+export function getCandidateSlugsForAcdn({ saltId, season = 1, episode = 1, finalEp = episode, isMovie = false }) {
+  if (isMovie) {
+    return [saltId, `${saltId}-the-movie`, `${saltId}-movie`];
+  }
+  const slugs = [];
+  if (finalEp !== episode) {
+    slugs.push(`${saltId}-${season}x${episode}`);
+    slugs.push(`${saltId}-${season}x${finalEp}`);
+  } else {
+    slugs.push(`${saltId}-${season}x${episode}`);
+  }
+  slugs.push(`${saltId}-1x${episode}`);
+  if (season > 1 && finalEp !== episode) {
+    slugs.push(`${saltId}-1x${finalEp}`);
+  }
+  slugs.push(`${saltId}-${episode}`);
+  slugs.push(saltId);
+  return [...new Set(slugs)];
+}
+
 /**
  * Resolves the ACDN multi-audio stream for one episode.
  * Returns { streamUrl, referer, kind: 'hls' | 'file', mapped, slug } or null.
@@ -370,9 +396,25 @@ export function resolveCandidate({ anilistId, episode = 1, title = "", isMovie =
 export async function resolveAcdn({ anilistId, episode = 1, title = "", isMovie = false, lang = "" }) {
   const cand = resolveCandidate({ anilistId, episode, title, isMovie });
   if (!cand.saltId) return null;
-  const slug = cand.isMovie ? cand.saltId : `${cand.saltId}-${cand.season}x${cand.finalEp}`;
-  const ctx = { title, season: cand.season, episode: cand.finalEp, isMovie: cand.isMovie, saltId: cand.saltId, slug };
+  const slugs = getCandidateSlugsForAcdn({
+    saltId: cand.saltId,
+    season: cand.season,
+    episode,
+    finalEp: cand.finalEp,
+    isMovie: cand.isMovie,
+  });
+  const slug = slugs[0];
+  const ctx = {
+    title,
+    season: cand.season,
+    episode,
+    finalEp: cand.finalEp,
+    isMovie: cand.isMovie,
+    saltId: cand.saltId,
+    slug,
+    slugs,
+  };
 
   const hit = (await fromAnimeDekho(ctx, lang)) || (await fromAnimeSalt(ctx, lang));
-  return hit ? { ...hit, mapped: cand.mapped, slug } : null;
+  return hit ? { ...hit, mapped: cand.mapped, slug: hit.slug || slug } : null;
 }
