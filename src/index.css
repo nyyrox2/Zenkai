@@ -360,3 +360,10 @@ html[data-tv] a:focus-visible, html[data-tv] button:focus-visible { box-shadow: 
 .zk-logofill .zk-lit { position: absolute; inset: 0; filter: none; animation: zk-logofill 4.5s ease-in-out infinite; }
 @keyframes zk-logofill { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @media (prefers-reduced-motion: reduce) { .zk-logofill .zk-lit { animation: none; } }
+
+/* Page loader: fades in, shadow breathes with the ghost's bob */
+.zk-pageload { animation: zk-fade 0.25s ease-out; }
+.zk-shadow { animation: zk-shadow 1.6s ease-in-out infinite; }
+@keyframes zk-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes zk-shadow { 0%, 100% { transform: scaleX(1); opacity: 0.5; } 50% { transform: scaleX(0.6); opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .zk-shadow, .zk-pageload { animation: none; } }

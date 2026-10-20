@@ -43,12 +43,24 @@ function captchaImage() {
 }
 
 /* ---------- challenge + token ---------- */
-async function challenge(request, secret) {
+// Captcha only when something looks off: the client says DevTools were opened (?cap=1), no UA / bot UA / no Accept-Language, or this IP keeps asking for challenges.
+const suspicious = (request, url) => {
+  const ua = request.headers.get("User-Agent") || "";
+  return (
+    url.searchParams.get("cap") === "1" ||
+    !ua ||
+    /bot|crawl|spider|headless|curl|wget|python|scrapy|httpclient|axios|node-fetch/i.test(ua) ||
+    !request.headers.get("Accept-Language") ||
+    (hits.get(`shield:${clientIp(request)}`)?.n ?? 0) > 12
+  );
+};
+
+async function challenge(request, secret, url) {
   const cid = crypto.randomUUID();
   const salt = hex(crypto.getRandomValues(new Uint8Array(8)));
   const t = Math.floor(Date.now() / 1000);
   const ih = await ipHash(request, secret);
-  const cap = 1; // Mandatory captcha check once per session
+  const cap = suspicious(request, url) ? 1 : 0;
   const { text, svg } = captchaImage();
   const capSig = await hmac(`cap:${cid}:${text}:${t}:${ih}`, secret);
   return {
@@ -114,7 +126,7 @@ export async function shield(request, env, path, json) {
   if (path === "/api/shield/challenge" || path === "/api/shield/verify") {
     const retry = limited(clientIp(request), "shield");
     if (retry) return json({ error: "Too many requests", retryAfter: retry }, 429);
-    if (path.endsWith("challenge")) return json(await challenge(request, secret));
+    if (path.endsWith("challenge")) return json(await challenge(request, secret, new URL(request.url)));
     if (request.method !== "POST") return json({ error: "Not available" }, 404);
     const out = await verify(await request.json().catch(() => null), request, secret);
     return out.token ? json({ success: true, ...out }) : json({ error: "Verification failed", code: out.code }, 403);

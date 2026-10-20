@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Ban, Loader2, ShieldAlert, ShieldCheck } from 'lucide-react'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { ShieldAlert, ShieldCheck } from 'lucide-react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { submitCaptcha, useShield } from '../lib/shield'
 import { cn } from '../lib/utils'
 import { BorderBeam } from './BorderBeam'
@@ -85,6 +86,12 @@ function CaptchaForm({ svg, error }: { svg: string; error: boolean }) {
 /** Mounted once in App. Renders nothing until DevTools / a bot is detected, or the server asks for a captcha. */
 export function ShieldGate() {
   const { devtools, bot, captcha } = useShield()
+  const navigate = useNavigate()
+  const { pathname, search } = useLocation()
+  // DevTools open: send them to the roast page (it sends them back once they close); it remembers where they were.
+  useEffect(() => {
+    if (devtools && !bot && pathname !== '/busted') navigate('/busted', { state: { from: pathname + search } })
+  }, [devtools, bot, pathname, search, navigate])
 
   return (
     <AnimatePresence>
@@ -92,19 +99,6 @@ export function ShieldGate() {
         <Backdrop key="bot" z={400}>
           <Card icon={<ShieldAlert className="size-8" />} title="Automated Access Denied" tone="danger">
             <p className="mt-2 text-sm leading-relaxed text-muted">Headless bots and scrapers can't use Zenkai.</p>
-          </Card>
-        </Backdrop>
-      ) : devtools ? (
-        <Backdrop key="dev" z={300}>
-          <Card icon={<Ban className="size-8" />} title="Developer Tools Detected" tone="danger">
-            <p className="mt-2 text-sm leading-relaxed text-muted">
-              Inspection tools are restricted on Zenkai to protect media streams.
-              <br />
-              <strong className="text-foreground">Close Developer Tools to continue.</strong>
-            </p>
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-border bg-card-2 px-4 py-2 text-xs font-bold text-muted">
-              <Loader2 className="size-3.5 animate-spin" /> Waiting for Developer Tools to close…
-            </div>
           </Card>
         </Backdrop>
       ) : captcha ? (

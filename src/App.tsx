@@ -7,6 +7,7 @@ import { Navbar } from './components/Navbar'
 import { ScrollProgress } from './components/ScrollProgress'
 import { ScrollToTop } from './components/ScrollToTop'
 import { TopLoader } from './components/TopLoader'
+import { PageLoader } from './components/PageLoader'
 import { ShieldGate } from './components/ShieldGate'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { Toaster } from './components/Toaster'
@@ -43,6 +44,7 @@ const MovieWatchPage = lazy(() => import('./pages/MovieWatchPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const AniListCallbackPage = lazy(() => import('./pages/AniListCallbackPage'))
 const FindPage = lazy(() => import('./pages/FindPage'))
+const BustedPage = lazy(() => import('./pages/BustedPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 export default function App() {
@@ -51,7 +53,7 @@ export default function App() {
   const gate = pathname === '/'
   const reader = isReaderPath(pathname) // Novel / manga readers are full-screen too
   const guide = pathname === '/self-host' // the self-hosting guide has its own slim header
-  const bare = gate || reader || guide || isWatchPath(pathname)
+  const bare = gate || pathname === '/busted' || reader || guide || isWatchPath(pathname)
   const section = sectionOf(pathname)
 
   useTrackHistory()
@@ -71,7 +73,7 @@ export default function App() {
       <ScrollToTop />
       {!bare && !isDetailsPath(pathname) && <Navbar />}
       <ErrorBoundary resetKey={pathname}>
-      <Suspense fallback={<div className="min-h-[70svh]" />}>
+      <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/home" element={<HomePage />} />
@@ -104,6 +106,7 @@ export default function App() {
           <Route path="/watch/:id" element={<WatchPage />} />
           <Route path="/anime/:id" element={<DetailsPage />} />
           <Route path="/mal/:id" element={<DetailsPage />} />
+          <Route path="/busted" element={<BustedPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>

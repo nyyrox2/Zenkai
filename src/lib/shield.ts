@@ -82,11 +82,14 @@ export function submitCaptcha(a: string) {
   set({ captcha: null })
 }
 
+// Set once DevTools have been seen: the next token then has to come with a captcha.
+let flagged = false
+
 async function fetchToken(): Promise<string | null> {
   try {
     let wrong = false
     for (let tries = 0; tries < 6; tries++) {
-      const { svg, ...c } = await (await nativeFetch(`${API}/api/shield/challenge`)).json()
+      const { svg, ...c } = await (await nativeFetch(`${API}/api/shield/challenge${flagged || state.bot ? '?cap=1' : ''}`)).json()
       if (c.off) {
         off = true
         set({ verified: true })
@@ -218,6 +221,7 @@ function checkDevTools() {
   if (open !== state.devtools) {
     set({ devtools: open })
     if (open) {
+      flagged = true
       forget()
       haltAllMedia()
     }
