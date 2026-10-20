@@ -6,7 +6,7 @@ import { GhostBuddy } from './GhostBuddy'
 import { ShimmerButton } from './ShimmerButton'
 import { cn } from '../lib/utils'
 
-export type ErrorKind = 'notfound' | 'server' | 'offline' | 'crash'
+export type ErrorKind = 'notfound' | 'server' | 'offline' | 'crash' | 'empty'
 
 const COPY: Record<ErrorKind, { digits?: [string, string]; title: string; text: string; lines: string[] }> = {
   notfound: {
@@ -25,6 +25,11 @@ const COPY: Record<ErrorKind, { digits?: [string, string]; title: string; text: 
     title: 'No signal',
     text: 'You seem to be offline. Check your connection and try again.',
     lines: ['Hello? Anyone there?', 'The wifi ghosted us.', 'Check your connection!'],
+  },
+  empty: {
+    title: 'Nothing to show yet',
+    text: 'No images turned up for this one.',
+    lines: ['Pretty empty in here...', 'I checked every corner.', 'Maybe check back later?', 'Not a single picture. Rude.'],
   },
   crash: {
     title: 'Something broke',
