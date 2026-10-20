@@ -1846,13 +1846,28 @@
             "startEpisode": 1
         }
     ],
-    "97940": [
-        {
-            "saltId": "black-clover",
-            "season": 1,
-            "startEpisode": 1
-        }
-    ],
+   "97940": [
+    {
+        "saltId": "black-clover",
+        "season": 1,
+        "startEpisode": 1
+    },
+    {
+        "saltId": "black-clover",
+        "season": 2,
+        "startEpisode": 52
+    },
+    {
+        "saltId": "black-clover",
+        "season": 3,
+        "startEpisode": 103
+    },
+    {
+        "saltId": "black-clover",
+        "season": 4,
+        "startEpisode": 155
+    }
+],
     "173584": [
         {
             "saltId": "the-strongest-magician-in-the-demon-lords-army-was-a-human",
