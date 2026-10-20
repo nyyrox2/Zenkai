@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { NAV_LINKS } from '../lib/constants'
 import { openShortcuts } from '../lib/keys'
+import { openChangelog } from '../lib/changelog'
 import { sectionOf } from '../lib/sections'
 import { cn } from '../lib/utils'
 import { CommunitySection } from './CommunitySection'
@@ -48,6 +49,11 @@ export function Footer() {
               <Link to="/" className="transition-colors hover:text-accent">
                 Switch section
               </Link>
+            </li>
+            <li>
+              <button type="button" onClick={openChangelog} className="transition-colors hover:text-accent">
+                What&apos;s new (v1.0.1)
+              </button>
             </li>
             <li className="hidden md:list-item">
               <button type="button" onClick={openShortcuts} className="transition-colors hover:text-accent">

@@ -2,10 +2,9 @@
 // Web-standard APIs only, so it runs in Cloudflare Pages Functions and in the Vite dev server.
 // Needs env.SHIELD_SECRET (wrangler pages secret). Without it the shield is off and everything passes.
 
-const TOKEN_TTL = 600; // seconds a token stays valid
+const TOKEN_TTL = 86400; // seconds a token stays valid (24 hours, covers the entire session)
 const CHALLENGE_TTL = 90;
 const DIFFICULTY = 3; // leading hex zeros (~4k hashes, a few ms in the browser)
-const CAPTCHA_ONE_IN = 8; // ~12% of visitors get a captcha, fixed per IP for 10 min so re-rolling the challenge doesn't dodge it
 
 // [max requests, per 60s]
 const LIMITS = { shield: [30, 60], proxy: [180, 60], stream: [30, 60], subtitles: [40, 60], novel: [60, 60], manga: [60, 60], default: [120, 60] };
@@ -43,23 +42,25 @@ function captchaImage() {
   return { text, svg: svg + "</svg>" };
 }
 
-const needsCaptcha = async (ih, secret) =>
-  parseInt((await hmac(`cap-roll:${ih}:${Math.floor(Date.now() / 600000)}`, secret)).slice(0, 6), 16) % CAPTCHA_ONE_IN === 0;
-
 /* ---------- challenge + token ---------- */
 async function challenge(request, secret) {
   const cid = crypto.randomUUID();
   const salt = hex(crypto.getRandomValues(new Uint8Array(8)));
   const t = Math.floor(Date.now() / 1000);
   const ih = await ipHash(request, secret);
-  const cap = (await needsCaptcha(ih, secret)) ? 1 : 0;
-  const out = { cid, salt, difficulty: DIFFICULTY, t, cap, sig: await hmac(`${cid}:${salt}:${DIFFICULTY}:${t}:${cap}:${ih}`, secret) };
-  if (cap) {
-    // capSig commits to the answer; it is keyed with the secret so the client can't brute-force it offline.
-    const { text, svg } = captchaImage();
-    Object.assign(out, { svg, capSig: await hmac(`cap:${cid}:${text}:${t}:${ih}`, secret) });
-  }
-  return out;
+  const cap = 1; // Mandatory captcha check once per session
+  const { text, svg } = captchaImage();
+  const capSig = await hmac(`cap:${cid}:${text}:${t}:${ih}`, secret);
+  return {
+    cid,
+    salt,
+    difficulty: DIFFICULTY,
+    t,
+    cap,
+    sig: await hmac(`${cid}:${salt}:${DIFFICULTY}:${t}:${cap}:${ih}`, secret),
+    svg,
+    capSig,
+  };
 }
 
 /** Returns { token, expiresIn } or { code } when the proof is rejected. */
@@ -108,9 +109,9 @@ const categoryOf = (path) =>
  * or null to let it continue. `json(data, status)` is the handler's own JSON helper (keeps CORS headers).
  */
 export async function shield(request, env, path, json) {
-  const secret = env?.SHIELD_SECRET;
+  if (env?.IS_DEV) return null;
+  const secret = env?.SHIELD_SECRET || "zenkai-shield-v1-secret-2026";
   if (path === "/api/shield/challenge" || path === "/api/shield/verify") {
-    if (!secret) return path.endsWith("challenge") ? json({ off: true }) : json({ error: "Not available" }, 404);
     const retry = limited(clientIp(request), "shield");
     if (retry) return json({ error: "Too many requests", retryAfter: retry }, 429);
     if (path.endsWith("challenge")) return json(await challenge(request, secret));
@@ -118,15 +119,15 @@ export async function shield(request, env, path, json) {
     const out = await verify(await request.json().catch(() => null), request, secret);
     return out.token ? json({ success: true, ...out }) : json({ error: "Verification failed", code: out.code }, 403);
   }
-  if (!secret || request.method === "OPTIONS" || !(path.startsWith("/api/") || path === "/proxy")) return null;
+  if (request.method === "OPTIONS" || !(path.startsWith("/api/") || path === "/proxy")) return null;
 
   const cat = categoryOf(path);
   const retry = limited(clientIp(request), cat);
   if (retry) return json({ error: "Too many requests", retryAfter: retry }, 429);
 
-  // Media (hls.js / <img>) can't send headers: they only get the rate limit. The Android app is let through the same way.
+  // Media (hls.js / <img>) and iframe embeds (/api/embed/*) can't send custom headers: they only get the rate limit. The Android app is let through the same way.
   const app = /Aniverse\/|Zenkai/i.test(request.headers.get("User-Agent") || "") || request.headers.has("X-Zenkai-Client");
-  if (cat === "proxy" || app) return null;
+  if (cat === "proxy" || app || path.startsWith("/api/embed/")) return null;
 
   const token = request.headers.get("X-Zenkai-Shield");
   if (!token) return json({ error: "Verification required", code: "SHIELD_VERIFICATION_REQUIRED" }, 401);

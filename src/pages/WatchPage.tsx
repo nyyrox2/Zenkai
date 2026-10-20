@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
-import { AlertTriangle, ChevronLeft, ChevronRight, Info } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Info, Lock } from 'lucide-react'
 import { fetchAnimeLite } from '../services/anilist'
 import { acdnMapped, fetchAnimeSalt, fetchStream } from '../services/api'
 import { useAsync } from '../hooks/useAsync'
@@ -24,6 +24,8 @@ import { Skeleton } from '../components/Skeleton'
 import { LoadingGrid } from '../components/LoadingGrid'
 import { Tour, tourDone, tourSeen, type TourStep } from '../components/Tour'
 import { ServerPopup, type ServerOpt } from '../components/ServerPopup'
+import { useShieldVerified, getToken } from '../lib/shield'
+import { BorderBeam } from '../components/BorderBeam'
 
 
 function Frame({ children }: { children: React.ReactNode }) {
@@ -67,6 +69,12 @@ export default function WatchPage() {
   const [autoSkip, setAutoSkip] = useFlag('zk:autoskip', false)
   const [skipFiller, setSkipFiller] = useFlag('zk:skipfiller', false)
 
+  const sessionVerified = useShieldVerified()
+  useEffect(() => {
+    if (!sessionVerified) {
+      void getToken()
+    }
+  }, [sessionVerified])
   const [loadKind, setLoadKind] = useState<'episode' | 'server'>('episode')
   const [aud, setAud] = useState<{ tracks: { i: number; label: string; lang: string }[]; active: number }>({ tracks: [], active: 0 })
   const [tourOn, setTourOn] = useState(false)
@@ -116,10 +124,23 @@ export default function WatchPage() {
     [id, bundle, a, ep, audio],
   )
 
-  const stream = useAsync(async () => (a && server.kind === 'direct' ? fetchStream({ id, ep, server: server.id, audio, title, format: a.format }) : null), [a?.id, ep, server.id, audio])
-  const salt = useAsync(async () => (a && server.kind === 'animesalt' ? fetchAnimeSalt({ id, ep, title, format: a.format, server: server.salt ?? '1' }) : null), [a?.id, ep, server.id])
+  const stream = useAsync(
+    async () => (a && sessionVerified && server.kind === 'direct' ? fetchStream({ id, ep, server: server.id, audio, title, format: a.format }) : null),
+    [a?.id, ep, server.id, audio, sessionVerified],
+  )
+  const salt = useAsync(
+    async () => (a && sessionVerified && server.kind === 'animesalt' ? fetchAnimeSalt({ id, ep, title, format: a.format, server: server.salt ?? '1' }) : null),
+    [a?.id, ep, server.id, sessionVerified],
+  )
+  // Keep the player mounted across episode / audio changes: last good stream stays until the new one lands
+  const [held, setHeld] = useState<{ d: NonNullable<typeof stream.data>; ep: number; audio: 'sub' | 'dub'; sid: string } | null>(null)
+  useEffect(() => {
+    if (stream.data) setHeld({ d: stream.data, ep, audio, sid: server.id })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.data])
+  const cur = stream.data ? { d: stream.data, ep, audio } : held && held.sid === server.id && !stream.error ? held : null
   const serverBusy = loadKind === 'server' && (stream.loading || salt.loading)
-  const embedSrc = server.kind === 'embed' ? (server.url?.(ctx) ?? null) : null
+  const embedSrc = sessionVerified && server.kind === 'embed' ? (server.url?.(ctx) ?? null) : null
 
   useEffect(() => {
     if (a) saveEpisode(id, ep)
@@ -176,12 +197,25 @@ export default function WatchPage() {
       <div className="mx-auto max-w-7xl lg:px-6 lg:pt-6">
         <div className="min-w-0">
           {/* Player */}
-          {!a ? (
+          {!sessionVerified ? (
+            <Frame>
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
+                <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-xl shadow-black/50">
+                  <Lock className="size-8 animate-pulse" />
+                  <BorderBeam size={80} duration={4} />
+                </div>
+                <h3 className="font-display text-lg font-bold text-foreground">Media Playback Locked</h3>
+                <p className="mt-1.5 max-w-sm text-xs text-muted leading-relaxed">
+                  Verification challenge in progress. Complete the challenge to unlock high-speed streaming.
+                </p>
+              </div>
+            </Frame>
+          ) : !a ? (
             <Loading quiet={serverBusy} />
           ) : server.kind === 'direct' ? (
-            stream.loading ? (
+            !cur && stream.loading ? (
               <Loading quiet={serverBusy} />
-            ) : stream.error || !stream.data ? (
+            ) : !cur ? (
               <Problem message={stream.error?.message ?? 'No stream found.'}>
                 {directList.filter((s) => s.id !== server.id).map((s) => (
                   <button key={s.id} onClick={() => go({ server: s.id })} className={cn(pill, 'border-white/20 bg-white/10 text-white')}>
@@ -200,18 +234,19 @@ export default function WatchPage() {
             ) : (
               <Frame>
                 <CinePlayer
-                  key={`${server.id}-${audio}-${ep}`}
-                  streamUrl={stream.data.streamUrl}
-                  intro={stream.data.intro}
-                  outro={stream.data.outro}
+                  key={server.id}
+                  switching={stream.loading}
+                  streamUrl={cur.d.streamUrl}
+                  intro={cur.d.intro}
+                  outro={cur.d.outro}
                   title={title}
-                  episode={ep}
+                  episode={cur.ep}
                   totalEpisodes={total}
                   availableEpisodes={available}
                   animeId={id}
                   format={a.format}
-                  directSubtitles={stream.data.subtitles.map((s, i) => ({ id: `s${i}`, label: s.label, lang: s.label, url: s.file }))}
-                  audioMode={audio}
+                  directSubtitles={cur.d.subtitles.map((s, i) => ({ id: `s${i}`, label: s.label, lang: s.label, url: s.file }))}
+                  audioMode={cur.audio}
                   onAudio={(m) => go({ audio: m })}
                   onAudioTracks={(tracks, active) => setAud({ tracks, active })}
                   audioSel={audSel}
@@ -228,7 +263,7 @@ export default function WatchPage() {
                   skipFiller={skipFiller}
                   onSkipFiller={setSkipFiller}
                   onSelectEpisode={(n) => go({ ep: n }, false)}
-                  onProgress={(pos, dur) => touchHistory(mediaToCard(a), { ep, server: server.id, audio, pos, dur })}
+                  onProgress={(pos, dur) => touchHistory(mediaToCard(a), { ep: cur.ep, server: server.id, audio, pos, dur })}
                   onEnded={() => {
                     finishEpisode(mediaToCard(a), ep, hasNext)
                     if (autoNext && next) go({ ep: next }, false)
@@ -367,7 +402,7 @@ export default function WatchPage() {
           {/* Episodes */}
           {a && available > 0 && (
             <section data-tour="w-eps" className="mt-8" aria-label="Episodes">
-              <EpisodeList total={total} available={available} current={ep} hrefFor={hrefFor} info={eps} kinds={kinds} fallbackImg={a.bannerImage ?? a.coverImage.extraLarge} defaultRuntime={a.duration} />
+              <EpisodeList total={total} available={available} current={ep} hrefFor={hrefFor} onPick={() => setLoadKind('episode')} info={eps} kinds={kinds} fallbackImg={a.bannerImage ?? a.coverImage.extraLarge} defaultRuntime={a.duration} />
             </section>
           )}
         </div>

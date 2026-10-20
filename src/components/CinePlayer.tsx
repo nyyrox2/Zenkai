@@ -6,6 +6,7 @@ import {
   Server, Settings, SkipBack, SkipForward, Upload, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { apiUrl } from '../services/api'
+import { LoadingGrid } from './LoadingGrid'
 import { Tour, tourDone, tourSeen, type TourStep } from './Tour'
 import { gpuSupported, startUpscale } from '../lib/upscale'
 import { findActiveCue, parseSubtitleText, type Cue } from '../lib/subtitles'
@@ -132,6 +133,8 @@ export interface CinePlayerProps {
   episodeKind?: 'filler' | 'mixed' | 'recap'
   skipFiller?: boolean
   onSkipFiller?: (v: boolean) => void
+  /** next episode's stream is being fetched; the player stays mounted (and fullscreen) meanwhile */
+  switching?: boolean
 }
 
 const PLAYER_TOUR: TourStep[] = [
@@ -230,7 +233,7 @@ export default function CinePlayer({
   directSubtitles = [], audioMode = 'sub', onAudio, onAudioTracks, audioSel, tourReady = true, servers, serverId, onServer,
   hasNextEpisode = false, hasPrevEpisode = false, onNextEpisode, onPrevEpisode, onSelectEpisode, onEnded, onProgress,
   autoNext = true, onAutoNext, autoSkip = false, onAutoSkip,
-  nextEpisode, episodeKind, skipFiller = false, onSkipFiller,
+  nextEpisode, episodeKind, skipFiller = false, onSkipFiller, switching = false,
 }: CinePlayerProps) {
   const vid = useRef<HTMLVideoElement>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -356,30 +359,30 @@ export default function CinePlayer({
       hls.current = h
       h.loadSource(noSeg ? streamUrl.replace('&seg=1', '') : streamUrl)
       h.attachMedia(v)
-      h.on(Hls.Events.MANIFEST_PARSED, (_, d) => {
+      h.on(Hls.Events.MANIFEST_PARSED, (_: any, d: any) => {
         setLevels(
           (d.levels || [])
-            .map((l, i) => ({ i, h: l.height || 0, label: l.height ? `${l.height}p` : `Level ${i + 1}` }))
-            .sort((a, b) => b.h - a.h),
+            .map((l: any, i: number) => ({ i, h: l.height || 0, label: l.height ? `${l.height}p` : `Level ${i + 1}` }))
+            .sort((a: any, b: any) => b.h - a.h),
         )
         // Profile → "Max quality": auto-switching stays on, it just never goes above the chosen height
         const cap = readMaxQuality()
-        const ok = cap ? (d.levels || []).map((l, i) => ({ i, h: l.height || 0 })).filter((l) => l.h && l.h <= cap).sort((a, b) => b.h - a.h) : []
+        const ok = cap ? (d.levels || []).map((l: any, i: number) => ({ i, h: l.height || 0 })).filter((l: any) => l.h && l.h <= cap).sort((a: any, b: any) => b.h - a.h) : []
         if (ok.length && h) h.autoLevelCapping = ok[0].i
         v.play().catch(() => {})
       })
       // Multi-audio streams (ACDN): list the renditions, restore the language picked last time
-      h.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, d) => {
-        const list = (d.audioTracks || []).map((t, i) => ({ i, label: t.name || t.lang || `Track ${i + 1}`, lang: t.lang || '' }))
+      h.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_: any, d: any) => {
+        const list = (d.audioTracks || []).map((t: any, i: number) => ({ i, label: t.name || t.lang || `Track ${i + 1}`, lang: t.lang || '' }))
         setAudioTracks(list)
         const want = readAlang().toLowerCase()
         const name = want.length === 2 ? (new Intl.DisplayNames(['en'], { type: 'language' }).of(want) ?? '').toLowerCase() : ''
-        const at = want ? list.find((t) => t.lang.toLowerCase() === want || t.label.toLowerCase() === want || (name && t.label.toLowerCase().includes(name))) : null
+        const at = want ? list.find((t: any) => t.lang.toLowerCase() === want || t.label.toLowerCase() === want || (name && t.label.toLowerCase().includes(name))) : null
         if (at && h && h.audioTrack !== at.i) h.audioTrack = at.i
         setAudioIdx(h ? h.audioTrack : 0)
       })
       h.on(Hls.Events.AUDIO_TRACK_SWITCHED, () => setAudioIdx(h ? h.audioTrack : 0))
-      h.on(Hls.Events.ERROR, (_, d) => {
+      h.on(Hls.Events.ERROR, (_: any, d: any) => {
         if (d.type === Hls.ErrorTypes.NETWORK_ERROR && h && !noSeg && streamUrl.includes('&seg=1')) {
           noSeg = true // ponytail: any network error on direct segments (referer/CORS) -> proxy everything, for the rest of the session
           h.loadSource(streamUrl.replace('&seg=1', ''))
@@ -402,8 +405,24 @@ export default function CinePlayer({
       setBusy(false)
     }
 
+    const onHalt = () => {
+      try {
+        if (h) {
+          h.stopLoad()
+          h.destroy()
+        }
+        hls.current = null
+        v.pause()
+        v.removeAttribute('src')
+        v.load()
+        setBusy(false)
+      } catch {}
+    }
+    window.addEventListener('zenkai:devtools-halt', onHalt)
+
     const t = window.setTimeout(() => setCard(false), 3800)
     return () => {
+      window.removeEventListener('zenkai:devtools-halt', onHalt)
       window.clearTimeout(t)
       v.removeEventListener('loadedmetadata', onMeta)
       if (h) h.destroy()
@@ -436,7 +455,10 @@ export default function CinePlayer({
   /** Fetch + parse a caption file; true when it produced cues. Stream captions need the player's referer, so try the proxy first, then the raw url. */
   const loadTrack = async (url: string | undefined, my: number, referer?: string): Promise<boolean> => {
     if (!url) return false
-    const proxied = apiUrl(`/api/proxy?url=${encodeURIComponent(url)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`)
+    const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname))
+    const streamProxy = !isDev ? (import.meta.env.VITE_STREAM_PROXY_URL as string | undefined)?.trim() : undefined
+    const proxyBase = streamProxy ? (streamProxy.includes('/proxy') ? streamProxy : `${streamProxy.replace(/\/+$/, '')}/api/public/proxy`) : apiUrl('/api/proxy')
+    const proxied = `${proxyBase}?url=${encodeURIComponent(url)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`
     for (const u of [proxied, url]) {
       try {
         const res = await fetch(u)
@@ -925,6 +947,7 @@ export default function CinePlayer({
 
       <div className="zp-in">
         {busy && !err && <div className="zp-spn" />}
+        {switching && <LoadingGrid label="Loading episode" className="pointer-events-none absolute bottom-16 left-4 z-30 text-white/70" />}
 
         {card && !err && (
           <div className="zp-card">

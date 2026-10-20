@@ -132,7 +132,73 @@ export async function tmdbDirect(anilistId: number, title: string, format?: stri
   return { mapping: map, tmdb }
 }
 
-export async function tmdbEpisodesDirect(tmdbId: number, season: number): Promise<{ n: number; name: string | null; overview: string | null; still: string | null; runtime: number | null; air: string | null }[]> {
-  const d = await get(`${TMDB}/tv/${tmdbId}/season/${season}?language=en-US`)
-  return (d.episodes || []).map((e: any) => ({ n: e.episode_number, name: e.name || null, overview: e.overview || null, still: e.still_path || null, runtime: e.runtime || null, air: e.air_date || null }))
+export async function tmdbEpisodesDirect(
+  tmdbId: number,
+  season: number,
+): Promise<{ n: number; name: string | null; overview: string | null; still: string | null; runtime: number | null; air: string | null }[]> {
+  // If requesting an explicit sequel season (e.g. season 2, 3), fetch that season directly
+  if (season > 1) {
+    const d = await get(`${TMDB}/tv/${tmdbId}/season/${season}?language=en-US`)
+    return (d.episodes || []).map((e: any) => ({
+      n: e.episode_number,
+      name: e.name || null,
+      overview: e.overview || null,
+      still: e.still_path || null,
+      runtime: e.runtime || null,
+      air: e.air_date || null,
+    }))
+  }
+
+  // For season 1 / main show: try to fetch absolute episode group first (gives all episodes for long-running shows)
+  try {
+    const eg = await get(`${TMDB}/tv/${tmdbId}/episode_groups`, 8000)
+    const groups: Array<{ id: string; name: string; type: number }> = eg?.results || []
+    const best =
+      groups.find((g) => g.type === 2 && /no specials/i.test(g.name)) ||
+      groups.find((g) => g.type === 2 && /absolute/i.test(g.name)) ||
+      groups.find((g) => g.type === 2) ||
+      groups.find((g) => /absolute|correct order/i.test(g.name))
+
+    if (best) {
+      const d = await get(`${TMDB}/tv/episode_group/${best.id}?language=en-US`, 12000)
+      const pool = (d.groups || []).filter((g: any) => !/special/i.test(g.name || '') && g.order !== 0)
+      const list = pool.length ? pool : d.groups || []
+      let eps: any[] = []
+      if (list.length === 1) {
+        eps = list[0].episodes || []
+      } else if (list.length > 1) {
+        const sorted = [...list].sort((a: any, b: any) => (b.episodes?.length || 0) - (a.episodes?.length || 0))
+        const largest = sorted[0]
+        const second = sorted[1]
+        if (largest && (!second || (largest.episodes?.length || 0) > (second.episodes?.length || 0) * 2)) {
+          eps = largest.episodes || []
+        } else {
+          const inOrder = [...list].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+          eps = inOrder.flatMap((g: any) => g.episodes || [])
+        }
+      }
+      if (eps.length > 0) {
+        return eps.map((e: any) => ({
+          n: typeof e.order === 'number' && e.order >= 0 ? e.order + 1 : Number(e.episode_number),
+          name: e.name || null,
+          overview: e.overview || null,
+          still: e.still_path || null,
+          runtime: e.runtime || null,
+          air: e.air_date || null,
+        }))
+      }
+    }
+  } catch {
+    /* fallback to standard season 1 */
+  }
+
+  const d = await get(`${TMDB}/tv/${tmdbId}/season/1?language=en-US`)
+  return (d.episodes || []).map((e: any) => ({
+    n: e.episode_number,
+    name: e.name || null,
+    overview: e.overview || null,
+    still: e.still_path || null,
+    runtime: e.runtime || null,
+    air: e.air_date || null,
+  }))
 }

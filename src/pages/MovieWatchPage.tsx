@@ -2,7 +2,7 @@ import { toast } from '../lib/toast'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
-import { ChevronLeft, ChevronRight, Loader2, TriangleAlert } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Lock, TriangleAlert } from 'lucide-react'
 import { BorderBeam } from '../components/BorderBeam'
 import { ErrorState } from '../components/ErrorState'
 import { ServerMenu } from '../components/ServerMenu'
@@ -11,6 +11,7 @@ import { Tabs } from '../components/Tabs'
 import { useAsync } from '../hooks/useAsync'
 import { cn } from '../lib/utils'
 import { fetchDetails, fetchEpisodes, fetchProviders, movieHref, resolveProvider, type MediaType } from '../services/movies'
+import { useShieldVerified, getToken } from '../lib/shield'
 
 const PREF = 'zk:movie-server:v1'
 const readPref = () => {
@@ -39,12 +40,19 @@ export default function MovieWatchPage() {
   const providerId = list.find((p) => p.id === params.get('p'))?.id ?? list.find((p) => p.id === readPref())?.id ?? list[0]?.id
   const provider = list.find((p) => p.id === providerId)
 
+  const [frameLoaded, setFrameLoaded] = useState(false)
+  const sessionVerified = useShieldVerified()
+  useEffect(() => {
+    if (!sessionVerified) {
+      void getToken()
+    }
+  }, [sessionVerified])
+
   const src = useAsync(
-    () => (providerId ? resolveProvider({ providerId, type, tmdbId: id, season, episode }) : Promise.resolve(null)),
-    [providerId, type, id, season, episode],
+    () => (sessionVerified && providerId ? resolveProvider({ providerId, type, tmdbId: id, season, episode }) : Promise.resolve(null)),
+    [sessionVerified, providerId, type, id, season, episode],
   )
 
-  const [frameLoaded, setFrameLoaded] = useState(false)
   useEffect(() => setFrameLoaded(false), [src.data])
   useEffect(() => {
     document.title = `${details.data?.title ?? 'Watch'} — Zenkai`
@@ -89,43 +97,58 @@ export default function MovieWatchPage() {
 
       {/* Player */}
       <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-border bg-black shadow-2xl shadow-black/30 sm:rounded-3xl">
-        {src.data && (
-          <iframe
-            key={src.data}
-            src={src.data}
-            title={title}
-            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-            allowFullScreen
-            referrerPolicy="origin"
-            onLoad={() => setFrameLoaded(true)}
-            className="absolute inset-0 size-full border-0"
-          />
-        )}
-        {(providers.loading || src.loading || (src.data && !frameLoaded)) && !src.error && !providers.error && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black text-white/80">
-            <span className="flex items-center gap-3 text-sm">
-              <Loader2 className="size-5 animate-spin" /> Loading {provider?.label ?? 'server'}…
-            </span>
-          </div>
-        )}
-        {(src.error || providers.error) && (
-          <div role="alert" className="absolute inset-0 grid place-items-center bg-black p-6 text-center text-white">
-            <div className="flex max-w-sm flex-col items-center gap-3">
-              <TriangleAlert className="size-7" />
-              <p className="text-sm text-white/80">{providers.error?.message ?? src.error?.message ?? 'This server did not load.'}</p>
-              {nextServer && nextServer.id !== providerId ? (
-                <button type="button" onClick={() => pick(nextServer.id)} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition active:scale-95">
-                  Try {nextServer.label}
-                </button>
-              ) : (
-                <button type="button" onClick={() => (providers.error ? providers.reload() : src.reload())} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition active:scale-95">
-                  Try again
-                </button>
-              )}
+        {!sessionVerified ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
+            <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-xl shadow-black/50">
+              <Lock className="size-8 animate-pulse" />
+              <BorderBeam size={80} duration={4} />
             </div>
+            <h3 className="font-display text-lg font-bold text-foreground">Media Playback Locked</h3>
+            <p className="mt-1.5 max-w-sm text-xs text-muted leading-relaxed">
+              Verification challenge in progress. Complete the challenge to unlock high-speed streaming.
+            </p>
           </div>
+        ) : (
+          <>
+            {src.data && (
+              <iframe
+                key={src.data}
+                src={src.data}
+                title={title}
+                allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                allowFullScreen
+                referrerPolicy="origin"
+                onLoad={() => setFrameLoaded(true)}
+                className="absolute inset-0 size-full border-0"
+              />
+            )}
+            {(providers.loading || src.loading || (src.data && !frameLoaded)) && !src.error && !providers.error && (
+              <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black text-white/80">
+                <span className="flex items-center gap-3 text-sm">
+                  <Loader2 className="size-5 animate-spin" /> Loading {provider?.label ?? 'server'}…
+                </span>
+              </div>
+            )}
+            {(src.error || providers.error) && (
+              <div role="alert" className="absolute inset-0 grid place-items-center bg-black p-6 text-center text-white">
+                <div className="flex max-w-sm flex-col items-center gap-3">
+                  <TriangleAlert className="size-7" />
+                  <p className="text-sm text-white/80">{providers.error?.message ?? src.error?.message ?? 'This server did not load.'}</p>
+                  {nextServer && nextServer.id !== providerId ? (
+                    <button type="button" onClick={() => pick(nextServer.id)} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition active:scale-95">
+                      Try {nextServer.label}
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => (providers.error ? providers.reload() : src.reload())} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition active:scale-95">
+                      Try again
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            <BorderBeam size={220} duration={10} />
+          </>
         )}
-        <BorderBeam size={220} duration={10} />
       </div>
 
       {/* Title + episode nav */}

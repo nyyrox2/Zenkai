@@ -128,7 +128,7 @@ export interface EpInfo {
 }
 
 const epMem = new Map<string, Promise<EpInfo[]>>()
-export function fetchTmdbEpisodes(tmdbId: number, season: number): Promise<EpInfo[]> {
+export function fetchTmdbEpisodes(tmdbId: number, season = 1): Promise<EpInfo[]> {
   const key = `${tmdbId}:${season}`
   const hit = epMem.get(key)
   if (hit) return hit

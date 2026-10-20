@@ -12,10 +12,36 @@ function parseTimestamp(str?: string): number {
   return -1
 }
 
-/** SRT + WebVTT parser. */
+/** SRT + WebVTT + ASS parser. */
 export function parseSubtitleText(content: string): Cue[] {
   if (!content) return []
   const cues: Cue[] = []
+
+  // Check if content is ASS / SSA format
+  if (content.includes('Dialogue:')) {
+    const lines = content.replace(/\r\n?/g, '\n').split('\n')
+    for (const raw of lines) {
+      const line = raw.trim()
+      if (!line.startsWith('Dialogue:')) continue
+      const rest = line.slice(9).trim()
+      const parts = rest.split(',')
+      if (parts.length < 10) continue
+      const start = parseTimestamp(parts[1])
+      const end = parseTimestamp(parts[2])
+      if (start < 0 || end <= start) continue
+      const text = parts
+        .slice(9)
+        .join(',')
+        .replace(/\{[^\}]*\}/g, '')
+        .replace(/\\N/gi, '\n')
+        .replace(/\\n/gi, '\n')
+        .replace(/\\h/gi, ' ')
+        .trim()
+      if (text) cues.push({ start, end, text })
+    }
+    if (cues.length) return cues
+  }
+
   const blocks = content.replace(/\r\n?/g, '\n').split(/\n\s*\n/)
   for (const block of blocks) {
     const lines = block.trim().split('\n')

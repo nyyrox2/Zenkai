@@ -28,6 +28,7 @@ export function EpisodeList({
   defaultRuntime,
   badge = 'Now playing',
   kinds,
+  onPick,
 }: {
   total: number
   /** highest episode that has aired */
@@ -40,6 +41,7 @@ export function EpisodeList({
   badge?: string
   /** filler / mixed / recap episodes, canon is absent */
   kinds?: Map<number, EpKind>
+  onPick?: (ep: number) => void
 }) {
   const pages = Math.ceil(total / PAGE)
   const [page, setPage] = useState(() => Math.max(0, Math.floor(((current ?? 1) - 1) / PAGE)))
@@ -178,7 +180,7 @@ export function EpisodeList({
             return (
               <li key={n}>
                 {aired ? (
-                  <Link to={hrefFor(n)} className={cls} aria-current={on ? 'true' : undefined}>
+                  <Link to={hrefFor(n)} onClick={() => onPick?.(n)} className={cls} aria-current={on ? 'true' : undefined}>
                     {body}
                   </Link>
                 ) : (

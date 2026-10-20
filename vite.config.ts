@@ -15,7 +15,7 @@ function zenkaiApi(): Plugin {
           const { handle } = await server.ssrLoadModule('/server/handler.js')
           const headers = new Headers()
           for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v)
-          const out: Response | null = await handle(new Request(`http://${req.headers.host}${url}`, { method: req.method, headers }), { SHIELD_SECRET: process.env.SHIELD_SECRET })
+          const out: Response | null = await handle(new Request(`http://${req.headers.host}${url}`, { method: req.method, headers }), { SHIELD_SECRET: process.env.SHIELD_SECRET, IS_DEV: true })
           if (!out) return next()
           res.writeHead(out.status, Object.fromEntries(out.headers))
           if (out.body) Readable.fromWeb(out.body as never).pipe(res)
@@ -65,6 +65,7 @@ function zenkaiSeo(): Plugin {
     transformIndexHtml: (html) => html.split('%SITE_URL%').join(SITE_URL),
     generateBundle() {
       const day = new Date().toISOString().slice(0, 10)
+  
       const urls = PAGES.map(
         ([path, freq, pr]) =>
           `  <url>\n    <loc>${SITE_URL}${path}</loc>\n    <lastmod>${day}</lastmod>\n    <changefreq>${freq}</changefreq>\n    <priority>${pr}</priority>${path === '/' ? `\n    <image:image>\n      <image:loc>${SITE_URL}/og-image.jpg</image:loc>\n      <image:title>Zenkai: watch anime and movies, read manga and novels</image:title>\n    </image:image>` : ''}\n  </url>`,
@@ -85,5 +86,10 @@ function zenkaiSeo(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), zenkaiApi(), zenkaiSeo()],
+  resolve: {
+    alias: {
+      'hls.js': 'hls.js/dist/hls.js',
+    },
+  },
   server: { host: true },
 })

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Footer } from './components/Footer'
 import { MobileDock } from './components/MobileDock'
 import { Navbar } from './components/Navbar'
@@ -11,6 +12,7 @@ import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { Toaster } from './components/Toaster'
 import { MovieSearchModal } from './components/MovieSearchModal'
 import { SearchModal } from './components/SearchModal'
+import { ChangelogModal } from './components/ChangelogModal'
 import { useTrackHistory } from './lib/backToDetails'
 import { initAniListSync } from './lib/anilist'
 import { useApplyTvMode } from './lib/keys'
@@ -68,6 +70,7 @@ export default function App() {
       {!bare && <ScrollProgress />}
       <ScrollToTop />
       {!bare && !isDetailsPath(pathname) && <Navbar />}
+      <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<div className="min-h-[70svh]" />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -104,6 +107,7 @@ export default function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
+      </ErrorBoundary>
       {!bare && <Footer />}
       {!bare && <MobileDock />}
       {!bare && section === 'anime' && <SearchModal />}
@@ -111,6 +115,7 @@ export default function App() {
       <Toaster />
       <ShortcutsHelp />
       <ShieldGate />
+      <ChangelogModal />
     </>
   )
 }

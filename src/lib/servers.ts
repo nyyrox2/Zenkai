@@ -30,13 +30,14 @@ const tv = (c: EmbedCtx, movie: (id: number) => string, show: (id: number, s: nu
 export const SERVERS: ServerDef[] = [
   { id: 'megaplay', name: 'MegaPlay', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true },
   { id: 'vidstream', name: 'Vidstream', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true },
+  { id: 'flixcloud', name: 'FlixCloud', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true },
   { id: 'acdn', name: 'ACDN', note: 'Direct HLS · Multi audio', kind: 'direct', audio: false, multi: true },
   { id: 'animesalt-1', name: 'AnimeSalt 1', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '1' },
   { id: 'animesalt-2', name: 'AnimeSalt 2', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '2' },
+  { id: 'reanime', name: 'ReAnime', note: 'Embed · AniList', kind: 'embed', audio: true, url: (c) => `/api/embed/reanime?id=${c.anilistId}&ep=${c.episode}&audio=${c.audio}` },
   { id: 'zokoanime', name: 'ZokoAnime', note: 'Embed · MAL', kind: 'embed', audio: true, url: (c) => (c.malId ? `https://zokoanime.video/stream/mal/${c.malId}/${c.episode}/${c.audio}?color=dc143c` : null) },
   { id: 'tryembed', name: 'TryEmbed', note: 'Embed · MAL', kind: 'embed', audio: true, url: (c) => (c.malId ? `https://tryembed.us.cc/embed/anime/mal/${c.malId}/${c.episode}/${c.audio}?skin=silicon&autoSkip=true` : null) },
   { id: 'vidnest', name: 'Vidnest', note: 'Embed · AniList', kind: 'embed', audio: true, url: (c) => `https://vidnest.fun/anime/${c.anilistId}/${c.episode}/${c.audio}` },
-  { id: 'recloud', name: 'ReCloud', note: 'Embed · AniList', kind: 'embed', audio: true, url: (c) => `https://cdn.4animo.xyz/embed/hd-2/ani/${c.anilistId}/${c.episode}/${c.audio}?k=1` },
   { id: 'yumezone', name: 'YumeZone', note: 'Embed · AniList', kind: 'embed', audio: true, url: (c) => `https://yumezone.qzz.io/embed/megaplay/ani/${c.anilistId}/${c.episode}/${c.audio}` },
   { id: 'vidzee', name: 'VidZee', note: 'Embed · TMDB', kind: 'embed', audio: false, url: (c) => tv(c, (i) => `https://player.vidzee.wtf/embed/movie/${i}?lang=en`, (i, s) => `https://player.vidzee.wtf/embed/tv/${i}/${s}/${c.episode}?lang=en`) },
   { id: 'vidlove', name: 'VidLove', note: 'Embed · TMDB', kind: 'embed', audio: false, url: (c) => tv(c, (i) => `https://player.vidlove.cc/embed/movie/${i}`, (i, s) => `https://player.vidlove.cc/embed/tv/${i}/${s}/${c.episode}`) },
@@ -45,7 +46,11 @@ export const SERVERS: ServerDef[] = [
   { id: '2embed', name: '2Embed', note: 'Embed · TMDB', kind: 'embed', audio: false, url: (c) => tv(c, (i) => `https://www.2embed.stream/embed/movie/${i}`, (i, s) => `https://www.2embed.stream/embed/tv/${i}/${s}/${c.episode}`) },
 ]
 
-export const serverById = (id: string) => SERVERS.find((s) => s.id === id) ?? SERVERS[0]
+export const serverById = (id: string) =>
+  SERVERS.find((s) => s.id === id) ??
+  (id === 'flixcloud-1' || id === 'flixcloud-2' ? SERVERS.find((s) => s.id === 'flixcloud') : undefined) ??
+  (id === 'recloud' ? SERVERS.find((s) => s.id === 'reanime') : undefined) ??
+  SERVERS[0]
 
 /** Direct (Zenkai player) servers; all are offered for both SUB and DUB. */
 export const DIRECT = SERVERS.filter((s) => s.kind === 'direct')

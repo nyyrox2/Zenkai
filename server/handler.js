@@ -1,6 +1,7 @@
 // One Web-standard handler shared by Cloudflare Pages Functions and the Vite dev server.
 // handle(request) -> Response | null (null = not an API route)
 import { resolveDirectStreamWorker } from "./direct-stream.js";
+import { resolveFlixCloud, resolveReanimeEmbed } from "./flixcloud.js";
 import { extractAnimeSaltPlayer } from "./animesalt.js";
 import { resolveAcdn } from "./acdn.js";
 import { validateProxyUrl } from "./ssrf.js";
@@ -192,11 +193,11 @@ function refererFor(host, requested) {
   if (/animeapps|nukitashi|playeng/.test(host)) return "https://playeng.animeapps.top/";
   if (/nexabloom|stellarfrontier|phantomharbor|shadowharbor|hiddenvertex|emeralddrift|eclipseharbor|megaplay|megap|shiora|akirax|imgnex/.test(host)) return "https://megaplay.buzz/";
   if (/animesalt|as-cdn|acdn\.top|ravok/.test(host)) return "https://animesalt.cx/";
-  if (/flixcloud|atomic4cdn|rundowncdn/.test(host)) return "https://flixcloud.cc/";
+  if (/flixcloud|atomic4cdn|rundowncdn|vividcdn|fallencdn|enc-dec/.test(host)) return "https://flixcloud.cc/";
   return requested || null;
 }
 
-async function proxy(request, url) {
+async function proxy(request, url, proxyBase = "/proxy") {
   const target = url.searchParams.get("url");
   const check = validateProxyUrl(target);
   if (!check.valid) return json({ error: check.error }, 403);
@@ -216,18 +217,25 @@ async function proxy(request, url) {
 
   const out = new Headers(CORS);
   const type = up.headers.get("Content-Type") || "";
-  const isPlaylist = /mpegurl/i.test(type) || /\.m3u8?$/i.test(t.pathname);
+  const isPlaylist =
+    /mpegurl/i.test(type) ||
+    /\.m3u8?$/i.test(t.pathname) ||
+    t.pathname.includes("parse-flixcloud") ||
+    (t.searchParams.get("url") || "").includes(".m3u8");
 
   if (up.ok && isPlaylist) {
     const text = await up.text();
     if (/^\s*</.test(text)) return new Response(text, { status: up.status, headers: out });
     const direct = url.searchParams.get("seg") === "1"; // segments straight from the CDN, only playlists/keys use the Worker
+    const base = t.hostname.includes("enc-dec.app") && t.searchParams.get("url")
+      ? new URL(t.searchParams.get("url"))
+      : t;
     const wrap = (u, keep) => {
       try {
-        const abs = new URL(u, t);
-        if (!abs.search && t.search) abs.search = t.search;
-        if (direct && keep) return abs.href;
-        return `/proxy?url=${encodeURIComponent(abs.href)}&referer=${encodeURIComponent(referer)}${direct ? "&seg=1" : ""}`;
+        const abs = new URL(u, base);
+        if (!abs.search && base.search && !u.includes("?")) abs.search = base.search;
+        if (direct && keep && !/rundowncdn|flixcloud|vividcdn|fallencdn/.test(abs.hostname)) return abs.href;
+        return `${proxyBase}?url=${encodeURIComponent(abs.href)}&referer=${encodeURIComponent(referer)}${direct ? "&seg=1" : ""}`;
       } catch {
         return u;
       }
@@ -242,7 +250,7 @@ async function proxy(request, url) {
           variant = s.startsWith("#EXT-X-STREAM-INF");
           return s.replace(/URI=["']([^"']+)["']/g, (_, u) => `URI="${wrap(u, s.startsWith("#EXT-X-MAP"))}"`);
         }
-        const plist = variant || /\.m3u8?(\?|$)/i.test(s);
+        const plist = variant || /\.m3u8?(\?|$)/i.test(s) || s.includes("parse-flixcloud");
         variant = false;
         return wrap(s, !plist);
       })
@@ -253,11 +261,12 @@ async function proxy(request, url) {
   }
 
   if (type) out.set("Content-Type", type);
+  if (/\.(bin|key)$/i.test(t.pathname)) out.set("Content-Type", "application/octet-stream");
   for (const h of ["Content-Length", "Content-Range", "Accept-Ranges"]) {
     const v = up.headers.get(h);
     if (v) out.set(h, v);
   }
-  if (up.ok && /\.(ts|m4s|mp4|aac|key)$/i.test(t.pathname)) out.set("Cache-Control", "public, max-age=3600");
+  if (up.ok && /\.(ts|m4s|mp4|aac|key|bin|png|webp)$/i.test(t.pathname)) out.set("Cache-Control", "public, max-age=3600");
   return new Response(up.body, { status: up.status, headers: out });
 }
 
@@ -349,7 +358,31 @@ const slugVariants = (t) => {
   return [t, base, base.replace(/\s*:.*$/, ""), base.replace(/^the\s+/i, ""), base.replace(/uu/gi, "u")].map(slugOf);
 };
 
+function getProxyBase(request, env) {
+  // Never use external proxy when running on dev/local server
+  if (env?.IS_DEV) return "/proxy";
+  try {
+    const host = new URL(request.url).hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1" || host.endsWith(".local")) {
+      return "/proxy";
+    }
+  } catch {}
+
+  let p = env?.STREAM_PROXY_URL || env?.VITE_STREAM_PROXY_URL || globalThis.process?.env?.STREAM_PROXY_URL || globalThis.process?.env?.VITE_STREAM_PROXY_URL || "";
+  p = p.trim().replace(/\/+$/, "");
+  if (!p) return "/proxy";
+  try {
+    const parsed = new URL(p);
+    if (!parsed.pathname || parsed.pathname === "/" || parsed.pathname === "") {
+      parsed.pathname = "/api/public/proxy";
+      p = parsed.href.replace(/\/+$/, "");
+    }
+  } catch {}
+  return p;
+}
+
 export async function handle(request, env) {
+  const proxyBase = getProxyBase(request, env);
   const url = new URL(request.url);
   const path = url.pathname;
   const q = (k, d = "") => url.searchParams.get(k) ?? d;
@@ -360,7 +393,7 @@ export async function handle(request, env) {
   const blocked = await shield(request, env, path, json);
   if (blocked) return blocked;
 
-  if (path === "/proxy" || path === "/api/proxy") return proxy(request, url);
+  if (path === "/proxy" || path === "/api/proxy") return proxy(request, url, proxyBase);
 
   if (path === "/api/stream") {
     const anilistId = parseInt(q("id", "0"), 10);
@@ -384,13 +417,34 @@ export async function handle(request, env) {
           server: "ACDN",
           audio: "multi",
           multiAudio: true,
-          streamUrl: `/proxy?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}&seg=1`,
+          streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}&seg=1`,
           subtitles: [],
           intro: null,
           outro: null,
         });
       } catch (e) {
         return json({ error: e.message || "ACDN resolution failed" }, 502);
+      }
+    }
+
+    // FlixCloud: direct HLS from Re:Anime / FlixCloud (enc-dec / Web Crypto decrypted)
+    if (server.startsWith("flixcloud")) {
+      try {
+        const r = await cached(`flixcloud:${anilistId}:${episode}:${audio}:1:${title}`, 10 * 60e3, () =>
+          resolveFlixCloud({ anilistId, episode, audio, title, preferredServer: "1" })
+        );
+        if (!r?.streamUrl) return json({ error: `No ${audio.toUpperCase()} stream found on FlixCloud` }, 404);
+        return json({
+          success: true,
+          server: "FlixCloud",
+          audio: r.audio,
+          streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://flixcloud.cc/")}`,
+          subtitles: r.subtitles || [],
+          intro: r.intro,
+          outro: r.outro,
+        });
+      } catch (e) {
+        return json({ error: e.message || "FlixCloud resolution failed" }, 502);
       }
     }
 
@@ -401,7 +455,7 @@ export async function handle(request, env) {
         success: true,
         server: r.server,
         audio: r.audio,
-        streamUrl: `/proxy?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://megaplay.buzz/")}&seg=1`,
+        streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://megaplay.buzz/")}&seg=1`,
         subtitles: r.subtitles || [],
         intro: r.intro,
         outro: r.outro,
@@ -486,6 +540,48 @@ export async function handle(request, env) {
     const id = parseInt(q("id", "0"), 10);
     const season = parseInt(q("season", "1"), 10) || 1;
     if (!id) return json({ error: "Missing id" }, 400);
+
+    if (season === 1) {
+      try {
+        const eg = await cached(`tmdb-eg:${id}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/${id}/episode_groups`));
+        const groups = eg?.results || [];
+        const best =
+          groups.find((g) => g.type === 2 && /no specials/i.test(g.name)) ||
+          groups.find((g) => g.type === 2 && /absolute/i.test(g.name)) ||
+          groups.find((g) => g.type === 2) ||
+          groups.find((g) => /absolute|correct order/i.test(g.name));
+
+        if (best) {
+          const d = await cached(`tmdb-eps-grp:${best.id}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/episode_group/${best.id}?language=en-US`));
+          const pool = (d.groups || []).filter((g) => !/special/i.test(g.name || "") && g.order !== 0);
+          const list = pool.length ? pool : d.groups || [];
+          let chosen = [];
+          if (list.length === 1) {
+            chosen = list[0].episodes || [];
+          } else if (list.length > 1) {
+            const sorted = [...list].sort((a, b) => (b.episodes?.length || 0) - (a.episodes?.length || 0));
+            const largest = sorted[0];
+            const second = sorted[1];
+            if (largest && (!second || (largest.episodes?.length || 0) > (second.episodes?.length || 0) * 2)) {
+              chosen = largest.episodes || [];
+            } else {
+              const inOrder = [...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+              chosen = inOrder.flatMap((g) => g.episodes || []);
+            }
+          }
+          if (chosen.length > 0) {
+            const episodes = chosen.map((e) => {
+              const n = typeof e.order === "number" && e.order >= 0 ? e.order + 1 : Number(e.episode_number);
+              return { n, name: e.name || null, overview: e.overview || null, still: e.still_path || null, runtime: e.runtime || null, air: e.air_date || null };
+            });
+            return json({ success: true, episodes }, 200, 86400);
+          }
+        }
+      } catch {
+        /* fallback to season 1 */
+      }
+    }
+
     try {
       const d = await cached(`tmdb-eps:${id}:${season}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/${id}/season/${season}?language=en-US`));
       const episodes = (d.episodes || []).map((e) => ({ n: e.episode_number, name: e.name || null, overview: e.overview || null, still: e.still_path || null, runtime: e.runtime || null, air: e.air_date || null }));
@@ -521,6 +617,37 @@ export async function handle(request, env) {
       const two = ["2", "abyss"].includes(q("server", "1").toLowerCase());
       const embedUrl = r.success ? (two ? r.abyssUrl || r.myStreamUrl || r.embedUrl : r.myStreamUrl || r.abyssUrl || r.embedUrl) : null;
       return embedUrl ? json({ success: true, embedUrl }, 200, 1800) : json({ success: false, error: r.error || "Not found on AnimeSalt" }, 404);
+    } catch (e) {
+      return json({ success: false, error: e.message }, 500);
+    }
+  }
+
+  if (path === "/api/embed/reanime") {
+    const anilistId = parseInt(q("id", "0"), 10);
+    const episode = parseInt(q("ep", "1"), 10) || 1;
+    const audio = q("audio", "sub").toLowerCase();
+    try {
+      const embedUrl = await cached(`embed:reanime:${anilistId}:${episode}:${audio}`, 30 * 60e3, () =>
+        resolveReanimeEmbed({ anilistId, episode, audio })
+      );
+      if (embedUrl) {
+        if (q("format") === "json" || request.headers.get("accept")?.includes("application/json")) {
+          return json({ success: true, embedUrl }, 200, 1800);
+        }
+        return new Response(
+          `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${embedUrl}"><script>location.replace(${JSON.stringify(embedUrl)})</script></head><body>Redirecting to <a href="${embedUrl}">ReAnime player</a>...</body></html>`,
+          {
+            status: 302,
+            headers: {
+              ...CORS,
+              Location: embedUrl,
+              "Content-Type": "text/html; charset=utf-8",
+              "Cache-Control": "public, max-age=1800",
+            },
+          }
+        );
+      }
+      return json({ success: false, error: "No ReAnime embed found for this episode" }, 404);
     } catch (e) {
       return json({ success: false, error: e.message }, 500);
     }

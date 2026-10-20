@@ -15,8 +15,27 @@ interface State {
   bot: boolean
   /** Set while the server wants a captcha solved (svg is the image). */
   captcha: { svg: string; error: boolean } | null
+  verified: boolean
 }
-let state: State = { devtools: false, bot: false, captcha: null }
+
+let token: string | null = null
+let exp = 0
+try {
+  token = sessionStorage.getItem(KEY.tok)
+  exp = Number(sessionStorage.getItem(KEY.exp) || 0)
+} catch {}
+
+let off = false
+let pending: Promise<string | null> | null = null
+
+const isTokenValid = () => !off && !!token && Date.now() < exp - 30_000
+
+let state: State = {
+  devtools: false,
+  bot: false,
+  captcha: null,
+  verified: import.meta.env.DEV || isTokenValid(),
+}
 const subs = new Set<() => void>()
 const set = (p: Partial<State>) => {
   state = { ...state, ...p }
@@ -28,12 +47,17 @@ export const useShield = () =>
     () => state,
   )
 
+export function isShieldVerified(): boolean {
+  return import.meta.env.DEV || off || isTokenValid()
+}
+
+export function useShieldVerified(): boolean {
+  const s = useShield()
+  return s.verified
+}
+
 /* ---------- token ---------- */
 const nativeFetch = window.fetch.bind(window)
-let token: string | null = sessionStorage.getItem(KEY.tok)
-let exp = Number(sessionStorage.getItem(KEY.exp) || 0)
-let off = false
-let pending: Promise<string | null> | null = null
 
 async function solve(cid: string, salt: string, difficulty: number) {
   const prefix = '0'.repeat(difficulty)
@@ -63,7 +87,11 @@ async function fetchToken(): Promise<string | null> {
     let wrong = false
     for (let tries = 0; tries < 6; tries++) {
       const { svg, ...c } = await (await nativeFetch(`${API}/api/shield/challenge`)).json()
-      if (c.off) return (off = true), null
+      if (c.off) {
+        off = true
+        set({ verified: true })
+        return null
+      }
       const nonce = await solve(c.cid, c.salt, c.difficulty)
       // Every API call waits here until the captcha is solved.
       const answer = c.cap ? await askCaptcha(svg, wrong) : undefined
@@ -76,8 +104,11 @@ async function fetchToken(): Promise<string | null> {
       if (r.ok && d?.token) {
         token = d.token
         exp = Date.now() + d.expiresIn * 1000
-        sessionStorage.setItem(KEY.tok, token!)
-        sessionStorage.setItem(KEY.exp, String(exp))
+        try {
+          sessionStorage.setItem(KEY.tok, token!)
+          sessionStorage.setItem(KEY.exp, String(exp))
+        } catch {}
+        set({ verified: true, captcha: null })
         return token
       }
       if (d?.code !== 'SHIELD_CAPTCHA_WRONG') return null
@@ -90,7 +121,7 @@ async function fetchToken(): Promise<string | null> {
 }
 
 export function getToken(): Promise<string | null> {
-  if (off) return Promise.resolve(null)
+  if (off || import.meta.env.DEV) return Promise.resolve(null)
   if (token && Date.now() < exp - 30_000) return Promise.resolve(token)
   return (pending ??= fetchToken().finally(() => (pending = null)))
 }
@@ -98,8 +129,11 @@ export function getToken(): Promise<string | null> {
 const forget = () => {
   token = null
   exp = 0
-  sessionStorage.removeItem(KEY.tok)
-  sessionStorage.removeItem(KEY.exp)
+  try {
+    sessionStorage.removeItem(KEY.tok)
+    sessionStorage.removeItem(KEY.exp)
+  } catch {}
+  set({ verified: import.meta.env.DEV || off })
 }
 
 /* ---------- fetch interceptor ---------- */
@@ -114,8 +148,33 @@ const isProtected = (input: RequestInfo | URL) => {
   }
 }
 
+export function haltAllMedia() {
+  try {
+    document.querySelectorAll('video, audio').forEach((media) => {
+      try {
+        const el = media as HTMLMediaElement
+        el.pause()
+        el.removeAttribute('src')
+        el.load()
+      } catch {}
+    })
+    window.dispatchEvent(new CustomEvent('zenkai:devtools-halt'))
+  } catch {}
+}
+
 function install() {
   window.fetch = async (input, init) => {
+    if (state.devtools || state.bot) {
+      const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (!urlStr.includes('/api/shield/')) {
+        haltAllMedia()
+        return new Response(JSON.stringify({ error: 'Inspection restricted by Zenkai Shield' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
     if (!isProtected(input)) return nativeFetch(input, init)
     const send = (tok: string | null) => {
       const h = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
@@ -156,7 +215,13 @@ function checkDevTools() {
   } catch {
     /* CSP without unsafe-eval: the size check above still runs */
   }
-  if (open !== state.devtools) set({ devtools: open })
+  if (open !== state.devtools) {
+    set({ devtools: open })
+    if (open) {
+      forget()
+      haltAllMedia()
+    }
+  }
 }
 
 function onKey(e: KeyboardEvent) {
@@ -179,7 +244,6 @@ export function startShield() {
   if (started) return
   started = true
   install()
-  void getToken()
   if (import.meta.env.DEV) return
   if (looksAutomated()) return set({ bot: true })
   window.addEventListener('keydown', onKey, true)
