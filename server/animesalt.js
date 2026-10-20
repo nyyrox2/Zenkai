@@ -87,67 +87,10 @@ export function getCandidateSlugs({
   isMovie = false,
   mapping = {}
 }) {
-  const candidates = [];
-
-  // 1. Direct Mapping via anime-mapping.json (Same as APK AnimeMappingRepository)
+  // Direct Mapping via anime-mapping.json only (strict: never guess slugs or generate fuzzy fallbacks)
   const mapped = pickMapping(mapping, anilistId, episode, isMovie);
-  if (mapped) {
-    if (mapped.isMovie) {
-      candidates.push(mapped.saltId);
-      candidates.push(`${mapped.saltId}-the-movie`);
-      candidates.push(`${mapped.saltId}-movie`);
-    } else {
-      if (mapped.finalEp !== episode) {
-        candidates.push(`${mapped.saltId}-${mapped.season}x${episode}`);
-        candidates.push(`${mapped.saltId}-${mapped.season}x${mapped.finalEp}`);
-      } else {
-        candidates.push(`${mapped.saltId}-${mapped.season}x${episode}`);
-      }
-      candidates.push(`${mapped.saltId}-1x${episode}`);
-      if (mapped.season > 1 && mapped.finalEp !== episode) {
-        candidates.push(`${mapped.saltId}-1x${mapped.finalEp}`);
-      }
-      candidates.push(`${mapped.saltId}-${episode}`);
-      candidates.push(mapped.saltId);
-    }
-  }
-
-  // 2. Normalized Primary Title
-  const clean = cleanTitleForSlug(title);
-  const normTitle = normalizeAnimeSaltTitle(clean || title);
-  const season = extractSeason(title, romajiTitle);
-  if (normTitle) {
-    if (isMovie) {
-      candidates.push(normTitle);
-      candidates.push(`${normTitle}-the-movie`);
-      candidates.push(`${normTitle}-movie`);
-    } else {
-      candidates.push(`${normTitle}-${season}x${episode}`);
-      if (season > 1) {
-        candidates.push(`${normTitle}-1x${episode}`);
-      }
-      candidates.push(`${normTitle}-${episode}`);
-      candidates.push(normTitle);
-    }
-  }
-
-  // 3. Romaji Title
-  if (romajiTitle) {
-    const cleanRomaji = cleanTitleForSlug(romajiTitle);
-    const normRomaji = normalizeAnimeSaltTitle(cleanRomaji || romajiTitle);
-    if (normRomaji && normRomaji !== normTitle) {
-      if (isMovie) {
-        candidates.push(normRomaji);
-      } else {
-        candidates.push(`${normRomaji}-${season}x${episode}`);
-        if (season > 1) {
-          candidates.push(`${normRomaji}-1x${episode}`);
-        }
-      }
-    }
-  }
-
-  return [...new Set(candidates.filter(Boolean))];
+  if (!mapped?.slug) return [];
+  return [mapped.slug];
 }
 
 function extractIframeSrc(snippet) {
@@ -192,19 +135,22 @@ export async function extractAnimeSaltPlayer({
 
   const mapping = await loadMapping(origin);
   const slugs = getCandidateSlugs({ anilistId, episode, title, romajiTitle, isMovie, mapping });
+  if (!slugs.length) {
+    return {
+      success: false,
+      error: "Anime not mapped in anime-mapping.json. Please add a mapping for this title."
+    };
+  }
 
   for (const slug of slugs) {
     const candidateUrls = isMovie
       ? [
           `${BASE_URL}/movies/${slug}/`,
-          `${BASE_URL}/anime/${slug}/`,
-          `${BASE_URL}/episode/${slug}/`,
           `https://animesalt.ac/movies/${slug}/`,
           `https://animesalt.ro/movies/${slug}/`
         ]
       : [
           `${BASE_URL}/episode/${slug}/`,
-          `${BASE_URL}/movies/${slug}/`,
           `https://animesalt.ac/episode/${slug}/`,
           `https://animesalt.ro/episode/${slug}/`
         ];

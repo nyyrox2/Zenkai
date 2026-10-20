@@ -361,32 +361,17 @@ async function fromAnimeSalt({ saltId, slugs = [], isMovie }, lang) {
 
 /* ---------------- Public API ---------------- */
 
-/** AniList id + episode -> { saltId, season, finalEp, isMovie }. Uses anime-mapping.json, then falls back to the title. */
+/** AniList id + episode -> { saltId, season, episode, finalEp, isMovie, slug, mapped }. Strict mapping only. */
 export function resolveCandidate({ anilistId, episode = 1, title = "", isMovie = false, mapping = ANIME_MAPPING }) {
   const mapped = pickMapping(mapping, anilistId, episode, isMovie);
   if (mapped) return { ...mapped, mapped: true };
-  const saltId = normalizeAnimeSaltTitle(cleanTitleForSlug(title) || title);
-  return { saltId, season: extractSeason(title), finalEp: episode, isMovie: !!isMovie, mapped: false };
+  return null;
 }
 
-export function getCandidateSlugsForAcdn({ saltId, season = 1, episode = 1, finalEp = episode, isMovie = false }) {
-  if (isMovie) {
-    return [saltId, `${saltId}-the-movie`, `${saltId}-movie`];
-  }
-  const slugs = [];
-  if (finalEp !== episode) {
-    slugs.push(`${saltId}-${season}x${episode}`);
-    slugs.push(`${saltId}-${season}x${finalEp}`);
-  } else {
-    slugs.push(`${saltId}-${season}x${episode}`);
-  }
-  slugs.push(`${saltId}-1x${episode}`);
-  if (season > 1 && finalEp !== episode) {
-    slugs.push(`${saltId}-1x${finalEp}`);
-  }
-  slugs.push(`${saltId}-${episode}`);
-  slugs.push(saltId);
-  return [...new Set(slugs)];
+export function getCandidateSlugsForAcdn({ saltId, season = 1, episode = 1, slug, isMovie = false }) {
+  if (slug) return [slug];
+  if (isMovie) return [saltId];
+  return [`${saltId}-${season}x${episode}`];
 }
 
 /**
@@ -395,26 +380,26 @@ export function getCandidateSlugsForAcdn({ saltId, season = 1, episode = 1, fina
  */
 export async function resolveAcdn({ anilistId, episode = 1, title = "", isMovie = false, lang = "" }) {
   const cand = resolveCandidate({ anilistId, episode, title, isMovie });
-  if (!cand.saltId) return null;
+  if (!cand || !cand.saltId) return null;
   const slugs = getCandidateSlugsForAcdn({
     saltId: cand.saltId,
     season: cand.season,
-    episode,
-    finalEp: cand.finalEp,
+    episode: cand.episode,
+    slug: cand.slug,
     isMovie: cand.isMovie,
   });
-  const slug = slugs[0];
+  const slug = cand.slug || slugs[0];
   const ctx = {
     title,
     season: cand.season,
-    episode,
-    finalEp: cand.finalEp,
+    episode: cand.episode,
+    finalEp: cand.episode,
     isMovie: cand.isMovie,
     saltId: cand.saltId,
     slug,
     slugs,
   };
 
-  const hit = (await fromAnimeDekho(ctx, lang)) || (await fromAnimeSalt(ctx, lang));
-  return hit ? { ...hit, mapped: cand.mapped, slug: hit.slug || slug } : null;
+  const hit = (await fromAnimeSalt(ctx, lang)) || (await fromAnimeDekho(ctx, lang));
+  return hit ? { ...hit, mapped: true, slug: hit.slug || slug } : null;
 }

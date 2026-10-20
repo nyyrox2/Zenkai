@@ -57,53 +57,8 @@
         } catch (e) {}
       })()
     </script>
-    <style>
-      /* Opening screen: lives in the HTML so it paints before any JS runs. src/lib/boot.ts drives it and lifts it. */
-      #zk-boot{--b:#f6f6f8;--f:#0b0b0e;--a:#dc143c;--m:rgba(11,11,14,.55);position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;background:var(--b);color:var(--f);font-family:Inter,ui-sans-serif,system-ui,sans-serif;will-change:transform;contain:strict}
-      html.dark #zk-boot{--b:#050506;--f:#f5f5f7;--a:#e8294c;--m:rgba(245,245,247,.55)}
-      #zk-boot::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 50% at 50% 42%,color-mix(in srgb,var(--a) 20%,transparent),transparent 70%)}
-      #zk-boot::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,transparent,var(--a),transparent);box-shadow:0 0 22px 2px var(--a)}
-      .zk-b-core,.zk-b-low{position:relative;display:flex;flex-direction:column;align-items:center}
-      .zk-b-core{gap:14px}
-      .zk-b-low{gap:12px}
-      .zk-b-mark{position:relative;display:grid;place-items:center;width:76px;height:76px;border-radius:22px;background:var(--a);color:#fff;font:900 40px/1 Outfit,Inter,system-ui,sans-serif;box-shadow:0 14px 40px -10px var(--a);animation:zk-b-pop .55s cubic-bezier(.22,1,.36,1) both}
-      .zk-b-mark::after{content:"";position:absolute;inset:0;border-radius:inherit;border:2px solid var(--a);animation:zk-b-ring 1.7s ease-out .5s infinite}
-      .zk-b-word{font:800 30px/1 Outfit,Inter,system-ui,sans-serif;letter-spacing:-.02em;animation:zk-b-up .6s cubic-bezier(.22,1,.36,1) .12s both}
-      .zk-b-kanji{font-size:12px;letter-spacing:.5em;padding-left:.5em;color:var(--m);animation:zk-b-up .6s cubic-bezier(.22,1,.36,1) .24s both}
-      .zk-b-bar{width:min(220px,56vw);height:3px;border-radius:3px;overflow:hidden;background:color-mix(in srgb,var(--f) 12%,transparent)}
-      .zk-b-bar i{display:block;height:100%;border-radius:inherit;transform:scaleX(var(--zk-p,.06));transform-origin:left;transition:transform .45s cubic-bezier(.22,1,.36,1);background:linear-gradient(90deg,var(--a),color-mix(in srgb,var(--a) 55%,#fff));box-shadow:0 0 10px var(--a)}
-      .zk-b-status{margin:0;font-size:11px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--m)}
-      #zk-boot.zk-out{transform:translate3d(0,-101%,0);pointer-events:none;transition:transform .8s cubic-bezier(.76,0,.2,1) .24s}
-      #zk-boot.zk-out .zk-b-core,#zk-boot.zk-out .zk-b-low{opacity:0;transform:scale(1.06);transition:opacity .28s ease,transform .28s ease}
-      @keyframes zk-b-pop{from{opacity:0;transform:scale(.7) rotate(-8deg)}to{opacity:1;transform:none}}
-      @keyframes zk-b-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-      @keyframes zk-b-ring{from{opacity:.55;transform:scale(1)}to{opacity:0;transform:scale(1.55)}}
-      @media (prefers-reduced-motion:reduce){
-        .zk-b-mark,.zk-b-word,.zk-b-kanji{animation:none!important}
-        .zk-b-mark::after{animation:none!important;opacity:0}
-        #zk-boot.zk-out{transform:none;opacity:0;transition:opacity .3s ease}
-      }
-    </style>
   </head>
   <body>
-    <div id="zk-boot" role="status" aria-live="polite" aria-label="Loading Zenkai">
-      <div class="zk-b-core">
-        <div class="zk-b-mark" aria-hidden="true">Z</div>
-        <div class="zk-b-word">Zenkai</div>
-        <div class="zk-b-kanji" aria-hidden="true">全開</div>
-      </div>
-      <div class="zk-b-low">
-        <div class="zk-b-bar" aria-hidden="true"><i></i></div>
-        <p class="zk-b-status" id="zk-boot-status">Getting things ready</p>
-      </div>
-    </div>
-    <script>
-      // Safety net: if the app never starts (blocked script, crash), do not trap the visitor behind the opening screen.
-      setTimeout(function () {
-        var b = document.getElementById('zk-boot')
-        if (b) b.classList.add('zk-out')
-      }, 15000)
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
