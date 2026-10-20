@@ -292,6 +292,13 @@
       "startEpisode": 1
     }
   ],
+  "966": [
+    {
+      "saltId": "shinchan",
+      "season": 1,
+      "startEpisode": 1
+    }
+  ],
   "1117": [
     {
       "saltId": "pokemon-the-movie-2000",
@@ -514,9 +521,16 @@
       "startEpisode": 1
     }
   ],
-  "2387": [
+  "2393": [
     {
-      "saltId": "doraemon-nobitas-new-great-adventure-into-the-underworld-the-seven-magic-users",
+      "saltId": "doraemon-nobita-and-the-windmasters",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "2450": [
+    {
+      "saltId": "shinchan-movie-mr-smellys-ambition",
       "season": null,
       "startEpisode": 1
     }
@@ -528,13 +542,6 @@
       "startEpisode": 1
     }
   ],
-  "2472": [
-    {
-      "saltId": "doraemon-nobitas-dinosaur",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "2528": [
     {
       "saltId": "dinosaur-king",
@@ -542,51 +549,65 @@
       "startEpisode": 1
     }
   ],
+  "2654": [
+    {
+      "saltId": "doraemon-nobita-and-the-winged-braves",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "2655": [
+    {
+      "saltId": "doraemon-nobita-and-the-robot-kingdom",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "2656": [
+    {
+      "saltId": "doraemon-nobita-in-the-wan-nyan-spacetime-odyssey",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "2657": [
+    {
+      "saltId": "doraemon-nobita-and-the-knights-on-dinosaurs",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "2658": [
+    {
+      "saltId": "doraemon-the-record-of-nobitas-parallel-journey-to-the-west",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
   "2659": [
-    {
-      "saltId": "doraemon-nobita-and-the-spiral-city",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2660": [
-    {
-      "saltId": "doraemon-nobita-and-the-galaxy-super-express",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2661": [
-    {
-      "saltId": "doraemon-nobitas-diary-on-the-creation-of-the-world",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2662": [
-    {
-      "saltId": "doraemon-nobitas-three-visionary-swordsmen",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2663": [
     {
       "saltId": "doraemon-nobita-and-the-tin-labyrinth",
       "season": null,
       "startEpisode": 1
     }
   ],
-  "2664": [
+  "2661": [
     {
       "saltId": "doraemon-nobita-and-the-kingdom-of-clouds",
       "season": null,
       "startEpisode": 1
     }
   ],
-  "2665": [
+  "2662": [
     {
-      "saltId": "doraemon-nobitas-dorabian-nights",
+      "saltId": "doraemon-the-new-record-of-nobitas-spaceblazer",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "2664": [
+    {
+      "saltId": "doraemon-nobitas-great-adventure-in-the-south-seas",
       "season": null,
       "startEpisode": 1
     }
@@ -600,70 +621,70 @@
   ],
   "2667": [
     {
-      "saltId": "doraemon-nobita-and-the-animal-planet",
+      "saltId": "doraemon-nobita-and-the-castle-of-the-undersea-devil",
       "season": null,
       "startEpisode": 1
     }
   ],
   "2668": [
     {
-      "saltId": "doraemon-nobita-and-the-knights-on-dinosaurs",
+      "saltId": "doraemon-nobita-drifts-in-the-universe",
       "season": null,
       "startEpisode": 1
     }
   ],
-  "2670": [
+  "2669": [
     {
       "saltId": "doraemon-nobitas-little-star-wars",
       "season": null,
       "startEpisode": 1
     }
   ],
-  "2672": [
+  "2670": [
     {
-      "saltId": "doraemon-nobita-and-the-castle-of-the-undersea-devil",
+      "saltId": "doraemon-nobitas-dorabian-nights",
       "season": null,
       "startEpisode": 1
     }
   ],
   "2673": [
     {
-      "saltId": "doraemon-the-record-of-nobitas-parallel-journey-to-the-west",
+      "saltId": "doraemon-nobitas-new-great-adventure-into-the-underworld-the-seven-magic-users",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "2674": [
+    {
+      "saltId": "doraemon-nobitas-diary-on-the-creation-of-the-world",
       "season": null,
       "startEpisode": 1
     }
   ],
   "2675": [
     {
-      "saltId": "doraemon-nobitas-great-adventure-in-the-south-seas",
+      "saltId": "doraemon-nobita-and-the-galaxy-super-express",
       "season": null,
       "startEpisode": 1
     }
   ],
   "2676": [
     {
-      "saltId": "doraemon-nobita-drifts-in-the-universe",
+      "saltId": "doraemon-nobitas-three-visionary-swordsmen",
       "season": null,
       "startEpisode": 1
     }
   ],
   "2677": [
     {
-      "saltId": "doraemon-nobita-and-the-legend-of-the-sun-king",
+      "saltId": "doraemon-nobita-and-the-animal-planet",
       "season": null,
       "startEpisode": 1
     }
   ],
   "2678": [
     {
-      "saltId": "doraemon-nobita-and-the-winged-braves",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2679": [
-    {
-      "saltId": "doraemon-nobita-and-the-robot-kingdom",
+      "saltId": "doraemon-nobita-and-the-spiral-city",
       "season": null,
       "startEpisode": 1
     }
@@ -675,73 +696,10 @@
       "startEpisode": 1
     }
   ],
-  "2681": [
-    {
-      "saltId": "doraemon-nobita-in-the-wan-nyan-spacetime-odyssey",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "2735": [
     {
       "saltId": "shinchan",
       "season": 1,
-      "startEpisode": 1
-    }
-  ],
-  "2736": [
-    {
-      "saltId": "shinchan-movie-action-kamen-vs-higure-rakshas",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2737": [
-    {
-      "saltId": "shinchan-movie-treasures-of-the-buri-buri-kingdom",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2739": [
-    {
-      "saltId": "shinchan-movie-adventures-in-henderland",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2740": [
-    {
-      "saltId": "shinchan-movie-dark-tama-tama-thrilling-chase",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2741": [
-    {
-      "saltId": "shinchan-movie-blitzkrieg-pigs-hoofs-secret-mission",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2743": [
-    {
-      "saltId": "shinchan-movie-bungle-in-the-jungle",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2744": [
-    {
-      "saltId": "shinchan-movie-mr-smellys-ambition",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "2746": [
-    {
-      "saltId": "shinchan-movie-the-spicy-kasukabe-dancers",
-      "season": null,
       "startEpisode": 1
     }
   ],
@@ -780,9 +738,16 @@
       "startEpisode": 1
     }
   ],
-  "3661": [
+  "3727": [
     {
-      "saltId": "doraemon-nobita-and-the-green-giant-legend",
+      "saltId": "doraemon-nobitas-dinosaur",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "3745": [
+    {
+      "saltId": "shinchan-movie-treasures-of-the-buri-buri-kingdom",
       "season": null,
       "startEpisode": 1
     }
@@ -829,13 +794,6 @@
       "startEpisode": 1
     }
   ],
-  "4270": [
-    {
-      "saltId": "shinchan-movie-the-golden-sword",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "4367": [
     {
       "saltId": "the-gutsy-frog",
@@ -864,17 +822,17 @@
       "startEpisode": 1
     }
   ],
+  "5096": [
+    {
+      "saltId": "doraemon-nobita-and-the-green-giant-legend",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
   "5114": [
     {
       "saltId": "fullmetal-alchemist-brotherhood",
       "season": 1,
-      "startEpisode": 1
-    }
-  ],
-  "5249": [
-    {
-      "saltId": "doraemon-the-new-record-of-nobitas-spaceblazer",
-      "season": null,
       "startEpisode": 1
     }
   ],
@@ -930,7 +888,7 @@
   ],
   "6460": [
     {
-      "saltId": "shinchan-pursuit-of-the-balls-of-darkness",
+      "saltId": "shinchan-movie-dark-tama-tama-thrilling-chase",
       "season": null,
       "startEpisode": 1
     }
@@ -966,9 +924,65 @@
       "startEpisode": 1
     }
   ],
+  "6930": [
+    {
+      "saltId": "doraemon-the-new-record-of-nobitas-spaceblazer",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "7045": [
+    {
+      "saltId": "doraemon-nobita-and-the-legend-of-the-sun-king",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
   "7664": [
     {
       "saltId": "pokemon-zoroark-master-of-illusions",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "8358": [
+    {
+      "saltId": "shinchan-movie-action-kamen-vs-higure-rakshas",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "8359": [
+    {
+      "saltId": "shinchan-movie-adventures-in-henderland",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "8360": [
+    {
+      "saltId": "shinchan-movie-blitzkrieg-pigs-hoofs-secret-mission",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "8362": [
+    {
+      "saltId": "shinchan-movie-bungle-in-the-jungle",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "8363": [
+    {
+      "saltId": "shinchan-movie-the-spicy-kasukabe-dancers",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "8367": [
+    {
+      "saltId": "shinchan-movie-the-golden-sword",
       "season": null,
       "startEpisode": 1
     }
@@ -997,7 +1011,7 @@
   "8687": [
     {
       "saltId": "doraemon-2005",
-      "season": 1,
+      "season": 3,
       "startEpisode": 1
     }
   ],
@@ -1022,13 +1036,6 @@
       "startEpisode": 1
     }
   ],
-  "9846": [
-    {
-      "saltId": "doraemon-nobita-and-the-new-steel-troops-winged-angels",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "9969": [
     {
       "saltId": "gintama",
@@ -1050,9 +1057,23 @@
       "startEpisode": 1
     }
   ],
+  "10534": [
+    {
+      "saltId": "doraemon-nobita-and-the-new-steel-troops-winged-angels",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
   "10740": [
     {
       "saltId": "pokemon-the-movie-black-victini-and-reshiram",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "11053": [
+    {
+      "saltId": "doraemon-nobita-and-the-island-of-miracles-animal-adventure",
       "season": null,
       "startEpisode": 1
     }
@@ -1072,13 +1093,6 @@
       "saltId": "hunter-x-hunter",
       "season": 3,
       "startEpisode": 39
-    }
-  ],
-  "11075": [
-    {
-      "saltId": "doraemon-nobita-and-the-island-of-miracles-animal-adventure",
-      "season": null,
-      "startEpisode": 1
     }
   ],
   "11359": [
@@ -1109,7 +1123,7 @@
       "startEpisode": 1
     }
   ],
-  "12497": [
+  "12499": [
     {
       "saltId": "shinchan-movie-himawari-banegi-rajkumari",
       "season": null,
@@ -1144,17 +1158,17 @@
       "startEpisode": 1
     }
   ],
-  "14729": [
-    {
-      "saltId": "doraemon-nobitas-secret-gadget-museum",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "14837": [
     {
       "saltId": "dragon-ball-z-battle-of-gods",
       "season": 1,
+      "startEpisode": 1
+    }
+  ],
+  "15925": [
+    {
+      "saltId": "doraemon-nobitas-secret-gadget-museum",
+      "season": null,
       "startEpisode": 1
     }
   ],
@@ -1186,7 +1200,7 @@
       "startEpisode": 1
     }
   ],
-  "17088": [
+  "17113": [
     {
       "saltId": "shinchan-movie-very-very-tasty-tasty",
       "season": null,
@@ -1214,7 +1228,7 @@
       "startEpisode": 1
     }
   ],
-  "19811": [
+  "19645": [
     {
       "saltId": "doraemon-new-nobitas-great-demon-peko-and-the-exploration-party-of-five",
       "season": null,
@@ -1329,13 +1343,6 @@
       "startEpisode": 1
     }
   ],
-  "20743": [
-    {
-      "saltId": "doraemon-nobita-and-the-space-heroes",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "20755": [
     {
       "saltId": "assassination-classroom",
@@ -1410,13 +1417,6 @@
     {
       "saltId": "gintama",
       "season": 3,
-      "startEpisode": 1
-    }
-  ],
-  "21008": [
-    {
-      "saltId": "shinchan-movie-masala-story",
-      "season": null,
       "startEpisode": 1
     }
   ],
@@ -1510,13 +1510,6 @@
       "startEpisode": 1
     }
   ],
-  "21422": [
-    {
-      "saltId": "shinchan-movie-the-dreaming-world",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "21440": [
     {
       "saltId": "digimon-adventure-tri-part-2-determination",
@@ -1587,13 +1580,6 @@
       "startEpisode": 1
     }
   ],
-  "87522": [
-    {
-      "saltId": "doraemon-nobitas-great-adventure-in-the-antarctic-kachi-kochi",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "97634": [
     {
       "saltId": "pokemon-the-series-sun-moon",
@@ -1651,6 +1637,20 @@
       "startEpisode": 1
     }
   ],
+  "98092": [
+    {
+      "saltId": "crayon-shin-chan-spin-off",
+      "season": 1,
+      "startEpisode": 1
+    }
+  ],
+  "98093": [
+    {
+      "saltId": "crayon-shin-chan-spin-off",
+      "season": 2,
+      "startEpisode": 1
+    }
+  ],
   "98289": [
     {
       "saltId": "beyblade-burst",
@@ -1693,9 +1693,23 @@
       "startEpisode": 1
     }
   ],
-  "98762": [
+  "98744": [
+    {
+      "saltId": "shinchan-movie-masala-story",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "99084": [
     {
       "saltId": "doraemon-nobitas-treasure-island",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "99085": [
+    {
+      "saltId": "doraemon-nobitas-great-adventure-in-the-antarctic-kachi-kochi",
       "season": null,
       "startEpisode": 1
     }
@@ -1760,6 +1774,20 @@
     {
       "saltId": "tokyo-ghoul",
       "season": 2,
+      "startEpisode": 1
+    }
+  ],
+  "100289": [
+    {
+      "saltId": "shinchan-movie-the-dreaming-world",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
+  "100291": [
+    {
+      "saltId": "doraemon-nobita-and-the-space-heroes",
+      "season": null,
       "startEpisode": 1
     }
   ],
@@ -1918,13 +1946,6 @@
       "episodeOffset": 12
     }
   ],
-  "104688": [
-    {
-      "saltId": "doraemon-nobitas-chronicle-of-the-moon-exploration",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "104825": [
     {
       "saltId": "rezero-starting-life-in-another-world-the-frozen-bond",
@@ -1992,6 +2013,13 @@
     {
       "saltId": "bofuri-i-dont-want-to-get-hurt-so-ill-max-out-my-defense",
       "season": 1,
+      "startEpisode": 1
+    }
+  ],
+  "106493": [
+    {
+      "saltId": "doraemon-nobitas-chronicle-of-the-moon-exploration",
+      "season": null,
       "startEpisode": 1
     }
   ],
@@ -2094,9 +2122,9 @@
       "startEpisode": 1
     }
   ],
-  "110777": [
+  "111312": [
     {
-      "saltId": "doraemon-nobitas-new-dinosaur",
+      "saltId": "shinchan-movie-rakuga-kingdom",
       "season": null,
       "startEpisode": 1
     }
@@ -2112,13 +2140,6 @@
     {
       "saltId": "the-rising-of-the-shield-hero",
       "season": 3,
-      "startEpisode": 1
-    }
-  ],
-  "111812": [
-    {
-      "saltId": "shinchan-movie-rakuga-kingdom",
-      "season": null,
       "startEpisode": 1
     }
   ],
@@ -2183,6 +2204,13 @@
       "saltId": "haikyu",
       "season": 4,
       "startEpisode": 14
+    }
+  ],
+  "113669": [
+    {
+      "saltId": "doraemon-nobitas-new-dinosaur",
+      "season": null,
+      "startEpisode": 1
     }
   ],
   "113717": [
@@ -2437,7 +2465,7 @@
       "startEpisode": 1
     }
   ],
-  "127419": [
+  "127331": [
     {
       "saltId": "shinchan-movie-the-mystery-of-tenkasu-academy",
       "season": null,
@@ -2663,6 +2691,13 @@
       "startEpisode": 1
     }
   ],
+  "139037": [
+    {
+      "saltId": "crayon-shin-chan-spin-off",
+      "season": 3,
+      "startEpisode": 1
+    }
+  ],
   "139095": [
     {
       "saltId": "fairy-tail-100-years-quest",
@@ -2790,13 +2825,6 @@
       "startEpisode": 1
     }
   ],
-  "142270": [
-    {
-      "saltId": "shinchan-movie-the-legends-of-ninja-mononoke",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "142279": [
     {
       "saltId": "reborn-to-master-the-blade-from-hero-king-to-extraordinary-squire-%e2%99%80",
@@ -2810,6 +2838,13 @@
       "season": 2,
       "startEpisode": 1,
       "episodeOffset": 7
+    }
+  ],
+  "142549": [
+    {
+      "saltId": "shinchan-movie-the-legends-of-ninja-mononoke",
+      "season": null,
+      "startEpisode": 1
     }
   ],
   "142598": [
@@ -2899,6 +2934,13 @@
   "145610": [
     {
       "saltId": "scott-pilgrim-takes-off",
+      "season": 1,
+      "startEpisode": 1
+    }
+  ],
+  "145665": [
+    {
+      "saltId": "rurouni-kenshin-2023",
       "season": 1,
       "startEpisode": 1
     }
@@ -3045,13 +3087,6 @@
       "startEpisode": 1
     }
   ],
-  "151608": [
-    {
-      "saltId": "doraemon-the-movie-nobitas-sky-utopia",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
   "151801": [
     {
       "saltId": "mashle-magic-and-muscles",
@@ -3077,6 +3112,13 @@
     {
       "saltId": "why-raeliana-ended-up-at-the-dukes-mansion",
       "season": 1,
+      "startEpisode": 1
+    }
+  ],
+  "151896": [
+    {
+      "saltId": "doraemon-the-movie-nobitas-sky-utopia",
+      "season": null,
       "startEpisode": 1
     }
   ],
@@ -3262,6 +3304,13 @@
       "startEpisode": 1
     }
   ],
+  "156009": [
+    {
+      "saltId": "crayon-shin-chan-spin-off",
+      "season": 4,
+      "startEpisode": 1
+    }
+  ],
   "156023": [
     {
       "saltId": "an-archdemons-dilemma-how-to-love-your-elf-bride",
@@ -3360,6 +3409,13 @@
       "startEpisode": 1
     }
   ],
+  "158595": [
+    {
+      "saltId": "shinchan-movie-new-dimension-battle-of-supernatural-powers",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
   "158704": [
     {
       "saltId": "im-in-love-with-the-villainess",
@@ -3392,13 +3448,6 @@
     {
       "saltId": "bleach-thousand-year-blood-war",
       "season": 2,
-      "startEpisode": 1
-    }
-  ],
-  "159495": [
-    {
-      "saltId": "shinchan-movie-new-dimension-battle-of-supernatural-powers",
-      "season": null,
       "startEpisode": 1
     }
   ],
@@ -3621,6 +3670,20 @@
       "episodeOffset": 12
     }
   ],
+  "166874": [
+    {
+      "saltId": "rurouni-kenshin-2023",
+      "season": 2,
+      "startEpisode": 1
+    }
+  ],
+  "166976": [
+    {
+      "saltId": "doraemon-the-movie-nobitas-earth-symphony",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
   "167152": [
     {
       "saltId": "sentenced-to-be-a-hero",
@@ -3638,13 +3701,6 @@
   "167732": [
     {
       "saltId": "my-hero-academia-youre-next",
-      "season": null,
-      "startEpisode": 1
-    }
-  ],
-  "167733": [
-    {
-      "saltId": "doraemon-the-movie-nobitas-earth-symphony",
       "season": null,
       "startEpisode": 1
     }
@@ -3796,6 +3852,13 @@
       "startEpisode": 1
     }
   ],
+  "171145": [
+    {
+      "saltId": "crayon-shin-chan-the-movie-our-dinosaur-diary",
+      "season": null,
+      "startEpisode": 1
+    }
+  ],
   "171457": [
     {
       "saltId": "makeine-too-many-losing-heroines",
@@ -3835,13 +3898,6 @@
     {
       "saltId": "jujutsu-kaisen",
       "season": 3,
-      "startEpisode": 1
-    }
-  ],
-  "172464": [
-    {
-      "saltId": "crayon-shin-chan-the-movie-our-dinosaur-diary",
-      "season": null,
       "startEpisode": 1
     }
   ],
