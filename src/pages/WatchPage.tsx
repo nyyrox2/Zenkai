@@ -23,7 +23,6 @@ import { ErrorState } from '../components/ErrorState'
 import { Skeleton } from '../components/Skeleton'
 import { LoadingGrid } from '../components/LoadingGrid'
 import { LogoFill } from '../components/LogoFill'
-import { LOGO_URL } from '../lib/constants'
 import { Tour, tourDone, tourSeen, type TourStep } from '../components/Tour'
 import { ServerPopup, type ServerOpt } from '../components/ServerPopup'
 import { useShieldVerified, getToken } from '../lib/shield'
@@ -34,9 +33,17 @@ function Frame({ children }: { children: React.ReactNode }) {
   return <div data-tour="w-player" className="relative aspect-video w-full overflow-hidden bg-black lg:shadow-2xl lg:shadow-black/40 lg:ring-1 lg:ring-white/10">{children}</div>
 }
 
-/** Episode / first load: the show's logo fills from dim to full colour. `quiet` (server switch) leaves the player black. */
-function Loading({ quiet, logo }: { quiet?: boolean; logo: string }) {
-  return <Frame>{!quiet && <div className="absolute inset-0 grid place-items-center"><LogoFill src={logo} /></div>}</Frame>
+/** Loading (episode, first load and server switch): the show's logo fills from dim to full colour. No logo: the grid loader, and `quiet` (server switch) leaves the player black. */
+function Loading({ quiet, logo }: { quiet?: boolean; logo: string | null }) {
+  return (
+    <Frame>
+      {logo ? (
+        <div className="absolute inset-0 grid place-items-center"><LogoFill src={logo} /></div>
+      ) : (
+        !quiet && <LoadingGrid className="absolute bottom-3 left-3 text-white/60 sm:bottom-4 sm:left-4" />
+      )}
+    </Frame>
+  )
 }
 
 function Problem({ message, children }: { message: string; children?: React.ReactNode }) {
@@ -112,7 +119,7 @@ export default function WatchPage() {
   }
 
   const bundle = useTmdb(a?.id, title, a?.format)
-  const logo = tmdbImg(bundle?.tmdb?.logo, 'w500') ?? LOGO_URL
+  const logo = tmdbImg(bundle?.tmdb?.logo, 'w500')
   const eps = useEpisodes(bundle?.tmdb ?? null, a?.streamingEpisodes)
   const kinds = useFiller(a)
   const ctx: EmbedCtx = useMemo(
