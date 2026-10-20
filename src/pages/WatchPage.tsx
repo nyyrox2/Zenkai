@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
 import { AlertTriangle, ChevronLeft, ChevronRight, Info, Lock } from 'lucide-react'
 import { fetchAnimeLite } from '../services/anilist'
-import { acdnMapped, fetchAnimeSalt, fetchStream } from '../services/api'
+import { acdnMapped, fetchAnimeSalt, fetchStream, tmdbImg } from '../services/api'
 import { useAsync } from '../hooks/useAsync'
 import { useTmdb } from '../hooks/useTmdb'
 import { useEpisodes } from '../hooks/useEpisodes'
@@ -22,6 +22,8 @@ import { EpisodeList } from '../components/EpisodeList'
 import { ErrorState } from '../components/ErrorState'
 import { Skeleton } from '../components/Skeleton'
 import { LoadingGrid } from '../components/LoadingGrid'
+import { LogoFill } from '../components/LogoFill'
+import { LOGO_URL } from '../lib/constants'
 import { Tour, tourDone, tourSeen, type TourStep } from '../components/Tour'
 import { ServerPopup, type ServerOpt } from '../components/ServerPopup'
 import { useShieldVerified, getToken } from '../lib/shield'
@@ -32,9 +34,9 @@ function Frame({ children }: { children: React.ReactNode }) {
   return <div data-tour="w-player" className="relative aspect-video w-full overflow-hidden bg-black lg:shadow-2xl lg:shadow-black/40 lg:ring-1 lg:ring-white/10">{children}</div>
 }
 
-/** Episode / first load: grid loader bottom-left of the player. `quiet` (server switch) leaves the player black; the loader shows below it. */
-function Loading({ quiet }: { quiet?: boolean }) {
-  return <Frame>{!quiet && <LoadingGrid className="absolute bottom-3 left-3 text-white/60 sm:bottom-4 sm:left-4" />}</Frame>
+/** Episode / first load: the show's logo fills from dim to full colour. `quiet` (server switch) leaves the player black. */
+function Loading({ quiet, logo }: { quiet?: boolean; logo: string }) {
+  return <Frame>{!quiet && <div className="absolute inset-0 grid place-items-center"><LogoFill src={logo} /></div>}</Frame>
 }
 
 function Problem({ message, children }: { message: string; children?: React.ReactNode }) {
@@ -110,6 +112,7 @@ export default function WatchPage() {
   }
 
   const bundle = useTmdb(a?.id, title, a?.format)
+  const logo = tmdbImg(bundle?.tmdb?.logo, 'w500') ?? LOGO_URL
   const eps = useEpisodes(bundle?.tmdb ?? null, a?.streamingEpisodes)
   const kinds = useFiller(a)
   const ctx: EmbedCtx = useMemo(
@@ -211,10 +214,10 @@ export default function WatchPage() {
               </div>
             </Frame>
           ) : !a ? (
-            <Loading quiet={serverBusy} />
+            <Loading quiet={serverBusy} logo={logo} />
           ) : server.kind === 'direct' ? (
             !cur && stream.loading ? (
-              <Loading quiet={serverBusy} />
+              <Loading quiet={serverBusy} logo={logo} />
             ) : !cur ? (
               <Problem message={stream.error?.message ?? 'No stream found.'}>
                 {directList.filter((s) => s.id !== server.id).map((s) => (
@@ -277,7 +280,7 @@ export default function WatchPage() {
             )
           ) : server.kind === 'animesalt' ? (
             salt.loading ? (
-              <Loading quiet={serverBusy} />
+              <Loading quiet={serverBusy} logo={logo} />
             ) : salt.error || !salt.data ? (
               <Problem message={salt.error?.message ?? 'Not found on AnimeSalt.'}>
                 <button onClick={() => go({ server: server.id === 'animesalt-1' ? 'animesalt-2' : 'megaplay' })} className={cn(pill, 'border-white/20 bg-white/10 text-white')}>
@@ -294,7 +297,7 @@ export default function WatchPage() {
               <iframe key={embedSrc} src={embedSrc} title={title} allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowFullScreen className="absolute inset-0 size-full border-0" />
             </Frame>
           ) : bundle === null ? (
-            <Loading quiet={serverBusy} />
+            <Loading quiet={serverBusy} logo={logo} />
           ) : (
             <Problem message={`${server.name} needs an id this title doesn't have.`}>
               <button onClick={() => go({ server: 'megaplay' })} className={cn(pill, 'border-white/20 bg-white/10 text-white')}>

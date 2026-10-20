@@ -26,6 +26,7 @@ import { CharacterCard } from '../components/CharacterCard'
 import { Countdown } from '../components/Countdown'
 import { DotPattern } from '../components/DotPattern'
 import { EpisodeList } from '../components/EpisodeList'
+import { Gallery } from '../components/Gallery'
 import { StarBorder } from '../components/StarBorder'
 import { ErrorState } from '../components/ErrorState'
 import { NumberTicker } from '../components/NumberTicker'
@@ -40,7 +41,7 @@ import { StatusBreakdown } from '../components/StatusBreakdown'
 import { Tabs } from '../components/Tabs'
 import { TrailerModal } from '../components/TrailerModal'
 
-type TabId = 'overview' | 'episodes' | 'order' | 'characters' | 'relations' | 'stats'
+type TabId = 'overview' | 'episodes' | 'order' | 'characters' | 'relations' | 'gallery' | 'stats'
 
 /** AniList's own score / status distributions, shaped like Jikan's so the same charts render when MyAnimeList is slow or down. */
 function anilistStats(a: AniMediaDetails): JikanStats | null {
@@ -206,6 +207,7 @@ export default function DetailsPage() {
     { id: 'order', label: 'Watch order' },
     { id: 'characters', label: 'Characters', count: a.characters.edges.length },
     { id: 'relations', label: 'Related', count: relations.length + print.length },
+    { id: 'gallery', label: 'Gallery' },
     { id: 'stats', label: 'Stats' },
   ]
 
@@ -619,6 +621,8 @@ export default function DetailsPage() {
                   {relations.length === 0 && print.length === 0 && <Empty text="No related titles found." />}
                 </div>
               )}
+
+              {tab === 'gallery' && <Gallery anime={a} tmdb={tmdb} />}
 
               {tab === 'stats' && (
                 <div className="space-y-8">

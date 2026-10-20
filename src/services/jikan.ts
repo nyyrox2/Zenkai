@@ -65,6 +65,8 @@ function get<T>(path: string): Promise<T> {
 }
 
 export const fetchMalFull = (malId: number) => get<JikanFull>(`/anime/${malId}/full`)
+export const fetchMalPictures = (malId: number) =>
+  get<{ jpg: { large_image_url: string | null; image_url: string | null } }[]>(`/anime/${malId}/pictures`)
 export const fetchMalStats = (malId: number) => get<JikanStats>(`/anime/${malId}/statistics`)
 /** MAL's own per-episode filler / recap flags (100 episodes a page). No "mixed" here, that comes from AnimeFillerList. */
 export async function fetchMalEpisodeKinds(malId: number) {

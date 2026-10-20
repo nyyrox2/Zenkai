@@ -35,7 +35,7 @@ function readTrail(): Record<string, string> {
 
 /** Call once in App: remembers which path sits in each history slot (slots are overwritten on push, so it stays accurate). */
 export function useTrackHistory() {
-  const { pathname } = useLocation()
+  const { pathname, key } = useLocation()
   useEffect(() => {
     const idx = window.history.state?.idx
     if (typeof idx !== 'number') return
@@ -47,7 +47,7 @@ export function useTrackHistory() {
     } catch {
       /* storage full / blocked: back falls back to the default */
     }
-  }, [pathname])
+  }, [pathname, key]) // key: episode switches push same-path entries; every slot must be recorded
 }
 
 /** How many history steps back the nearest non-player page is, or null when there is none (use the fallback). */
@@ -57,7 +57,7 @@ export function smartBackDelta(pathname: string): number | null {
   const trail = readTrail()
   for (let i = idx - 1; i >= 0; i--) {
     const p = trail[i]
-    if (p !== undefined && (isPlayerPath(p) || p === pathname)) continue
+    if (p === undefined || isPlayerPath(p) || p === pathname) continue // unrecorded slot: never a safe landing
     return i - idx
   }
   return null

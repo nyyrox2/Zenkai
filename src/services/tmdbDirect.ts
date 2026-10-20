@@ -132,6 +132,15 @@ export async function tmdbDirect(anilistId: number, title: string, format?: stri
   return { mapping: map, tmdb }
 }
 
+/** Every TMDB backdrop + poster for a title (textless backdrops first). */
+export async function tmdbGallery(type: string, id: number): Promise<string[]> {
+  const d = await get(`${TMDB}/${type}/${id}/images?include_image_language=en,null`)
+  const byVotes = (a: any, b: any) => b.vote_average - a.vote_average
+  const bd = (d.backdrops || []).sort((a: any, b: any) => Number(!!a.iso_639_1) - Number(!!b.iso_639_1) || byVotes(a, b))
+  const ps = (d.posters || []).sort(byVotes)
+  return [...bd.slice(0, 40), ...ps.slice(0, 20)].map((i: any) => `https://image.tmdb.org/t/p/w1280${i.file_path}`)
+}
+
 export async function tmdbEpisodesDirect(
   tmdbId: number,
   season: number,

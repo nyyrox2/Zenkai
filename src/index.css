@@ -353,3 +353,10 @@ section[id] {
 html[data-tv] { font-size: 112.5%; scroll-padding-block: 120px; }
 html[data-tv] :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 0.75rem; }
 html[data-tv] a:focus-visible, html[data-tv] button:focus-visible { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 28%, transparent); }
+
+/* ---------- Player loading: logo fills from dim to full colour ---------- */
+.zk-logofill { position: relative; width: min(55%, 360px); }
+.zk-logofill img { display: block; width: 100%; max-height: 40svh; object-fit: contain; filter: brightness(0.25); }
+.zk-logofill .zk-lit { position: absolute; inset: 0; filter: none; animation: zk-logofill 2s ease-in-out infinite; }
+@keyframes zk-logofill { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .zk-logofill .zk-lit { animation: none; } }
