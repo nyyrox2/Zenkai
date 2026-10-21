@@ -1,1 +1,1 @@
-{ "version": 1, "include": ["/api/*", "/proxy"], "exclude": [] }
+{ "version": 1, "include": ["/api/*", "/proxy", "/anime/*", "/mal/*"], "exclude": [] }

@@ -106,7 +106,7 @@ const cleanTitle = (t = "") =>
     .replace(/\s*:\s*$/, "")
     .trim();
 
-async function tmdbFor(anilistId, title, format) {
+export async function tmdbFor(anilistId, title, format) {
   const map = anilistId ? await mapOf(anilistId) : null;
   let ref = map?.tmdb ? { id: map.tmdb.id, type: map.tmdb.type, season: map.tmdb.season } : null;
 
