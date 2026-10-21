@@ -1,36 +1,16 @@
 import type { AniCardMedia, AniMedia } from '../types/anime'
 import type { CatalogParams } from './anilist'
 import { get as jikan } from './jikan'
+import { aniIdCache, resolveAniList } from '../lib/aniIds'
 
 /**
  * AniList is down -> list pages (home / search / browse) come from MyAnimeList (Jikan).
- * Our ids are AniList ids, so every MAL id is translated with AniBridge's sibling ARM in ONE batch call;
- * titles ARM can't map are dropped.
+ * Our ids are AniList ids, so every MAL id is translated with AniBridge (ARM as backup);
+ * titles neither can map are dropped.
  */
-const ARM = 'https://arm.haglund.dev/api/v2/ids?include=anilist,myanimelist'
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const idCache = new Map<number, number | null>()
-
-async function toAniList(mal: number[]): Promise<void> {
-  const need = [...new Set(mal)].filter((m) => !idCache.has(m))
-  if (!need.length) return
-  const ctl = new AbortController()
-  const t = window.setTimeout(() => ctl.abort(), 12000)
-  try {
-    const r = await fetch(ARM, {
-      method: 'POST',
-      signal: ctl.signal,
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(need.map((m) => ({ myanimelist: m }))),
-    })
-    if (!r.ok) throw new Error(String(r.status))
-    const out = (await r.json()) as ({ anilist?: number | null } | null)[]
-    need.forEach((m, i) => idCache.set(m, out[i]?.anilist ?? null))
-  } finally {
-    window.clearTimeout(t)
-  }
-}
+const idCache = aniIdCache
+const toAniList = resolveAniList
 
 const FORMAT: Record<string, string> = { TV: 'TV', Movie: 'MOVIE', OVA: 'OVA', ONA: 'ONA', Special: 'SPECIAL', 'TV Special': 'TV_SPECIAL', Music: 'MUSIC' }
 const STATUS: Record<string, string> = { 'Finished Airing': 'FINISHED', 'Currently Airing': 'RELEASING', 'Not yet aired': 'NOT_YET_RELEASED' }

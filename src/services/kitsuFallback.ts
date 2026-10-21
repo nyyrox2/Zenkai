@@ -1,10 +1,11 @@
 import type { AniCardMedia, AniMedia } from '../types/anime'
 import type { CatalogParams } from './anilist'
 import { getSeason } from '../lib/utils'
+import { aniIdCache, resolveAniList } from '../lib/aniIds'
 
 /**
  * AniList is down -> Kitsu first. Its `mappings` already carry the AniList + MAL ids,
- * so there is no ID-translation hop (that hop was what made the MAL fallback fragile). Max page size is 20.
+ * so most titles need no ID-translation hop; the rest go through AniBridge via their MAL id. Max page size is 20.
  */
 const K = 'https://kitsu.io/api/edge/anime'
 
@@ -18,11 +19,13 @@ async function kitsu(params: Record<string, string>): Promise<AniMedia[]> {
     if (!r.ok) throw new Error(String(r.status))
     const j = await r.json()
     const inc = new Map<string, any>((j.included || []).map((i: any) => [`${i.type}:${i.id}`, i.attributes]))
+    const all = (j.data || []).map((a: any) => toMedia(a, inc)).filter(Boolean) as AniMedia[]
+    await resolveAniList(all.filter((m) => !m.id && m.idMal).map((m) => m.idMal as number))
     const seen = new Set<number>()
     const out: AniMedia[] = []
-    for (const a of j.data || []) {
-      const m = toMedia(a, inc)
-      if (!m || seen.has(m.id)) continue
+    for (const m of all) {
+      m.id ||= aniIdCache.get(m.idMal as number) ?? 0
+      if (!m.id || seen.has(m.id)) continue
       seen.add(m.id)
       out.push(m)
     }
@@ -40,13 +43,14 @@ function toMedia(d: any, inc: Map<string, any>): AniMedia | null {
   if (a.nsfw || a.ageRating === 'R18') return null
   const maps = (d.relationships?.mappings?.data || []).map((r: any) => inc.get(`mappings:${r.id}`)).filter(Boolean)
   const ext = (site: string) => Number(maps.find((m: any) => m.externalSite === site)?.externalId) || null
-  const id = ext('anilist/anime')
-  if (!id) return null
+  const id = ext('anilist/anime') ?? 0
+  const idMal = ext('myanimelist/anime')
+  if (!id && !idMal) return null
   const cover = a.posterImage?.large || a.posterImage?.original || null
   const start = a.startDate ? new Date(a.startDate) : null
   return {
     id,
-    idMal: ext('myanimelist/anime'),
+    idMal,
     title: { romaji: a.titles?.en_jp ?? a.canonicalTitle ?? null, english: a.titles?.en ?? a.canonicalTitle ?? null, native: a.titles?.ja_jp ?? null },
     coverImage: { extraLarge: cover, large: cover, color: null },
     bannerImage: a.coverImage?.large || a.coverImage?.original || null,
