@@ -78,12 +78,15 @@ async function mapLists(...lists: any[][]): Promise<AniMedia[][]> {
 }
 
 export async function homeFromMal() {
-  const [now, top, pop, soon] = await Promise.all([
-    jikan<any[]>('/seasons/now?limit=24&sfw'),
-    jikan<any[]>('/top/anime?limit=24&sfw'),
-    jikan<any[]>('/top/anime?filter=bypopularity&limit=24&sfw'),
-    jikan<any[]>('/seasons/upcoming?limit=24&sfw'),
-  ])
+  const ok = (r: PromiseSettledResult<any[]>) => (r.status === 'fulfilled' ? r.value : [])
+  const [now, top, pop, soon] = (
+    await Promise.allSettled([
+      jikan<any[]>('/seasons/now?limit=24&sfw'),
+      jikan<any[]>('/top/anime?limit=24&sfw'),
+      jikan<any[]>('/top/anime?filter=bypopularity&limit=24&sfw'),
+      jikan<any[]>('/seasons/upcoming?limit=24&sfw'),
+    ])
+  ).map(ok)
   const [n, t, p, u] = await mapLists(now, top, pop, soon)
   if (!n.length && !t.length && !p.length) throw new Error('No fallback data')
   const card = (l: AniMedia[]): AniCardMedia[] => l.slice(0, 18)

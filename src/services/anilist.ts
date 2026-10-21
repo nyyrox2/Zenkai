@@ -3,6 +3,7 @@ import { getSeason } from '../lib/utils'
 import { fetchAnimeFallback } from './fallback'
 import { AniListDownError, markAniListDown, markAniListUp } from '../lib/anilistStatus'
 import { catalogFromMal, homeFromMal, searchFromMal } from './malFallback'
+import { catalogFromKitsu, homeFromKitsu, searchFromKitsu } from './kitsuFallback'
 
 const ENDPOINT = 'https://graphql.anilist.co'
 const TTL = 5 * 60 * 1000
@@ -39,18 +40,21 @@ async function gql<T>(query: string, variables: Record<string, unknown> = {}): P
   return json.data as T
 }
 
-/** AniList first; when it is down, run the MAL / TMDB fallback and flag the site-wide "AniList is down" banner. */
-async function guard<T>(run: () => Promise<T>, fb: () => Promise<T>): Promise<T> {
+/** AniList first; when it is down try each fallback in order (Kitsu, then MAL) and flag the site-wide banner. */
+async function guard<T>(run: () => Promise<T>, ...fbs: (() => Promise<T>)[]): Promise<T> {
   try {
     return await run()
   } catch (err) {
     if (!(err instanceof AniListDownError)) throw err
     markAniListDown()
-    try {
-      return await fb()
-    } catch {
-      throw new Error('AniList is down and the MAL fallback failed too. Try again in a minute.')
+    for (const fb of fbs) {
+      try {
+        return await fb()
+      } catch {
+        /* next fallback */
+      }
     }
+    throw new Error('AniList is down and every fallback failed too. Try again in a minute.')
   }
 }
 
@@ -92,7 +96,7 @@ const CARD_FIELDS = /* GraphQL */ `
 `
 
 /* ---------- Home: one request, five rows (only the hero rows carry full fields) ---------- */
-export const fetchHome = (): Promise<HomeData> => guard(homeAniList, homeFromMal)
+export const fetchHome = (): Promise<HomeData> => guard(homeAniList, homeFromKitsu, homeFromMal)
 async function homeAniList(): Promise<HomeData> {
   const { season, year } = getSeason()
   const query = /* GraphQL */ `
@@ -132,7 +136,7 @@ async function homeAniList(): Promise<HomeData> {
 
 /* ---------- Search ---------- */
 export const searchAnime = (search: string, genre?: string): Promise<AniMedia[]> =>
-  guard(() => searchAniList(search, genre), () => searchFromMal(search))
+  guard(() => searchAniList(search, genre), () => searchFromKitsu(search), () => searchFromMal(search))
 async function searchAniList(search: string, genre?: string): Promise<AniMedia[]> {
   const query = /* GraphQL */ `
     query ($search: String, $genre: String, $sort: [MediaSort]) {
@@ -243,7 +247,7 @@ export interface CatalogParams {
 }
 
 export const fetchCatalog = (p: CatalogParams, page: number): Promise<{ items: AniCardMedia[]; hasNext: boolean }> =>
-  guard(() => catalogAniList(p, page), () => catalogFromMal(p, page))
+  guard(() => catalogAniList(p, page), () => catalogFromKitsu(p, page), () => catalogFromMal(p, page))
 async function catalogAniList(p: CatalogParams, page: number): Promise<{ items: AniCardMedia[]; hasNext: boolean }> {
   const query = /* GraphQL */ `
     query ($page: Int, $search: String, $genre: String, $format: MediaFormat, $year: Int, $season: MediaSeason, $status: MediaStatus, $sort: [MediaSort], $pop: Int) {
