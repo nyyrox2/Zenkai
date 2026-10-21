@@ -307,14 +307,6 @@ export default function DetailsPage() {
         </button>
       </div>
 
-      {a.fallback && (
-        <div className="relative z-20 mx-auto mt-4 flex max-w-7xl items-center gap-2 px-4 sm:px-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-glass px-4 py-2 text-xs font-medium text-muted backdrop-blur-xl">
-            <ShieldAlert className="size-4 text-amber-400" /> AniList is down — showing fallback data from TMDB
-          </div>
-        </div>
-      )}
-
       {/* ---------- Body ---------- */}
       <div className="relative mx-auto -mt-24 grid max-w-7xl gap-8 px-4 pb-16 sm:px-6 lg:-mt-32 lg:grid-cols-[290px_minmax(0,1fr)] lg:gap-12">
         {/* Sidebar */}

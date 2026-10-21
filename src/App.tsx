@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { AniListDownBanner } from './components/AniListDownBanner'
 import { Footer } from './components/Footer'
 import { MobileDock } from './components/MobileDock'
 import { Navbar } from './components/Navbar'
@@ -70,6 +71,7 @@ export default function App() {
       <TopLoader />
       {!bare && <ScrollProgress />}
       <ScrollToTop />
+      {!bare && <AniListDownBanner />}
       {!bare && !isDetailsPath(pathname) && <Navbar />}
       <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<PageLoader />}>

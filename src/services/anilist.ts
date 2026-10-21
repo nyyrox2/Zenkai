@@ -1,6 +1,8 @@
 import type { AniAiringEntry, AniCardMedia, AniMedia, AniMediaDetails, AniStreamingEpisode, HomeData, WatchOrderEntry } from '../types/anime'
 import { getSeason } from '../lib/utils'
 import { fetchAnimeFallback } from './fallback'
+import { AniListDownError, markAniListDown, markAniListUp } from '../lib/anilistStatus'
+import { catalogFromMal, homeFromMal, searchFromMal } from './malFallback'
 
 const ENDPOINT = 'https://graphql.anilist.co'
 const TTL = 5 * 60 * 1000
@@ -12,22 +14,44 @@ async function gql<T>(query: string, variables: Record<string, unknown> = {}): P
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < TTL) return hit.data as T
 
-  const res = await fetch(ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ query, variables }),
-  })
+  let res: Response
+  try {
+    res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ query, variables }),
+    })
+  } catch {
+    throw new AniListDownError('AniList is unreachable right now.')
+  }
 
   const json = await res.json().catch(() => null)
 
   if (!res.ok || json?.errors?.length) {
-    if (res.status === 429) throw new Error('AniList rate limit reached. Please wait a minute and retry.')
+    if (res.status === 429) throw new AniListDownError('AniList rate limit reached. Please wait a minute and retry.')
+    if (res.status >= 500) throw new AniListDownError(`AniList is down (${res.status}).`)
     if (res.status === 404) throw new Error('Anime not found.')
     throw new Error(json?.errors?.[0]?.message ?? `AniList request failed (${res.status})`)
   }
 
+  markAniListUp()
   cache.set(key, { at: Date.now(), data: json.data })
   return json.data as T
+}
+
+/** AniList first; when it is down, run the MAL / TMDB fallback and flag the site-wide "AniList is down" banner. */
+async function guard<T>(run: () => Promise<T>, fb: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (err) {
+    if (!(err instanceof AniListDownError)) throw err
+    markAniListDown()
+    try {
+      return await fb()
+    } catch {
+      throw new Error('AniList is down and the MAL fallback failed too. Try again in a minute.')
+    }
+  }
 }
 
 const MEDIA_FIELDS = /* GraphQL */ `
@@ -68,7 +92,8 @@ const CARD_FIELDS = /* GraphQL */ `
 `
 
 /* ---------- Home: one request, five rows (only the hero rows carry full fields) ---------- */
-export async function fetchHome(): Promise<HomeData> {
+export const fetchHome = (): Promise<HomeData> => guard(homeAniList, homeFromMal)
+async function homeAniList(): Promise<HomeData> {
   const { season, year } = getSeason()
   const query = /* GraphQL */ `
     query ($season: MediaSeason, $year: Int) {
@@ -106,7 +131,9 @@ export async function fetchHome(): Promise<HomeData> {
 }
 
 /* ---------- Search ---------- */
-export async function searchAnime(search: string, genre?: string): Promise<AniMedia[]> {
+export const searchAnime = (search: string, genre?: string): Promise<AniMedia[]> =>
+  guard(() => searchAniList(search, genre), () => searchFromMal(search))
+async function searchAniList(search: string, genre?: string): Promise<AniMedia[]> {
   const query = /* GraphQL */ `
     query ($search: String, $genre: String, $sort: [MediaSort]) {
       Page(perPage: 12) {
@@ -188,6 +215,7 @@ async function withFallback(run: () => Promise<AniMediaDetails>, id: number, fro
     return await run()
   } catch (err) {
     if (err instanceof Error && err.message === 'Anime not found.') throw err
+    markAniListDown()
     try {
       return await fetchAnimeFallback(id, fromMal)
     } catch {
@@ -214,7 +242,9 @@ export interface CatalogParams {
   minPopularity?: number
 }
 
-export async function fetchCatalog(p: CatalogParams, page: number): Promise<{ items: AniCardMedia[]; hasNext: boolean }> {
+export const fetchCatalog = (p: CatalogParams, page: number): Promise<{ items: AniCardMedia[]; hasNext: boolean }> =>
+  guard(() => catalogAniList(p, page), () => catalogFromMal(p, page))
+async function catalogAniList(p: CatalogParams, page: number): Promise<{ items: AniCardMedia[]; hasNext: boolean }> {
   const query = /* GraphQL */ `
     query ($page: Int, $search: String, $genre: String, $format: MediaFormat, $year: Int, $season: MediaSeason, $status: MediaStatus, $sort: [MediaSort], $pop: Int) {
       Page(page: $page, perPage: 24) {
@@ -240,7 +270,13 @@ export async function fetchCatalog(p: CatalogParams, page: number): Promise<{ it
 }
 
 /* ---------- Schedule ---------- */
-export async function fetchAiring(from: number, to: number): Promise<AniAiringEntry[]> {
+export const fetchAiring = (from: number, to: number): Promise<AniAiringEntry[]> =>
+  airingAniList(from, to).catch((err) => {
+    if (!(err instanceof AniListDownError)) throw err
+    markAniListDown()
+    throw new Error('AniList is down, and the schedule needs it. Try again in a minute.')
+  })
+async function airingAniList(from: number, to: number): Promise<AniAiringEntry[]> {
   const query = /* GraphQL */ `
     query ($page: Int, $from: Int, $to: Int) {
       Page(page: $page, perPage: 50) {
@@ -286,10 +322,11 @@ export interface AniLite extends AniMedia {
   relations: { edges: { relationType: string; node: { id: number; type: string; format: string | null; title: AniMedia['title'] } }[] }
 }
 
-export async function fetchAnimeLite(id: number): Promise<AniLite> {
-  const data = await gql<{ Media: AniLite }>(LITE_QUERY, { id })
-  return data.Media
-}
+export const fetchAnimeLite = (id: number): Promise<AniLite> =>
+  guard(
+    async () => (await gql<{ Media: AniLite }>(LITE_QUERY, { id })).Media,
+    () => fetchAnimeFallback(id, false) as Promise<AniLite>,
+  )
 
 /* ---------- Watch order (franchise walk through PREQUEL / SEQUEL / SIDE_STORY / SPIN_OFF / PARENT) ---------- */
 interface OrderNode {

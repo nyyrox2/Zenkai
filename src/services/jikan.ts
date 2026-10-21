@@ -50,7 +50,7 @@ async function request<T>(path: string): Promise<T> {
   throw last instanceof Error ? last : new Error('MyAnimeList is unreachable')
 }
 
-function get<T>(path: string): Promise<T> {
+export function get<T>(path: string): Promise<T> {
   if (done.has(path)) return Promise.resolve(done.get(path) as T)
   const pending = inflight.get(path)
   if (pending) return pending as Promise<T>
