@@ -1,7 +1,7 @@
 /**
  * Artwork pools for the rotating hero images (landing cards, Manga / Novels hero).
  * Anime + manga come from AniList's most popular and trending lists (One Piece, Naruto, Bleach…), novels from Lnori's
- * library with NovelFire as a fallback. Pools are cached for a few hours; the shuffle happens on every page view.
+ * library with NovelFire as a fallback. When AniList is down the anime / manga pools come from Kitsu instead. Pools are cached for a few hours; the shuffle happens on every page view.
  */
 import { apiUrl } from './api'
 import { fetchNovelHome } from './novel'
@@ -86,6 +86,26 @@ async function loadAniList(): Promise<Pick<ShowcasePools, 'anime' | 'manga'>> {
   return v
 }
 
+/** AniList is down -> most popular anime / manga straight from Kitsu (20 per page, two pages each). Not cached, so AniList is retried next visit. */
+async function loadKitsu(): Promise<Pick<ShowcasePools, 'anime' | 'manga'>> {
+  type Raw = { data?: { attributes: { nsfw?: boolean; ageRating?: string | null; canonicalTitle?: string; titles?: { en?: string; en_jp?: string }; posterImage?: { large?: string; original?: string } | null; coverImage?: { large?: string; original?: string } | null } }[] }
+  const page = async (kind: 'anime' | 'manga', offset: number): Promise<ShowcaseImage[]> => {
+    const q = new URLSearchParams({ sort: 'popularityRank', 'page[limit]': '20', 'page[offset]': String(offset) })
+    const r = await fetch(`https://kitsu.io/api/edge/${kind}?${q}`, { headers: { Accept: 'application/vnd.api+json' } })
+    if (!r.ok) throw new Error(`Kitsu ${r.status}`)
+    const out: ShowcaseImage[] = []
+    for (const { attributes: a } of ((await r.json()) as Raw).data ?? []) {
+      const src = a.posterImage?.large || a.posterImage?.original
+      if (!src || a.nsfw || a.ageRating === 'R18') continue
+      out.push({ src, wide: a.coverImage?.large || a.coverImage?.original || null, title: a.titles?.en || a.titles?.en_jp || a.canonicalTitle || 'Untitled' })
+    }
+    return out
+  }
+  const both = (kind: 'anime' | 'manga') => Promise.all([page(kind, 0), page(kind, 20)].map((p) => p.catch(() => [] as ShowcaseImage[]))).then((l) => l.flat())
+  const [anime, manga] = await Promise.all([both('anime'), both('manga')])
+  return { anime, manga }
+}
+
 async function loadNovels(): Promise<ShowcaseImage[]> {
   for (const source of ['lnori', 'novelfire'] as const) {
     try {
@@ -126,7 +146,7 @@ let pools: Promise<ShowcasePools> | null = null
 /** One shared load for the whole page; a source that fails just yields an empty pool (the card keeps its plain look). */
 export function fetchShowcase(): Promise<ShowcasePools> {
   pools ??= (async () => {
-    const [ani, novel, movies] = await Promise.all([loadAniList().catch(() => ({ anime: [], manga: [] })), loadNovels(), loadMovies()])
+    const [ani, novel, movies] = await Promise.all([loadAniList().catch(() => loadKitsu()).catch(() => ({ anime: [], manga: [] })), loadNovels(), loadMovies()])
     return { anime: ani.anime, manga: ani.manga, novel, movies }
   })()
   return pools
