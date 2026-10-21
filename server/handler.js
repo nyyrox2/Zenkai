@@ -139,6 +139,7 @@ export async function tmdbFor(anilistId, title, format) {
     map,
     tmdb: {
       id: ref.id,
+      name: d.name || d.title || null,
       type: ref.type,
       season: ref.season,
       imdbId: d.external_ids?.imdb_id || map?.imdb || null,

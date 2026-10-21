@@ -7,31 +7,68 @@ const plain = (s = "") => s.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
 
 const memo = new Map();
+
+/** Own AniList GraphQL call (direct, no third party). One retry on 429/5xx; successful results go in the Cloudflare edge cache. */
+async function anilist(kind, id) {
+  const cache = typeof caches !== "undefined" ? caches.default : null;
+  const ck = new Request(`https://share-cache.invalid/anilist/${kind}/${id}`);
+  const hit = cache && (await cache.match(ck).catch(() => null));
+  if (hit) return { m: await hit.json(), why: "" };
+
+  const query = `query($id:Int){Media(${kind === "mal" ? "idMal" : "id"}:$id,type:ANIME){id format description(asHtml:false) bannerImage coverImage{extraLarge large} title{romaji english}}}`;
+  let why = "";
+  for (let i = 0; i < 2; i++) {
+    try {
+      const r = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; ZenkaiShare/1.0)" },
+        body: JSON.stringify({ query, variables: { id: Number(id) } }),
+      });
+      if (r.ok) {
+        const m = (await r.json())?.data?.Media || null;
+        if (!m) return { m: null, why: "anilist empty" };
+        if (cache) await cache.put(ck, new Response(JSON.stringify(m), { headers: { "Cache-Control": "public, max-age=86400" } })).catch(() => {});
+        return { m, why: "" };
+      }
+      why = `anilist ${r.status}`;
+      if (r.status !== 429 && r.status < 500) break;
+      await new Promise((ok) => setTimeout(ok, 400));
+    } catch (e) {
+      why = "anilist " + String(e?.message || e).slice(0, 40);
+    }
+  }
+  return { m: null, why };
+}
 async function cardFor(kind, id) {
   const key = `${kind}:${id}`;
   const hit = memo.get(key);
   if (hit && Date.now() - hit.at < 6 * 3600e3) return hit.v;
 
-  const query = `query($id:Int){Media(${kind === "mal" ? "idMal" : "id"}:$id,type:ANIME){id format description(asHtml:false) bannerImage coverImage{extraLarge large} title{romaji english}}}`;
-  const r = await fetch("https://graphql.anilist.co", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ query, variables: { id: Number(id) } }),
-  });
-  if (!r.ok) return null;
-  const m = (await r.json())?.data?.Media;
-  if (!m) return null;
+  const { m, why } = await anilist(kind, id);
 
-  const title = m.title.english || m.title.romaji;
-  let image = null;
-  try {
-    const { tmdb } = await tmdbFor(m.id, m.title.romaji || title, m.format);
-    const pick = tmdb?.backdrops?.[0] || tmdb?.backdrop;
-    if (pick) image = TMDB_IMG + pick;
-  } catch {}
-  image = image || m.bannerImage || m.coverImage?.extraLarge || m.coverImage?.large || null;
+  let title, desc = "", image = null;
+  if (m) {
+    title = m.title.english || m.title.romaji;
+    desc = clip(plain(m.description || ""), 200);
+    try {
+      const { tmdb } = await tmdbFor(m.id, m.title.romaji || title, m.format);
+      const pick = tmdb?.backdrops?.[0] || tmdb?.backdrop;
+      if (pick) image = TMDB_IMG + pick;
+    } catch {}
+    image = image || m.bannerImage || m.coverImage?.extraLarge || m.coverImage?.large || null;
+  } else if (kind === "anilist") {
+    // AniList unreachable from the edge: AniBridge/ARM mapping -> TMDB gives title, overview and backdrop on its own
+    try {
+      const { tmdb } = await tmdbFor(Number(id), "", null);
+      if (!tmdb?.name) throw new Error("tmdb none");
+      title = tmdb.name;
+      desc = clip(plain(tmdb.overview || ""), 200);
+      const pick = tmdb.backdrops?.[0] || tmdb.backdrop;
+      if (pick) image = TMDB_IMG + pick;
+    } catch (e) { throw new Error(why + "; tmdb " + String(e?.message || e).slice(0, 40)); }
+  } else throw new Error(why);
 
-  const v = { title, desc: clip(plain(m.description || ""), 200), image };
+  const v = { title, desc, image };
   memo.set(key, { at: Date.now(), v });
   return v;
 }

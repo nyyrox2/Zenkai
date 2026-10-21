@@ -1,5 +1,6 @@
 import type { AniAiringEntry, AniCardMedia, AniMedia, AniMediaDetails, AniStreamingEpisode, HomeData, WatchOrderEntry } from '../types/anime'
 import { getSeason } from '../lib/utils'
+import { fetchAnimeFallback } from './fallback'
 
 const ENDPOINT = 'https://graphql.anilist.co'
 const TTL = 5 * 60 * 1000
@@ -181,15 +182,25 @@ const DETAILS_QUERY = /* GraphQL */ `
   ${MEDIA_FIELDS}
 `
 
-export async function fetchAnimeById(id: number): Promise<AniMediaDetails> {
-  const data = await gql<{ Media: AniMediaDetails }>(DETAILS_QUERY, { id })
-  return data.Media
+/** AniList first; if it's down / rate limited, rebuild the page from TMDB (ids via AniBridge). "Not found" is not a fallback case. */
+async function withFallback(run: () => Promise<AniMediaDetails>, id: number, fromMal: boolean): Promise<AniMediaDetails> {
+  try {
+    return await run()
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Anime not found.') throw err
+    try {
+      return await fetchAnimeFallback(id, fromMal)
+    } catch {
+      throw err
+    }
+  }
 }
 
-export async function fetchAnimeByMalId(idMal: number): Promise<AniMediaDetails> {
-  const data = await gql<{ Media: AniMediaDetails }>(DETAILS_QUERY, { idMal })
-  return data.Media
-}
+export const fetchAnimeById = (id: number) =>
+  withFallback(async () => (await gql<{ Media: AniMediaDetails }>(DETAILS_QUERY, { id })).Media, id, false)
+
+export const fetchAnimeByMalId = (idMal: number) =>
+  withFallback(async () => (await gql<{ Media: AniMediaDetails }>(DETAILS_QUERY, { idMal })).Media, idMal, true)
 
 /* ---------- Catalog (Trending / Popular / Top / Browse) ---------- */
 export interface CatalogParams {

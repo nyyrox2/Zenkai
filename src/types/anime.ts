@@ -93,6 +93,8 @@ export interface AniStreamingEpisode {
 }
 
 export interface AniMediaDetails extends AniMedia {
+  /** true when AniList was unreachable and this was rebuilt from TMDB */
+  fallback?: boolean
   streamingEpisodes: AniStreamingEpisode[]
   meanScore: number | null
   favourites: number | null
