@@ -125,6 +125,10 @@ export interface MangaPrefs {
   keepAwake: boolean
   /** go to the next chapter by itself at the end (paged modes) */
   autoNext: boolean
+  /** auto scroll speed in webtoon mode, 1..10 */
+  autoSpeed: number
+  /** seconds per page for auto page turning in paged modes, 2..30 */
+  autoSecs: number
   /** greyscale pages */
   grayscale: boolean
 }
@@ -143,6 +147,8 @@ export const DEFAULT_MANGA: MangaPrefs = {
   pageBadge: true,
   keepAwake: false,
   autoNext: false,
+  autoSpeed: 4,
+  autoSecs: 8,
   grayscale: false,
 }
 

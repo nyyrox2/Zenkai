@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
-import { ArrowDownUp, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, List, Maximize, Minimize, RefreshCw, RotateCcw, Settings, X } from 'lucide-react'
+import { ArrowDownUp, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, List, Maximize, Minimize, Minus, Pause, Play, Plus, RefreshCw, RotateCcw, Settings, X } from 'lucide-react'
 import { useAsync } from '../hooks/useAsync'
 import { mangaSourceInfo, readingKey, resolveMangaSource, sourceParams, type MangaSourceId } from '../lib/mangaModels'
 import { DEFAULT_MANGA, getReading, loadPrefs, savePrefs, saveReading, type MangaPrefs } from '../lib/reading'
@@ -100,6 +100,7 @@ function Reader({ id, chapterId }: { id: string; chapterId: string }) {
   const [bar, setBar] = useState(true)
   const [pageIdx, setPageIdx] = useState(0)
   const [full, setFull] = useState(false)
+  const [auto, setAuto] = useState(false)
 
   const list = useAsync(() => fetchMangaChapters(id, source).catch(() => [] as MangaChapterRef[]), [id, source])
   const pagesQ = useAsync(() => fetchMangaPages(chapterId, source), [chapterId, source])
@@ -138,6 +139,7 @@ function Reader({ id, chapterId }: { id: string; chapterId: string }) {
     setPageIdx(0)
     setPanel('none')
     setBar(true)
+    setAuto(false)
     window.scrollTo({ top: 0, left: 0 })
   }, [chapterId])
 
@@ -285,6 +287,57 @@ function Reader({ id, chapterId }: { id: string; chapterId: string }) {
     [pages.length, paged, jumpTo],
   )
 
+  const toggleAuto = useCallback(() => {
+    if (!auto) setBar(false)
+    setAuto(!auto)
+  }, [auto])
+
+  /* auto scroll: webtoon = smooth px/s, paged = turn the page every N seconds.
+     Stops by itself at the end of the chapter, when the tab is hidden, or when you take over (wheel / touch / scroll keys).
+     Paused while a side panel is open. ponytail: no auto-jump to the next chapter; add when asked. */
+  const running = auto && panel === 'none' && pages.length > 0
+  useEffect(() => {
+    if (!auto) return
+    const stop = () => setAuto(false)
+    const hidden = () => document.hidden && stop()
+    const key = (e: KeyboardEvent) => ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', ' ', 'Home', 'End'].includes(e.key) && stop()
+    document.addEventListener('visibilitychange', hidden)
+    window.addEventListener('wheel', stop, { passive: true })
+    window.addEventListener('touchstart', stop, { passive: true })
+    window.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('visibilitychange', hidden)
+      window.removeEventListener('wheel', stop)
+      window.removeEventListener('touchstart', stop)
+      window.removeEventListener('keydown', key)
+    }
+  }, [auto])
+
+  useEffect(() => {
+    if (!running || paged) return
+    let raf = 0
+    let prev = 0
+    let pos = window.scrollY // own float position: scrollY may be rounded, which would swallow slow speeds
+    const tick = (t: number) => {
+      const dt = prev ? Math.min(t - prev, 100) : 0
+      prev = t
+      if (Math.abs(window.scrollY - pos) > 50) pos = window.scrollY // layout shift or scrollbar drag: follow it
+      pos += (prefs.autoSpeed * 40 * dt) / 1000
+      window.scrollTo({ top: pos, left: 0 })
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) return setAuto(false)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [running, paged, prefs.autoSpeed])
+
+  useEffect(() => {
+    if (!running || !paged) return
+    if (pageIdx >= last) return setAuto(false)
+    const t = window.setTimeout(() => step(1), prefs.autoSecs * 1000)
+    return () => window.clearTimeout(t) // a manual turn changes pageIdx and restarts the countdown
+  }, [running, paged, pageIdx, last, step, prefs.autoSecs])
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null
@@ -292,6 +345,7 @@ function Reader({ id, chapterId }: { id: string; chapterId: string }) {
       if (e.ctrlKey || e.metaKey || e.altKey) return
       if (e.key === 'Escape') return setPanel('none')
       if (e.key === 'f' || e.key === 'F') return toggleFull()
+      if (e.key === 'a' || e.key === 'A') return toggleAuto()
       if (e.key === 'c' || e.key === 'C') return setPanel((p) => (p === 'chapters' ? 'none' : 'chapters'))
       if (e.key === 's' || e.key === 'S') return setPanel((p) => (p === 'settings' ? 'none' : 'settings'))
       if (e.key === '[') return toChapter(older)
@@ -310,7 +364,7 @@ function Reader({ id, chapterId }: { id: string; chapterId: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [paged, panel, rtl, step, goPage, pages.length, toChapter, older, newer, toggleFull])
+  }, [paged, panel, rtl, step, goPage, pages.length, toChapter, older, newer, toggleFull, toggleAuto])
 
   /* paged: tap zones + swipe */
   const down = useRef<{ x: number; y: number } | null>(null)
@@ -365,6 +419,9 @@ function Reader({ id, chapterId }: { id: string; chapterId: string }) {
           </div>
           <button type="button" aria-label="Fullscreen" onClick={toggleFull} className="hidden size-10 place-items-center rounded-full transition hover:bg-black/10 active:scale-90 sm:grid">
             {full ? <Minimize className="size-[18px]" /> : <Maximize className="size-[18px]" />}
+          </button>
+          <button type="button" aria-label={auto ? 'Stop auto scroll' : 'Start auto scroll'} aria-pressed={auto} onClick={toggleAuto} className={cn('grid size-10 place-items-center rounded-full transition hover:bg-black/10 active:scale-90', auto && 'bg-accent/20 text-accent')}>
+            {auto ? <Pause className="size-5" /> : <Play className="size-5" />}
           </button>
           <button type="button" aria-label="Chapters" onClick={() => setPanel((p) => (p === 'chapters' ? 'none' : 'chapters'))} className={cn('grid size-10 place-items-center rounded-full transition hover:bg-black/10 active:scale-90', panel === 'chapters' && 'bg-accent/20 text-accent')}>
             <List className="size-5" />
@@ -451,6 +508,34 @@ function Reader({ id, chapterId }: { id: string; chapterId: string }) {
           <div onClick={(e) => e.stopPropagation()}>
             <EndCard label={chapterLabel} hasNext={!!newer} hasPrev={!!older} onPrev={() => toChapter(older)} onNext={() => toChapter(newer)} details={details} />
           </div>
+        </div>
+      )}
+
+      {/* auto scroll controls: stay reachable while the bars are hidden */}
+      {auto && pages.length > 0 && (
+        <div className={cn('fixed right-3 z-[41] flex items-center gap-1 rounded-full bg-black/70 p-1 text-white shadow-lg backdrop-blur-md transition-[bottom] duration-300', barShown ? 'bottom-20' : 'bottom-4')}>
+          <button type="button" aria-label="Pause auto scroll" onClick={() => setAuto(false)} className="grid size-9 place-items-center rounded-full bg-accent text-accent-fg active:scale-90">
+            <Pause className="size-4" />
+          </button>
+          <button
+            type="button"
+            aria-label={paged ? 'Slower' : 'Slower scroll'}
+            disabled={paged ? prefs.autoSecs >= 30 : prefs.autoSpeed <= 1}
+            onClick={() => update(paged ? { autoSecs: Math.min(30, prefs.autoSecs + 1) } : { autoSpeed: Math.max(1, prefs.autoSpeed - 1) })}
+            className="grid size-9 place-items-center rounded-full active:scale-90 disabled:opacity-30"
+          >
+            <Minus className="size-4" />
+          </button>
+          <span className="w-9 text-center text-xs font-semibold tabular-nums">{paged ? `${prefs.autoSecs}s` : `${prefs.autoSpeed}×`}</span>
+          <button
+            type="button"
+            aria-label={paged ? 'Faster' : 'Faster scroll'}
+            disabled={paged ? prefs.autoSecs <= 2 : prefs.autoSpeed >= 10}
+            onClick={() => update(paged ? { autoSecs: Math.max(2, prefs.autoSecs - 1) } : { autoSpeed: Math.min(10, prefs.autoSpeed + 1) })}
+            className="grid size-9 place-items-center rounded-full active:scale-90 disabled:opacity-30"
+          >
+            <Plus className="size-4" />
+          </button>
         </div>
       )}
 
@@ -618,6 +703,19 @@ function ReaderSettings({ prefs, update, onReset }: { prefs: MangaPrefs; update:
         <input type="range" min={40} max={100} step={5} value={prefs.brightness} onChange={(e) => update({ brightness: Number(e.target.value) })} aria-label="Brightness" className="h-1 w-full accent-[var(--accent)]" />
       </div>
 
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <p className={lab}>{paged ? 'Auto page turn' : 'Auto scroll speed'}</p>
+          <span className="text-xs tabular-nums opacity-70">{paged ? `${prefs.autoSecs}s per page` : `${prefs.autoSpeed} / 10`}</span>
+        </div>
+        {paged ? (
+          <input type="range" min={2} max={30} step={1} dir="rtl" value={prefs.autoSecs} onChange={(e) => update({ autoSecs: Number(e.target.value) })} aria-label="Seconds per page" className="h-1 w-full accent-[var(--accent)]" />
+        ) : (
+          <input type="range" min={1} max={10} step={1} value={prefs.autoSpeed} onChange={(e) => update({ autoSpeed: Number(e.target.value) })} aria-label="Auto scroll speed" className="h-1 w-full accent-[var(--accent)]" />
+        )}
+        <p className="text-xs opacity-60">Start it with the play button at the top or the A key. Touching, scrolling or reaching the end stops it.</p>
+      </div>
+
       <div className="space-y-2">
         <p className={lab}>Display</p>
         <Toggle label="Info bar" hint="Page, progress, chapter, server and time" on={prefs.infoBar} onChange={(v) => update({ infoBar: v })} />
@@ -638,7 +736,7 @@ function ReaderSettings({ prefs, update, onReset }: { prefs: MangaPrefs; update:
       <button type="button" onClick={onReset} className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-current/20 py-3 text-sm font-semibold transition active:scale-95">
         <RotateCcw className="size-4" /> Reset to defaults
       </button>
-      <p className="hidden text-center text-[11px] opacity-50 sm:block">Keys: ← → turn · C chapters · S settings · F fullscreen · [ ] chapter</p>
+      <p className="hidden text-center text-[11px] opacity-50 sm:block">Keys: ← → turn · C chapters · S settings · F fullscreen · A auto scroll · [ ] chapter</p>
     </div>
   )
 }
