@@ -478,12 +478,14 @@ function Reader({ id, chapterId }: { id: string; chapterId: string }) {
         <div
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
-          className={cn('mx-auto flex min-h-svh select-none items-start justify-center', prefs.fit === 'original' ? 'touch-auto overflow-auto' : 'touch-pan-y', prefs.fit === 'height' && 'items-center')}
+          className={cn('mx-auto flex min-h-svh select-none', prefs.fit === 'original' ? 'touch-auto overflow-auto' : 'touch-pan-y')}
           style={{ maxWidth: prefs.fit === 'width' ? '56rem' : undefined }}
         >
           {atEnd ? (
             <EndCard label={chapterLabel} hasNext={!!newer} hasPrev={!!older} onPrev={() => toChapter(older)} onNext={() => toChapter(newer)} details={details} />
           ) : (
+            // m-auto centres the page both ways and, unlike items/justify-center, never clips an oversized page
+            <div className={cn('m-auto', prefs.fit === 'original' ? 'w-max' : 'w-full')}>
             <PageImg
               key={`${chapterId}:${pageIdx}`}
               source={source}
@@ -496,6 +498,7 @@ function Reader({ id, chapterId }: { id: string; chapterId: string }) {
                 prefs.fit === 'original' && 'mx-auto w-auto max-w-none',
               )}
             />
+            </div>
           )}
         </div>
       ) : (
