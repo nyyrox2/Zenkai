@@ -1,11 +1,17 @@
 import { Link } from 'react-router-dom'
 import { Play, X } from 'lucide-react'
 import { removeHistory, useHistory, type HistoryItem } from '../lib/library'
+import { cn } from '../lib/utils'
 
-const left = (h: HistoryItem) => (h.dur > 0 ? `${Math.max(1, Math.ceil((h.dur - h.pos) / 60))}m left` : null)
+const left = (h: HistoryItem) => {
+  if (h.dur > 0 && h.pos >= h.dur * 0.9) return 'Completed'
+  if (h.dur > 0) return `${Math.max(1, Math.ceil((h.dur - h.pos) / 60))}m left`
+  return 'Up next'
+}
 
 function Card({ h }: { h: HistoryItem }) {
   const pct = h.dur > 0 ? Math.min(100, Math.round((h.pos / h.dur) * 100)) : 0
+  const isDone = h.dur > 0 && h.pos >= h.dur * 0.9
   const href = `/watch/${h.id}?ep=${h.ep}&server=${h.server}&audio=${h.audio}`
   return (
     <div className="group/card relative w-[148px] shrink-0 snap-start sm:w-[178px] lg:w-[196px]">
@@ -38,7 +44,7 @@ function Card({ h }: { h: HistoryItem }) {
           </div>
         </div>
         <h3 className="mt-3 line-clamp-2 text-sm font-medium leading-snug transition-colors group-hover:text-accent">{h.title}</h3>
-        <p className="mt-1 truncate text-xs text-muted">{left(h) ?? 'Up next'}</p>
+        <p className={cn("mt-1 truncate text-xs", isDone ? "font-semibold text-accent" : "text-muted")}>{left(h) ?? 'Up next'}</p>
       </Link>
     </div>
   )

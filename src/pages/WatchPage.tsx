@@ -24,6 +24,7 @@ import { ErrorState } from '../components/ErrorState'
 import { Skeleton } from '../components/Skeleton'
 import { LoadingGrid } from '../components/LoadingGrid'
 import { LogoFill } from '../components/LogoFill'
+import { LOGO_URL } from '../lib/constants'
 import { Tour, tourDone, tourSeen, type TourStep } from '../components/Tour'
 import { ServerPopup, type ServerOpt } from '../components/ServerPopup'
 import { useShieldVerified, getToken } from '../lib/shield'
@@ -35,15 +36,14 @@ function Frame({ children }: { children: React.ReactNode }) {
   return <div data-tour="w-player" className="relative aspect-video w-full overflow-hidden bg-black lg:shadow-2xl lg:shadow-black/40 lg:ring-1 lg:ring-white/10">{children}</div>
 }
 
-/** Loading (episode, first load and server switch): the show's logo fills from dim to full colour. No logo: the grid loader, and `quiet` (server switch) leaves the player black. */
+/** Loading (episode, first load and server switch): the show's logo fills from dim to full colour. No logo: the Zenkai logo fills smoothly, plus quiet server switch. */
 function Loading({ quiet, logo }: { quiet?: boolean; logo: string | null }) {
   return (
     <Frame>
-      {logo ? (
-        <div className="absolute inset-0 grid place-items-center"><LogoFill src={logo} /></div>
-      ) : (
-        !quiet && <LoadingGrid className="absolute bottom-3 left-3 text-white/60 sm:bottom-4 sm:left-4" />
-      )}
+      <div className="absolute inset-0 grid place-items-center">
+        <LogoFill src={logo || LOGO_URL} />
+      </div>
+      {!quiet && <LoadingGrid className="absolute bottom-3 left-3 text-white/60 sm:bottom-4 sm:left-4" />}
     </Frame>
   )
 }
@@ -289,6 +289,10 @@ export default function WatchPage() {
                   onAutoNext={setAutoNext}
                   autoSkip={autoSkip}
                   onAutoSkip={setAutoSkip}
+                  episodesInfo={eps}
+                  fallbackImg={a.bannerImage ?? a.coverImage.extraLarge}
+                  defaultRuntime={a.duration}
+                  kinds={kinds}
                 />
               </Frame>
             )

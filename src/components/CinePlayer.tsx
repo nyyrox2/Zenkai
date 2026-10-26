@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import Hls from 'hls.js'
 import {
-  CheckCircle2, ChevronDown, ChevronRight, FastForward, Flag, Languages, List, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
-  Server, Settings, SkipBack, SkipForward, TriangleAlert, Upload, Volume1, Volume2, VolumeX, X,
+  AudioLines, Check, CheckCircle2, ChevronDown, FastForward, Flag, Languages, List, Loader2, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
+  Search, Server, Settings, SkipBack, SkipForward, TriangleAlert, Upload, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react'
-import { apiUrl, fetchStream } from '../services/api'
+import { apiUrl, fetchStream, type EpInfo, type EpKind } from '../services/api'
+import { KIND } from './EpisodeList'
 import { LoadingGrid } from './LoadingGrid'
 import { Tour, tourDone, tourSeen, type TourStep } from './Tour'
-import { gpuSupported, startUpscale } from '../lib/upscale'
+import { gpuSupported, startUpscale, type Anime4KMode } from '../lib/upscale'
 import { findActiveCue, parseSubtitleText, type Cue } from '../lib/subtitles'
 import { submitStreamReport } from '../lib/supabase'
 import { toast } from '../lib/toast'
@@ -23,16 +24,138 @@ const langName = (t: { language: string; label: string }) => {
   const raw = (t.language || t.label || '').split(/[-–(#]/)[0].trim()
   return ISO[raw.toLowerCase()] ?? (raw ? raw[0].toUpperCase() + raw.slice(1) : 'Unknown')
 }
+function formatTrackSubLabel(label: string, lang: string): string {
+  let s = (label || '').trim()
+  if (!s) return 'Default'
+  const langEsc = lang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const prefixRegex = new RegExp(`^${langEsc}\\s*[-–:#]?\\s*`, 'i')
+  if (prefixRegex.test(s)) {
+    s = s.replace(prefixRegex, '').trim()
+  }
+  if (s.startsWith('(') && s.endsWith(')')) {
+    s = s.slice(1, -1).trim()
+  }
+  s = s.replace(/([a-zA-Z])\(([^)]+)\)/g, '$1 ($2)')
+  if (!s || s.toLowerCase() === lang.toLowerCase()) {
+    return 'Default'
+  }
+  return s
+}
 const sourceReferer = (id?: string) => (id?.startsWith('flixcloud') ? 'https://flixcloud.cc/' : 'https://megaplay.buzz/')
-const SUB_SIZE = { small: 1.1, medium: 1.4, large: 1.85 } as const
-const CAP_COLORS = ['#ffffff', '#ffe14d', '#5fe3ff', '#7dff9b']
-const CAP_EDGE = {
-  none: 'none',
-  shadow: '0 1px 2px #000',
-  outline: '-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000',
+
+const SUB_SIZE = {
+  tiny: 0.9,
+  small: 1.15,
+  medium: 1.45,
+  large: 1.8,
+  xlarge: 2.2,
 } as const
-const CAP_DEFAULT = { size: 'medium' as keyof typeof SUB_SIZE, bg: 74, pos: 0, color: '#ffffff', edge: 'shadow' as keyof typeof CAP_EDGE }
+
+// Web fonts only (loaded in index.html) — system stacks render as garbage on some Android OEM fonts.
+const SUB_FONT_LIST = [
+  ['sans', 'Inter', '"Inter", Arial, sans-serif'],
+  ['fansub', 'Roboto', '"Roboto", Arial, sans-serif'],
+  ['rounded', 'Rounded', '"Outfit", "Nunito", sans-serif'],
+  ['nunito', 'Nunito', '"Nunito", sans-serif'],
+  ['poppins', 'Poppins', '"Poppins", Arial, sans-serif'],
+  ['montserrat', 'Montserrat', '"Montserrat", Arial, sans-serif'],
+  ['oswald', 'Oswald', '"Oswald", Impact, sans-serif'],
+  ['bebas', 'Bebas Neue', '"Bebas Neue", Impact, sans-serif'],
+  ['atkinson', 'Hyperlegible', '"Atkinson Hyperlegible", Arial, sans-serif'],
+  ['serif', 'Serif', '"Merriweather", Georgia, serif'],
+  ['mono', 'Mono', '"Roboto Mono", "Courier New", monospace'],
+  ['comic', 'Comic', '"Comic Neue", "Comic Sans MS", cursive'],
+  ['bangers', 'Bangers', '"Bangers", Impact, cursive'],
+] as const
+type SubFont = (typeof SUB_FONT_LIST)[number][0]
+const SUB_FONTS = Object.fromEntries(SUB_FONT_LIST.map(([k, , f]) => [k, f])) as Record<SubFont, string>
+const SUB_FONT_LABELS = Object.fromEntries(SUB_FONT_LIST.map(([k, l]) => [k, l])) as Record<SubFont, string>
+
+const CAP_COLORS = [
+  '#ffffff', // White
+  '#ffe14d', // Yellow
+  '#5fe3ff', // Cyan
+  '#7dff9b', // Mint
+  '#ff9f43', // Amber
+  '#ff78c4', // Pink
+]
+
+const EDGE_KEYS = ['none', 'shadow', 'outline', 'heavy', 'glow'] as const
+type EdgeKey = (typeof EDGE_KEYS)[number]
+const capEdge = (k: EdgeKey, c: string) =>
+  ({
+    none: 'none',
+    shadow: `0 2px 4px ${c}e6, 0 1px 2px ${c}`,
+    outline: `-1px -1px 0 ${c}, 1px -1px 0 ${c}, -1px 1px 0 ${c}, 1px 1px 0 ${c}`,
+    heavy: `-2px -2px 0 ${c}, 2px -2px 0 ${c}, -2px 2px 0 ${c}, 2px 2px 0 ${c}, 0 2px 6px ${c}`,
+    glow: `0 0 6px currentColor, 0 0 12px ${c}e6, 0 2px 4px ${c}`,
+  })[k] ?? 'none'
+
+const EDGE_COLORS = ['#000000', '#ffffff', '#dc143c', '#1e66ff', '#7a3cff']
+const BG_COLORS = ['#08080a', '#000000', '#1c1c24', '#0b1d4d', '#4d0b14', '#ffffff']
+const hexRgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) || 0).join(',')
+
+const CAP_BOX = {
+  pill: 'Pill',
+  block: 'Block',
+  none: 'None',
+} as const
+
+const CAP_DEFAULT = {
+  size: 'medium' as keyof typeof SUB_SIZE,
+  font: 'sans' as SubFont,
+  weight: 700,
+  spacing: 'normal' as 'normal' | 'wide' | 'tight',
+  bg: 65,
+  boxStyle: 'pill' as keyof typeof CAP_BOX,
+  pos: 0,
+  color: '#ffffff',
+  edge: 'shadow' as EdgeKey,
+  scale: 100,
+  italic: false,
+  upper: false,
+  edgeColor: '#000000',
+  bgColor: '#08080a',
+  opacity: 100,
+  lh: 135,
+  width: 100,
+  blur: 0,
+  align: 'center' as 'left' | 'center' | 'right',
+}
 type CapStyle = typeof CAP_DEFAULT
+
+const capCss = (cs: CapStyle, u: string): CSSProperties => {
+  const plain = cs.boxStyle === 'none' || cs.bg === 0
+  return {
+    fontSize: `max(13px, calc(${u} * ${(SUB_SIZE[cs.size] ?? 1.45) * (cs.scale / 100)}))`,
+    fontFamily: SUB_FONTS[cs.font] ?? SUB_FONTS.sans,
+    fontWeight: cs.weight ?? 700,
+    fontStyle: cs.italic ? 'italic' : 'normal',
+    textTransform: cs.upper ? 'uppercase' : 'none',
+    letterSpacing: cs.spacing === 'wide' ? '0.06em' : cs.spacing === 'tight' ? '-0.02em' : 'normal',
+    color: `rgba(${hexRgb(cs.color)},${cs.opacity / 100})`,
+    lineHeight: cs.lh / 100,
+    maxWidth: `${cs.width}%`,
+    textAlign: cs.align,
+    backdropFilter: !plain && cs.blur ? `blur(${cs.blur}px)` : undefined,
+    WebkitBackdropFilter: !plain && cs.blur ? `blur(${cs.blur}px)` : undefined,
+    background: plain ? 'transparent' : `rgba(${hexRgb(cs.bgColor)},${cs.bg / 100})`,
+    textShadow: capEdge(cs.edge, cs.edgeColor),
+    padding: plain ? '0.1em 0.35em' : '0.25em 0.7em',
+    borderRadius: cs.boxStyle === 'block' ? '2px' : '0.45em',
+  }
+}
+
+const CAP_PRESETS: [string, Partial<CapStyle>][] = [
+  ['Default', CAP_DEFAULT],
+  ['Netflix', { font: 'fansub', weight: 500, edge: 'shadow', boxStyle: 'none', bg: 0 }],
+  ['Fansub', { font: 'fansub', color: '#ffe14d', edge: 'heavy', boxStyle: 'none', bg: 0 }],
+  ['Cinema', { font: 'serif', weight: 400, edge: 'outline', boxStyle: 'none', bg: 0 }],
+  ['Comic', { font: 'bangers', upper: true, spacing: 'wide', edge: 'heavy', boxStyle: 'none', bg: 0 }],
+  ['Glass', { font: 'rounded', boxStyle: 'pill', bg: 35, blur: 8 }],
+  ['Accessible', { font: 'atkinson', size: 'large', color: '#ffe14d', boxStyle: 'block', bg: 90, bgColor: '#000000', edge: 'none' }],
+]
+
 const loadCap = (): CapStyle => {
   try {
     return { ...CAP_DEFAULT, ...JSON.parse(localStorage.getItem('zp-cap') || '{}') }
@@ -40,7 +163,35 @@ const loadCap = (): CapStyle => {
     return CAP_DEFAULT
   }
 }
-const EP_PAGE = 100
+
+export type VideoFilterPreset = 'off' | 'vibrant' | 'cinema' | 'sharp' | 'warm'
+
+const VIDEO_FILTER_DEFAULTS = {
+  preset: 'off' as VideoFilterPreset,
+  brightness: 100,
+  contrast: 100,
+  saturation: 100,
+}
+type VideoFilters = typeof VIDEO_FILTER_DEFAULTS
+
+const loadVideoFilters = (): VideoFilters => {
+  try {
+    return { ...VIDEO_FILTER_DEFAULTS, ...JSON.parse(localStorage.getItem('zp-vfx') || '{}') }
+  } catch {
+    return VIDEO_FILTER_DEFAULTS
+  }
+}
+
+const ANIME4K_MODES: Array<{ id: Anime4KMode; label: string; desc: string }> = [
+  { id: 'modeA', label: 'Mode A', desc: 'Balanced restoration & 2× upscale (Best for 720p/1080p anime)' },
+  { id: 'modeB', label: 'Mode B', desc: 'Soft restoration (Reduces compression ringing & artifacts)' },
+  { id: 'modeC', label: 'Mode C', desc: 'Sharp outlines & high detail for crisp modern animation' },
+  { id: 'modeAA', label: 'Mode AA', desc: 'Double-pass ultra restoration for maximum clean detail' },
+  { id: 'denoise', label: 'Denoise', desc: 'Artifact removal & debanding + 2× CNN upscale' },
+  { id: 'fast', label: 'Fast CNN', desc: 'Lightweight 2× neural net (low battery / integrated GPU)' },
+]
+const EP_PAGE = 25
+const fmtAir = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null)
 const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n))
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(' ')
 const fmt = (s: number) => {
@@ -147,6 +298,10 @@ export interface CinePlayerProps {
   onSkipFiller?: (v: boolean) => void
   /** next episode's stream is being fetched; the player stays mounted (and fullscreen) meanwhile */
   switching?: boolean
+  episodesInfo?: Map<number, EpInfo>
+  fallbackImg?: string | null
+  defaultRuntime?: number | null
+  kinds?: Map<number, EpKind>
 }
 
 const PLAYER_TOUR: TourStep[] = [
@@ -159,47 +314,314 @@ const PLAYER_TOUR: TourStep[] = [
   { target: '[data-tour="p-fs"]', title: 'Fullscreen', text: 'Go fullscreen. On a phone, turning it sideways does this automatically.' },
 ]
 
-function Sheet({ title, onClose, target, children }: { title: string; onClose: () => void; target: HTMLElement; children: React.ReactNode }) {
+function Sheet({
+  title,
+  onClose,
+  target,
+  className,
+  bodyClassName,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  target: HTMLElement
+  className?: string
+  bodyClassName?: string
+  children: React.ReactNode
+}) {
   return createPortal(
     <div className="zp-sw" onClick={onClose}>
-      <div className="zp-sh" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div className={cx('zp-sh', className)} role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="zp-sh-h">
           <h4>{title}</h4>
           <button className="zp-b" style={{ '--s': '40px' } as React.CSSProperties} onClick={onClose} aria-label="Close">
             <X />
           </button>
         </div>
-        <div className="zp-sh-b">{children}</div>
+        <div className={cx('zp-sh-b', bodyClassName)}>{children}</div>
       </div>
     </div>,
     target,
   )
 }
 
-function Episodes({ total, available, current, onPick }: { total: number; available: number; current: number; onPick: (n: number) => void }) {
-  const [page, setPage] = useState(Math.floor((current - 1) / EP_PAGE))
+function Episodes({
+  total,
+  available,
+  current,
+  episodesInfo,
+  fallbackImg,
+  defaultRuntime,
+  kinds,
+  onPick,
+}: {
+  total: number
+  available: number
+  current: number
+  episodesInfo?: Map<number, EpInfo>
+  fallbackImg?: string | null
+  defaultRuntime?: number | null
+  kinds?: Map<number, EpKind>
+  onPick: (n: number) => void
+}) {
   const pages = Math.ceil(total / EP_PAGE)
+  const [page, setPage] = useState(() => Math.max(0, Math.min(pages - 1, Math.floor(((current ?? 1) - 1) / EP_PAGE))))
+  const [q, setQ] = useState('')
+  const [dropOpen, setDropOpen] = useState(false)
+  const dropRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const currentItemRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!dropOpen) return
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
+        setDropOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [dropOpen])
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [page, q])
+
+  useEffect(() => {
+    if (currentItemRef.current) {
+      currentItemRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [])
+
   const from = page * EP_PAGE + 1
   const to = Math.min(total, from + EP_PAGE - 1)
+
+  const ranges = useMemo(() => {
+    return Array.from({ length: pages }, (_, i) => ({
+      index: i,
+      label: `Episodes ${i * EP_PAGE + 1} – ${Math.min(total, (i + 1) * EP_PAGE)}`,
+      short: `${i * EP_PAGE + 1} – ${Math.min(total, (i + 1) * EP_PAGE)}`,
+    }))
+  }, [pages, total])
+
+  const nums = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    let list = Array.from({ length: total }, (_, i) => i + 1)
+    if (term) {
+      const numMatch = term.replace(/^ep(isode)?\s*/i, '').trim()
+      list = list
+        .filter((n) => {
+          if (numMatch && String(n) === numMatch) return true
+          if (String(n) === term) return true
+          const epName = episodesInfo?.get(n)?.name
+          return epName ? epName.toLowerCase().includes(term) : false
+        })
+        .slice(0, 100)
+    } else {
+      list = list.slice(from - 1, to)
+    }
+    return list
+  }, [q, total, from, to, episodesInfo])
+
   return (
-    <>
-      {pages > 1 && (
-        <div className="zp-pg">
-          {Array.from({ length: pages }, (_, i) => (
-            <button key={i} className={cx('zp-pi', i === page && 'on')} onClick={() => setPage(i)}>
-              {i * EP_PAGE + 1}–{Math.min(total, (i + 1) * EP_PAGE)}
-            </button>
-          ))}
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <div className="relative z-20 shrink-0 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-white/40" />
+            <input
+              type="text"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search episode or title…"
+              aria-label="Search episodes"
+              className="h-8 w-full rounded-lg border border-white/10 bg-white/5 pl-8 pr-7 text-xs text-white placeholder:text-white/40 outline-none transition focus:border-white/30"
+            />
+            {q && (
+              <button
+                type="button"
+                onClick={() => setQ('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-white/40 hover:text-white"
+                aria-label="Clear search"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+
+          {pages > 1 && !q && (
+            <div ref={dropRef} className="relative shrink-0 sm:w-44">
+              <button
+                type="button"
+                onClick={() => setDropOpen((o) => !o)}
+                aria-haspopup="listbox"
+                aria-expanded={dropOpen}
+                className="flex h-8 w-full items-center justify-between gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-xs font-medium text-white transition hover:bg-white/10"
+              >
+                <span className="truncate">{ranges[page]?.short ?? 'Range'}</span>
+                <ChevronDown className={cx('size-3.5 shrink-0 text-white/50 transition-transform duration-200', dropOpen && 'rotate-180')} />
+              </button>
+
+              {dropOpen && (
+                <div
+                  role="listbox"
+                  className="absolute right-0 top-full mt-1.5 z-30 max-h-56 w-48 overflow-y-auto rounded-lg border border-white/10 bg-[#0c0c10]/70 backdrop-blur-xl p-1 shadow-xl scrollbar-thin"
+                >
+                  {ranges.map((r) => (
+                    <button
+                      key={r.index}
+                      role="option"
+                      aria-selected={r.index === page}
+                      type="button"
+                      onClick={() => {
+                        setPage(r.index)
+                        setDropOpen(false)
+                        listRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className={cx(
+                        'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-medium transition',
+                        r.index === page
+                          ? 'bg-white/10 font-semibold text-white'
+                          : 'text-white/75 hover:bg-white/5 hover:text-white'
+                      )}
+                    >
+                      <span>{r.label}</span>
+                      {r.index === page && <Check className="size-3 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
-      <div className="zp-eg">
-        {Array.from({ length: to - from + 1 }, (_, i) => from + i).map((n) => (
-          <button key={n} className={cx('zp-pi', n === current && 'on')} disabled={n > available} onClick={() => onPick(n)}>
-            {n}
-          </button>
-        ))}
+
+        <div className="mt-2 flex items-center justify-between text-[11px] text-white/45 px-0.5">
+          <span>{q ? `${nums.length} match${nums.length === 1 ? '' : 'es'} found` : `Showing ${from}–${to} of ${total} episodes`}</span>
+          {pages > 1 && !q && <span className="text-[10px] uppercase tracking-wider text-white/35">Page {page + 1}/{pages}</span>}
+        </div>
       </div>
-    </>
+
+      <div
+        ref={listRef}
+        tabIndex={0}
+        aria-label="Episodes list"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 space-y-1 scrollbar-thin outline-none"
+      >
+        {nums.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-white/10 p-6 text-center text-xs text-white/40">
+            No episodes found matching "{q}".
+          </div>
+        ) : (
+          nums.map((n) => {
+            const e = episodesInfo?.get(n)
+            const aired = n <= available
+            const on = n === current
+            const img = e?.image ?? fallbackImg ?? null
+            const mins = e?.runtime ?? defaultRuntime
+            const air = fmtAir(e?.air ?? null)
+            const kind = kinds?.get(n)
+            const name = e?.name ?? `Episode ${n}`
+
+            return (
+              <button
+                key={n}
+                ref={on ? currentItemRef : undefined}
+                type="button"
+                onClick={() => onPick(n)}
+                disabled={!aired}
+                aria-current={on ? 'true' : undefined}
+                className={cx(
+                  'group flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition',
+                  on
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/80 hover:bg-white/5 hover:text-white',
+                  !aired && 'cursor-not-allowed opacity-35 hover:bg-transparent'
+                )}
+              >
+                <div className="relative aspect-video w-24 sm:w-28 shrink-0 overflow-hidden rounded-md bg-white/5">
+                  {img ? (
+                    <img
+                      src={img}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className={cx(
+                        'h-full w-full object-cover transition-opacity duration-200',
+                        !e?.image && 'opacity-60'
+                      )}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-white/5 text-[10px] font-bold text-white/40">
+                      EP {n}
+                    </div>
+                  )}
+                  <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
+                  {kind && KIND[kind] && (
+                    <span
+                      className={cx(
+                        'absolute left-1 top-1 rounded px-1 py-0.2 text-[8.5px] font-bold uppercase',
+                        KIND[kind].cls
+                      )}
+                    >
+                      {KIND[kind].label}
+                    </span>
+                  )}
+                  <span className="absolute bottom-1 left-1.5 font-display text-xs font-bold text-white">
+                    {n}
+                  </span>
+                  {aired && (
+                    <span
+                      className={cx(
+                        'absolute bottom-1 right-1 grid size-5 place-items-center rounded bg-black/60 text-white',
+                        on && 'bg-[var(--a,#dc143c)] text-white'
+                      )}
+                    >
+                      {on ? <AudioLines className="size-2.5" /> : <Play className="size-2 fill-current" />}
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 py-0.5">
+                  <p
+                    className={cx(
+                      'line-clamp-1 text-xs sm:text-sm leading-snug font-medium',
+                      on ? 'text-white font-semibold' : 'text-white/90 group-hover:text-white'
+                    )}
+                  >
+                    {name}
+                  </p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/45">
+                    <span>Ep {n}</span>
+                    {mins ? <span>· {mins}m</span> : null}
+                    {air && <span>· {air}</span>}
+                    {kind && KIND[kind] && (
+                      <span className="text-[10px] font-medium text-amber-400">
+                        · {KIND[kind].label}
+                      </span>
+                    )}
+                    {!aired && (
+                      <span className="text-[10px] text-white/30">
+                        · Not aired
+                      </span>
+                    )}
+                    {on && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--a2,#ff4d6a)]">
+                        · Playing
+                      </span>
+                    )}
+                  </div>
+                  {e?.overview && (
+                    <p className="mt-0.5 line-clamp-1 text-[11px] leading-relaxed text-white/35">
+                      {e.overview}
+                    </p>
+                  )}
+                </div>
+              </button>
+            )
+          })
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -303,6 +725,7 @@ export default function CinePlayer({
   hasNextEpisode = false, hasPrevEpisode = false, onNextEpisode, onPrevEpisode, onSelectEpisode, onEnded, onProgress,
   autoNext = true, onAutoNext, autoSkip = false, onAutoSkip,
   nextEpisode, episodeKind, skipFiller = false, onSkipFiller, switching = false,
+  episodesInfo, fallbackImg, defaultRuntime, kinds,
 }: CinePlayerProps) {
   const vid = useRef<HTMLVideoElement>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -349,6 +772,7 @@ export default function CinePlayer({
   const [sheet, setSheet] = useState<SheetName>(null)
   const [pop, setPopRaw] = useState<PopName>(null)
   const [grp, setGrp] = useState<string | null>('English')
+  const [subSearch, setSubSearch] = useState('')
   const [note, setNote] = useState<{ k: 'load' | 'ok' | 'err'; msg: string } | null>(null)
   const [srcLeft, setSrcLeft] = useState(0) // other servers still being asked for captions
   const noteTimer = useRef(0)
@@ -366,6 +790,10 @@ export default function CinePlayer({
   const [offset, setOffset] = useState(0) // subtitle delay in seconds (+ = later)
   const [up, setUpRaw] = useState(() => gpuSupported && readNum('zp-up', 0) === 1)
   const [upInt, setUpIntRaw] = useState(() => readNum('zp-upi', 100))
+  const [upMode, setUpModeRaw] = useState<Anime4KMode>(() => {
+    const m = (typeof localStorage !== 'undefined' ? localStorage.getItem('zp-upm') : null) as Anime4KMode
+    return m && ['modeA', 'modeB', 'modeC', 'modeAA', 'denoise', 'fast'].includes(m) ? m : 'modeA'
+  })
   const [upErr, setUpErr] = useState<string | null>(null)
   const [vkey, setVkey] = useState(0)
   const cv = useRef<HTMLCanvasElement>(null)
@@ -378,6 +806,40 @@ export default function CinePlayer({
     setUpIntRaw(n)
     saveNum('zp-upi', n)
   }
+  const setUpMode = (m: Anime4KMode) => {
+    setUpErr(null)
+    setUpModeRaw(m)
+    try {
+      localStorage.setItem('zp-upm', m)
+    } catch {}
+  }
+  const [vfx, setVfxRaw] = useState<VideoFilters>(loadVideoFilters)
+  const setVfx = (patch: Partial<VideoFilters>) => {
+    setVfxRaw((p) => {
+      const next = { ...p, ...patch }
+      try {
+        localStorage.setItem('zp-vfx', JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }
+
+  const videoFilterStyle = useMemo(() => {
+    const list: string[] = []
+    if (vfx.preset === 'vibrant') {
+      list.push('saturate(1.28) contrast(1.06) brightness(1.02)')
+    } else if (vfx.preset === 'cinema') {
+      list.push('contrast(1.18) saturate(1.1) brightness(0.98)')
+    } else if (vfx.preset === 'sharp') {
+      list.push('contrast(1.14) brightness(1.02)')
+    } else if (vfx.preset === 'warm') {
+      list.push('sepia(0.2) saturate(1.08) brightness(0.98)')
+    }
+    if (vfx.brightness !== 100) list.push(`brightness(${vfx.brightness}%)`)
+    if (vfx.contrast !== 100) list.push(`contrast(${vfx.contrast}%)`)
+    if (vfx.saturation !== 100) list.push(`saturate(${vfx.saturation}%)`)
+    return list.length ? list.join(' ') : undefined
+  }, [vfx])
   const [ar, setArRaw] = useState<Aspect>(loadAspect)
   const setAr = (a: Aspect) => {
     setArRaw(a)
@@ -401,6 +863,41 @@ export default function CinePlayer({
   const [loadingSubs, setLoadingSubs] = useState(false)
   const [subErr, setSubErr] = useState<string | null>(null)
   const [card, setCard] = useState(true)
+const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale', min: number, max: number, step: number, unit = '%') => (
+    <>
+      <p className="zp-sec">{label} ({cs[key]}{unit})</p>
+      <input
+        type="range" className="zp-rg" min={min} max={max} step={step} value={cs[key]}
+        style={{ '--p': `${((cs[key] - min) / (max - min)) * 100}%` } as CSSProperties}
+        onChange={(e) => setCs({ [key]: +e.target.value })}
+        aria-label={label}
+      />
+    </>
+  )
+  const swatch = (list: string[], key: 'color' | 'bgColor' | 'edgeColor') => (
+    <>
+      {list.map((c) => (
+        <button
+          key={c}
+          className={cx('zp-pi zp-sw-c', cs[key] === c && 'on')}
+          style={{ '--c': c, backgroundColor: c } as CSSProperties}
+          onClick={() => setCs({ [key]: c })}
+          aria-label={`${key} ${c}`}
+        />
+      ))}
+      <label
+        className="zp-pi zp-sw-c"
+        style={{ '--c': 'conic-gradient(#f33,#fd3,#3f6,#3df,#36f,#f3d,#f33)', position: 'relative' } as CSSProperties}
+        aria-label="Custom color"
+      >
+        <input
+          type="color" value={cs[key]}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+          onChange={(e) => setCs({ [key]: e.target.value })}
+        />
+      </label>
+    </>
+  )
 
   st.current = { playing, sheet, pop, show }
 
@@ -730,6 +1227,16 @@ export default function CinePlayer({
     return [...m].sort(([a], [b]) => (a === 'English' ? -1 : b === 'English' ? 1 : a.localeCompare(b)))
   })()
 
+  const filteredLangs = useMemo(() => {
+    const q = subSearch.trim().toLowerCase()
+    if (!q) return langs
+    return langs.filter(
+      ([name, list]) =>
+        name.toLowerCase().includes(q) ||
+        list.some((t) => t.label.toLowerCase().includes(q) || (t.source && t.source.toLowerCase().includes(q)))
+    )
+  }, [langs, subSearch])
+
   const inIntro = intro != null && intro.end > 0 && time >= intro.start && time <= intro.end
   const inOutro = outro != null && outro.end > 0 && time >= outro.start && time <= outro.end
   const skip = inIntro ? { label: 'Skip intro', to: intro!.end } : inOutro ? { label: 'Skip outro', to: outro!.end } : null
@@ -753,17 +1260,23 @@ export default function CinePlayer({
     if (!up || !v || !c) return
     let dead = false
     let stop: (() => void) | undefined
-    startUpscale(v, c, () => !dead && setUpErr('GPU too slow'))
+    setUpErr(null)
+    startUpscale(v, c, {
+      mode: upMode,
+      onSlow: (reason) => {
+        if (!dead && reason) setUpErr(reason)
+      },
+    })
       .then((s) => (dead ? s() : (stop = s)))
       .catch((e: unknown) => {
         if (dead) return
-        setUpErr(e instanceof Error ? e.message : 'Upscaler failed')
+        setUpErr(e instanceof Error ? e.message : 'Upscaler initialization failed')
       })
     return () => {
       dead = true
       stop?.()
     }
-  }, [up, vkey])
+  }, [up, upMode, vkey])
 
   const cue = caps && cues.length ? findActiveCue(cues, time, -offset) : null
   const upNext = !skip && hasNextEpisode && dur > 0 && dur - time <= 20 && !!onNextEpisode
@@ -1147,7 +1660,7 @@ export default function CinePlayer({
       <video
         ref={vid}
         className="zp-v"
-        style={{ ...aspectStyle(ar) }}
+        style={{ ...aspectStyle(ar), filter: videoFilterStyle }}
         playsInline
         preload="auto"
         onTimeUpdate={onTime}
@@ -1172,15 +1685,15 @@ export default function CinePlayer({
           onEnded?.()
         }}
       />
-      {up && !upErr && <canvas ref={cv} className="zp-v" style={{ ...aspectStyle(ar), opacity: upInt / 100, pointerEvents: 'none' }} />}
+      {up && !upErr && <canvas ref={cv} className="zp-v" style={{ ...aspectStyle(ar), opacity: upInt / 100, pointerEvents: 'none', filter: videoFilterStyle }} />}
       <div className="zp-g" onPointerDown={holdStart} onPointerUp={(e) => holdEnd() || onTap(e)} onPointerCancel={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => e.preventDefault()} />
 
       <div className="zp-in">
         {busy && !err && <div className="zp-spn" />}
         {switching && <LoadingGrid label="Loading episode" className="pointer-events-none absolute bottom-16 left-4 z-30 text-white/70" />}
         {(note || switching) && (
-          <div className={cx('zp-toast', (note?.k ?? 'load') === 'err' && 'err')} role="status" aria-live="polite" key={note?.msg ?? 'sw'}>
-            {(note?.k ?? 'load') === 'load' ? <span className="zp-tspin" /> : note?.k === 'ok' ? <CheckCircle2 /> : <TriangleAlert />}
+          <div className={cx('zp-toast', (note?.k ?? 'load') === 'err' && 'err', (note?.k ?? 'load') === 'ok' && 'ok')} role="status" aria-live="polite" key={note?.msg ?? 'sw'}>
+            {(note?.k ?? 'load') === 'load' ? <Loader2 className="size-3.5 animate-spin shrink-0 text-white" /> : note?.k === 'ok' ? <CheckCircle2 /> : <TriangleAlert />}
             <span>{note?.msg ?? 'Switching stream…'}</span>
           </div>
         )}
@@ -1212,14 +1725,9 @@ export default function CinePlayer({
         )}
 
         {cue && (
-          <div className="zp-sub" style={{ '--sp': `${cs.pos}%` } as CSSProperties}>
+          <div className="zp-sub" style={{ '--sp': `${cs.pos}%`, justifyContent: { left: 'flex-start', center: 'center', right: 'flex-end' }[cs.align] } as CSSProperties}>
             <span
-              style={{
-                fontSize: `max(13px, calc(var(--u) * ${SUB_SIZE[cs.size]}))`,
-                color: cs.color,
-                background: `rgba(8,8,10,${cs.bg / 100})`,
-                textShadow: CAP_EDGE[cs.edge],
-              }}
+              style={capCss(cs, 'var(--u)')}
             >
               {cue}
             </span>
@@ -1408,13 +1916,14 @@ export default function CinePlayer({
 
 
         {pop && (
-          <div className="zp-pop" role="menu" aria-label={pop}>
+          <div className={cx('zp-pop', pop === 'cc' && 'zp-pop-cc')} role="menu" aria-label={pop}>
             {pop === 'spd' && (
               <>
                 <p className="zp-ph">Speed</p>
                 {SPEEDS.map((x) => (
                   <button key={x} className={cx('zp-row', speed === x && 'on')} onClick={() => (setRate(x), setPopRaw(null))}>
                     <span>{x === 1 ? 'Normal' : `${x}×`}</span>
+                    {speed === x && <Check className="size-3.5 shrink-0" />}
                   </button>
                 ))}
               </>
@@ -1424,10 +1933,12 @@ export default function CinePlayer({
                 <p className="zp-ph">Quality</p>
                 <button className={cx('zp-row', lvl === -1 && 'on')} onClick={() => (setQuality(-1), setPopRaw(null))}>
                   <span>Auto</span>
+                  {lvl === -1 && <Check className="size-3.5 shrink-0" />}
                 </button>
                 {levels.map((l) => (
                   <button key={l.i} className={cx('zp-row', lvl === l.i && 'on')} onClick={() => (setQuality(l.i), setPopRaw(null))}>
                     <span>{l.label}</span>
+                    {lvl === l.i && <Check className="size-3.5 shrink-0" />}
                   </button>
                 ))}
               </>
@@ -1438,6 +1949,7 @@ export default function CinePlayer({
                 {audioTracks.map((t) => (
                   <button key={t.i} className={cx('zp-row', t.i === audioIdx && 'on')} onClick={() => (setAudioTrack(t), setPopRaw(null))}>
                     <span>{t.label}</span>
+                    {t.i === audioIdx && <Check className="size-3.5 shrink-0" />}
                   </button>
                 ))}
               </>
@@ -1457,52 +1969,196 @@ export default function CinePlayer({
                 {servers.map((x) => (
                   <button key={x.id} className={cx('zp-row', x.id === serverId && 'on')} onClick={() => (x.id !== serverId && flash('load', `Switching to ${x.name}…`), onServer?.(x.id), setPopRaw(null))}>
                     <span>{x.name}</span>
+                    {x.id === serverId && <Check className="size-3.5 shrink-0" />}
                   </button>
                 ))}
               </>
             )}
             {pop === 'cc' && (
-              <>
-                <p className="zp-ph">Subtitles</p>
-                <button className={cx('zp-row', !caps && 'on')} onClick={() => (setCaps(false), setPopRaw(null))}>
-                  <span>Off</span>
-                </button>
-                {loadingSubs && <p className="zp-note zp-pad">Searching for subtitles…</p>}
-                {!loadingSubs && tracks.length === 0 && srcLeft === 0 && <p className="zp-note zp-pad">No subtitles found</p>}
-                {subErr && <p className="zp-note zp-pad">{subErr}</p>}
-                {langs.map(([name, list]) => {
-                  const cur = caps && list.some((t) => t.id === trackId)
-                  return (
-                    <div key={name}>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between border-b border-white/10 px-2 py-1 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Languages className="size-3.5 text-white/70" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-white/80">Subtitles</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPopRaw(null)
+                      setSheet('subs')
+                    }}
+                    title="Customize subtitle styling & sync"
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-white/50 hover:text-white transition"
+                  >
+                    <Settings className="size-3" />
+                    <span>Settings</span>
+                  </button>
+                </div>
+
+                {langs.length > 4 && (
+                  <div className="relative my-1 px-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-3 -translate-y-1/2 text-white/40" />
+                    <input
+                      type="text"
+                      value={subSearch}
+                      onChange={(e) => setSubSearch(e.target.value)}
+                      placeholder="Filter languages…"
+                      aria-label="Filter languages"
+                      className="h-7 w-full rounded-md border border-white/10 bg-white/5 pl-7 pr-6 text-xs text-white placeholder:text-white/40 outline-none transition focus:border-white/30"
+                    />
+                    {subSearch && (
                       <button
-                        className={cx('zp-row', cur && 'on')}
-                        aria-expanded={list.length > 1 ? grp === name : undefined}
-                        onClick={() => (list.length > 1 ? setGrp(grp === name ? null : name) : (void pick(list[0]), setPopRaw(null)))}
+                        type="button"
+                        onClick={() => setSubSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-white/40 hover:text-white"
+                        aria-label="Clear filter"
                       >
-                        <span>
-                          {name} ({list.length})
-                          {list.length === 1 && list[0].source && <small>{list[0].source}</small>}
-                        </span>
-                        {list.length > 1 && (grp === name ? <ChevronDown /> : <ChevronRight />)}
+                        <X className="size-2.5" />
                       </button>
-                      {list.length > 1 &&
-                        grp === name &&
-                        list.map((t) => (
-                          <button key={t.id} className={cx('zp-row zp-sub-row', caps && t.id === trackId && 'on')} onClick={() => (void pick(t), setPopRaw(null))}>
-                            <span>
-                              {t.label}
-                              {t.source && <small>{t.source}</small>}
-                            </span>
-                          </button>
-                        ))}
-                    </div>
-                  )
-                })}
-                {srcLeft > 0 && <p className="zp-note zp-pad">Checking {srcLeft} more source{srcLeft > 1 ? 's' : ''}…</p>}
-                <button className="zp-row zp-ft" onClick={() => (setPopRaw(null), setSheet('subs'))}>
-                  <span>Caption settings</span>
+                    )}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaps(false)
+                    setPopRaw(null)
+                  }}
+                  className={cx(
+                    'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs font-medium transition',
+                    !caps
+                      ? 'bg-white/10 text-white font-semibold'
+                      : 'text-white/70 hover:bg-white/5 hover:text-white'
+                  )}
+                >
+                  <span>Off</span>
+                  {!caps && <Check className="size-3.5 text-white shrink-0" />}
                 </button>
-              </>
+
+                {loadingSubs && (
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-white/50">
+                    <Loader2 className="size-3 animate-spin text-[var(--a,#dc143c)]" />
+                    <span>Searching for subtitles…</span>
+                  </div>
+                )}
+                {!loadingSubs && tracks.length === 0 && srcLeft === 0 && (
+                  <p className="px-2.5 py-1.5 text-xs text-white/50">No subtitles found.</p>
+                )}
+                {subErr && <p className="px-2.5 py-1 text-xs text-amber-400">{subErr}</p>}
+
+                <div className="flex flex-col gap-0.5">
+                  {filteredLangs.map(([name, list]) => {
+                    const isSingle = list.length === 1
+                    const isLangActive = caps && list.some((t) => t.id === trackId)
+                    const isExpanded = grp === name
+
+                    if (isSingle) {
+                      const t = list[0]
+                      const isSelected = caps && t.id === trackId
+                      const subLabel = formatTrackSubLabel(t.label, name)
+                      const displayName = subLabel !== 'Default' ? `${name} (${subLabel})` : name
+
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => {
+                            void pick(t)
+                            setPopRaw(null)
+                          }}
+                          className={cx(
+                            'group flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left transition',
+                            isSelected
+                              ? 'bg-white/10 text-white font-semibold'
+                              : 'text-white/80 hover:bg-white/5 hover:text-white'
+                          )}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="truncate text-xs">{displayName}</span>
+                            {t.source && <span className="block text-[10px] text-white/40">{t.source}</span>}
+                          </div>
+                          {isSelected && <Check className="size-3.5 shrink-0 text-white" />}
+                        </button>
+                      )
+                    }
+
+                    return (
+                      <div key={name} className="flex flex-col">
+                        <button
+                          type="button"
+                          aria-expanded={isExpanded}
+                          onClick={() => setGrp(isExpanded ? null : name)}
+                          className={cx(
+                            'group flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left transition',
+                            isLangActive
+                              ? 'text-white font-semibold bg-white/5'
+                              : 'text-white/80 hover:bg-white/5 hover:text-white'
+                          )}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="truncate text-xs">{name}</span>
+                            <span className="text-[10px] text-white/40">({list.length})</span>
+                            {isLangActive && (
+                              <span className="size-1.5 rounded-full bg-[var(--a,#dc143c)] shrink-0" />
+                            )}
+                          </div>
+                          <ChevronDown
+                            className={cx(
+                              'size-3.5 text-white/40 transition-transform duration-200 shrink-0',
+                              isExpanded && 'rotate-180 text-white'
+                            )}
+                          />
+                        </button>
+
+                        {isExpanded && (
+                          <div className="my-0.5 ml-3.5 flex flex-col gap-0.5 border-l border-white/10 pl-2">
+                            {list.map((t) => {
+                              const isSelected = caps && t.id === trackId
+                              const subLabel = formatTrackSubLabel(t.label, name)
+                              return (
+                                <button
+                                  key={t.id}
+                                  type="button"
+                                  onClick={() => {
+                                    void pick(t)
+                                    setPopRaw(null)
+                                  }}
+                                  className={cx(
+                                    'group flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left transition',
+                                    isSelected
+                                      ? 'text-white font-semibold bg-white/10'
+                                      : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                  )}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="truncate text-xs">{subLabel}</span>
+                                      {isSelected && <span className="size-1 rounded-full bg-[var(--a,#dc143c)] shrink-0" />}
+                                    </div>
+                                    {t.source && (
+                                      <span className="block text-[10px] text-white/40">
+                                        {t.source}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {isSelected && <Check className="size-3 shrink-0 text-white" />}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {srcLeft > 0 && (
+                  <p className="px-2.5 py-1 text-[10px] text-white/40">
+                    Checking {srcLeft} more source{srcLeft > 1 ? 's' : ''}…
+                  </p>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -1526,6 +2182,27 @@ export default function CinePlayer({
 
       {sheet === 'subs' && (
         <Sheet title="Subtitles" onClose={() => setSheet(null)} target={target}>
+          {/* Live Interactive Preview */}
+          <div className="zp-prev relative overflow-hidden rounded-lg border border-white/10 bg-gradient-to-b from-black/80 to-black/95 p-3 text-center">
+            <span className="text-[10px] font-semibold tracking-wider uppercase text-white/40 block mb-1.5">Live Preview</span>
+            <div className="flex items-center justify-center min-h-[44px]">
+              <span
+                style={capCss(cs, '14px')}
+              >
+                I'm gonna be King of the Pirates!
+              </span>
+            </div>
+          </div>
+
+          <p className="zp-sec">Presets</p>
+          <div className="zp-pg">
+            {CAP_PRESETS.map(([n, v]) => (
+              <button key={n} className="zp-pi" onClick={() => setCs({ ...CAP_DEFAULT, pos: cs.pos, ...v })}>
+                {n}
+              </button>
+            ))}
+          </div>
+
           <button className="zp-row" onClick={() => setCaps((c) => !c)}>
             <span>Show subtitles</span>
             <i className={cx('zp-tg', caps && 'on')} />
@@ -1558,8 +2235,23 @@ export default function CinePlayer({
           </button>
           <input ref={file} type="file" accept=".srt,.vtt,.txt" hidden onChange={uploadSub} />
 
+          <h5 className="zp-grp">Text</h5>
+          <p className="zp-sec">Font Family</p>
+          <div className="zp-fg">
+            {SUB_FONT_LIST.map(([k]) => (
+              <button
+                key={k}
+                className={cx('zp-pi', cs.font === k && 'on')}
+                style={{ fontFamily: SUB_FONTS[k] }}
+                onClick={() => setCs({ font: k })}
+              >
+                {SUB_FONT_LABELS[k]}
+              </button>
+            ))}
+          </div>
+
           <p className="zp-sec">Text size</p>
-          <div className="zp-pg">
+          <div className="zp-pg seg">
             {(Object.keys(SUB_SIZE) as (keyof typeof SUB_SIZE)[]).map((k) => (
               <button key={k} className={cx('zp-pi', cs.size === k && 'on')} onClick={() => setCs({ size: k })}>
                 {k[0].toUpperCase() + k.slice(1)}
@@ -1567,35 +2259,108 @@ export default function CinePlayer({
             ))}
           </div>
 
-          <p className="zp-sec">Text color</p>
-          <div className="zp-pg">
-            {CAP_COLORS.map((c) => (
-              <button
-                key={c}
-                className={cx('zp-pi zp-sw-c', cs.color === c && 'on')}
-                style={{ '--c': c } as CSSProperties}
-                onClick={() => setCs({ color: c })}
-                aria-label={`Caption color ${c}`}
-              />
+          <p className="zp-sec">Font Weight</p>
+          <div className="zp-pg seg">
+            {[
+              { w: 400, label: 'Light' },
+              { w: 500, label: 'Normal' },
+              { w: 700, label: 'Bold' },
+              { w: 900, label: 'Heavy' },
+            ].map(({ w, label }) => (
+              <button key={w} className={cx('zp-pi', cs.weight === w && 'on')} onClick={() => setCs({ weight: w })}>
+                {label}
+              </button>
             ))}
           </div>
 
-          <p className="zp-sec">Text edge</p>
+          <p className="zp-sec">Text color</p>
           <div className="zp-pg">
-            {(Object.keys(CAP_EDGE) as (keyof typeof CAP_EDGE)[]).map((k) => (
+            {swatch(CAP_COLORS, 'color')}
+          </div>
+
+          {slider('Text opacity', 'opacity', 20, 100, 5)}
+          {slider('Line height', 'lh', 100, 200, 5)}
+
+          <h5 className="zp-grp">Edge</h5>
+          <p className="zp-sec">Text edge / Outline</p>
+          <div className="zp-pg">
+            {EDGE_KEYS.map((k) => (
               <button key={k} className={cx('zp-pi', cs.edge === k && 'on')} onClick={() => setCs({ edge: k })}>
                 {k[0].toUpperCase() + k.slice(1)}
               </button>
             ))}
           </div>
 
-          <p className="zp-sec">Background opacity ({cs.bg}%)</p>
+          <p className="zp-sec">Edge color</p>
+          <div className="zp-pg">{swatch(EDGE_COLORS, 'edgeColor')}</div>
+
+          <h5 className="zp-grp">Background</h5>
+          <p className="zp-sec">Background style</p>
+          <div className="zp-pg">
+            {(Object.keys(CAP_BOX) as (keyof typeof CAP_BOX)[]).map((k) => (
+              <button key={k} className={cx('zp-pi', cs.boxStyle === k && 'on')} onClick={() => setCs({ boxStyle: k })}>
+                {CAP_BOX[k]}
+              </button>
+            ))}
+          </div>
+
+          {cs.boxStyle !== 'none' && (
+            <>
+              <p className="zp-sec">Background opacity ({cs.bg}%)</p>
+              <input
+                type="range" className="zp-rg" min={0} max={100} step={5} value={cs.bg}
+                style={{ '--p': `${cs.bg}%` } as CSSProperties}
+                onChange={(e) => setCs({ bg: +e.target.value })}
+                aria-label="Caption background opacity"
+              />
+            </>
+          )}
+
+          {cs.boxStyle !== 'none' && (
+            <>
+              <p className="zp-sec">Background color</p>
+              <div className="zp-pg">{swatch(BG_COLORS, 'bgColor')}</div>
+              {slider('Background blur', 'blur', 0, 20, 1, 'px')}
+            </>
+          )}
+
+          <p className="zp-sec">Style</p>
+          <div className="zp-pg">
+            <button className={cx('zp-pi', cs.italic && 'on')} onClick={() => setCs({ italic: !cs.italic })}>Italic</button>
+            <button className={cx('zp-pi', cs.upper && 'on')} onClick={() => setCs({ upper: !cs.upper })}>UPPERCASE</button>
+          </div>
+
+          <p className="zp-sec">Size fine-tune ({cs.scale}%)</p>
           <input
-            type="range" className="zp-rg" min={0} max={100} step={5} value={cs.bg}
-            style={{ '--p': `${cs.bg}%` } as CSSProperties}
-            onChange={(e) => setCs({ bg: +e.target.value })}
-            aria-label="Caption background opacity"
+            type="range" className="zp-rg" min={50} max={200} step={5} value={cs.scale}
+            style={{ '--p': `${((cs.scale - 50) / 150) * 100}%` } as CSSProperties}
+            onChange={(e) => setCs({ scale: +e.target.value })}
+            aria-label="Caption size fine-tune"
           />
+
+          <p className="zp-sec">Letter Spacing</p>
+          <div className="zp-pg seg">
+            {[
+              { id: 'tight', label: 'Tight' },
+              { id: 'normal', label: 'Normal' },
+              { id: 'wide', label: 'Wide' },
+            ].map(({ id, label }) => (
+              <button key={id} className={cx('zp-pi', cs.spacing === id && 'on')} onClick={() => setCs({ spacing: id as any })}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <h5 className="zp-grp">Position</h5>
+          <p className="zp-sec">Alignment</p>
+          <div className="zp-pg seg">
+            {(['left', 'center', 'right'] as const).map((a) => (
+              <button key={a} className={cx('zp-pi', cs.align === a && 'on')} onClick={() => setCs({ align: a })}>
+                {a[0].toUpperCase() + a.slice(1)}
+              </button>
+            ))}
+          </div>
+          {slider('Max width', 'width', 30, 100, 5)}
 
           <p className="zp-sec">Vertical position ({cs.pos}% up from bottom)</p>
           <input
@@ -1605,7 +2370,7 @@ export default function CinePlayer({
             aria-label="Caption vertical position"
           />
 
-          <button className="zp-pi" onClick={() => setCs(CAP_DEFAULT)}>
+          <button className="zp-pi" style={{ marginTop: '8px' }} onClick={() => setCs(CAP_DEFAULT)}>
             Reset style
           </button>
         </Sheet>
@@ -1626,13 +2391,29 @@ export default function CinePlayer({
       {sheet === 'set' && (
         <Sheet title="Settings" onClose={() => setSheet(null)} target={target}>
           <p className="zp-sec">4K upscaler (GPU)</p>
-          <button className="zp-row" disabled={!gpuSupported} onClick={() => setUp(!up)}>
-            <span>Anime4K upscaling</span>
-            <i className={cx('zp-tg', up && !upErr && 'on')} />
+          <button className="zp-row" disabled={!gpuSupported} onClick={() => { setUpErr(null); setUp(!up); }}>
+            <span>Anime4K WebGPU upscaling</span>
+            <i className={cx('zp-tg', up && 'on')} />
           </button>
-          {up && !upErr && (
+          {up && (
             <>
-              <p className="zp-sec">Intensity ({upInt}%)</p>
+              <p className="zp-sec">Anime4K Model / Shader Preset</p>
+              <div className="zp-pg">
+                {ANIME4K_MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    className={cx('zp-pi', upMode === m.id && 'on')}
+                    onClick={() => setUpMode(m.id)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <p className="zp-note" style={{ marginTop: '4px' }}>
+                {ANIME4K_MODES.find((m) => m.id === upMode)?.desc}
+              </p>
+
+              <p className="zp-sec">Upscale Intensity ({upInt}%)</p>
               <input
                 type="range" className="zp-rg" min={0} max={100} step={5} value={upInt}
                 style={{ '--p': `${upInt}%` } as CSSProperties}
@@ -1645,9 +2426,63 @@ export default function CinePlayer({
             {!gpuSupported
               ? 'This browser has no WebGPU, so the upscaler is unavailable.'
               : upErr
-                ? `Upscaler off: ${upErr}.`
-                : 'Runs on your GPU (Anime4K Mode A, up to 2× / 4K). Best on 720p–1080p sources.'}
+                ? `Upscaler note: ${upErr}. Try selecting another preset or re-toggling.`
+                : 'Runs in real-time on your GPU with WebGPU neural shaders. Best on 720p–1080p anime.'}
           </p>
+
+          <p className="zp-sec">Visual Enhancements &amp; Shaders</p>
+          <div className="zp-pg">
+            {[
+              { id: 'off', label: 'Default' },
+              { id: 'vibrant', label: 'Vibrance' },
+              { id: 'cinema', label: 'Cinema HDR' },
+              { id: 'sharp', label: 'Crisp Lines' },
+              { id: 'warm', label: 'Warm (Eye Care)' },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                className={cx('zp-pi', vfx.preset === id && 'on')}
+                onClick={() => setVfx({ preset: id as VideoFilterPreset })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <p className="zp-sec">Brightness ({vfx.brightness}%)</p>
+          <input
+            type="range" className="zp-rg" min={70} max={130} step={2} value={vfx.brightness}
+            style={{ '--p': `${((vfx.brightness - 70) / (130 - 70)) * 100}%` } as CSSProperties}
+            onChange={(e) => setVfx({ brightness: +e.target.value })}
+            aria-label="Video brightness"
+          />
+
+          <p className="zp-sec">Contrast ({vfx.contrast}%)</p>
+          <input
+            type="range" className="zp-rg" min={70} max={140} step={2} value={vfx.contrast}
+            style={{ '--p': `${((vfx.contrast - 70) / (140 - 70)) * 100}%` } as CSSProperties}
+            onChange={(e) => setVfx({ contrast: +e.target.value })}
+            aria-label="Video contrast"
+          />
+
+          <p className="zp-sec">Color Saturation ({vfx.saturation}%)</p>
+          <input
+            type="range" className="zp-rg" min={70} max={160} step={5} value={vfx.saturation}
+            style={{ '--p': `${((vfx.saturation - 70) / (160 - 70)) * 100}%` } as CSSProperties}
+            onChange={(e) => setVfx({ saturation: +e.target.value })}
+            aria-label="Video saturation"
+          />
+
+          {(vfx.preset !== 'off' || vfx.brightness !== 100 || vfx.contrast !== 100 || vfx.saturation !== 100) && (
+            <button
+              className="zp-pi"
+              style={{ marginTop: '8px' }}
+              onClick={() => setVfx(VIDEO_FILTER_DEFAULTS)}
+            >
+              Reset visual shaders
+            </button>
+          )}
+
           <p className="zp-sec">Aspect ratio</p>
           <div className="zp-pg">
             {ASPECTS.map((a) => (
@@ -1679,11 +2514,15 @@ export default function CinePlayer({
       )}
 
       {sheet === 'eps' && onSelectEpisode && (
-        <Sheet title="Episodes" onClose={() => setSheet(null)} target={target}>
+        <Sheet title="Episodes" onClose={() => setSheet(null)} target={target} className="zp-sh-wide" bodyClassName="zp-sh-b-eps">
           <Episodes
             total={totalEpisodes}
             available={avail}
             current={episode}
+            episodesInfo={episodesInfo}
+            fallbackImg={fallbackImg}
+            defaultRuntime={defaultRuntime}
+            kinds={kinds}
             onPick={(n) => {
               onSelectEpisode(n)
               setSheet(null)

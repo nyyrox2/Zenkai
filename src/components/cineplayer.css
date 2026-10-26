@@ -124,19 +124,19 @@
 .zp-row{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:calc(var(--u)*.8);width:100%;min-height:max(40px,calc(var(--u)*3.2));padding:0 calc(var(--u)*1.1);border-radius:calc(var(--u)*1);cursor:pointer;font-weight:600;transition:background .2s}
 .zp-row>span{flex:1;min-width:0}
 .zp-row small{display:block;font-size:.8em;font-weight:500;opacity:.55}
-.zp-row:hover{background:rgba(255,255,255,.08)}
-.zp-row.on{background:linear-gradient(135deg,color-mix(in srgb,var(--a) 30%,transparent),transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a) 70%,transparent)}
+.zp-row:hover{background:rgba(255,255,255,.06)}
+.zp-row.on{background:rgba(255,255,255,.09);color:#fff;box-shadow:none}
 .zp-row svg{width:1.3em;height:1.3em;flex:none}
 .zp-tg{flex:none;position:relative;width:2.6em;height:1.5em;border-radius:99px;background:rgba(255,255,255,.2);transition:background .2s}
 .zp-tg::after{content:"";position:absolute;top:.2em;left:.2em;width:1.1em;height:1.1em;border-radius:50%;background:#fff;transition:transform .28s cubic-bezier(.34,1.56,.64,1)}
-.zp-tg.on{background:linear-gradient(135deg,var(--a),var(--a2))}
+.zp-tg.on{background:var(--a)}
 .zp-tg.on::after{transform:translateX(1.1em)}
 .zp-pg{display:flex;flex-wrap:wrap;gap:calc(var(--u)*.6)}
-.zp-pi{all:unset;box-sizing:border-box;display:grid;place-items:center;min-width:max(44px,calc(var(--u)*3.6));min-height:max(36px,calc(var(--u)*2.9));padding:0 calc(var(--u)*1.1);border-radius:99px;cursor:pointer;font-weight:700;background:rgba(255,255,255,.1);transition:background .2s,transform .2s cubic-bezier(.34,1.56,.64,1)}
-.zp-pi:hover{background:rgba(255,255,255,.18)}
-.zp-pi:active{transform:scale(.94)}
+.zp-pi{all:unset;box-sizing:border-box;display:grid;place-items:center;min-width:max(44px,calc(var(--u)*3.6));min-height:max(36px,calc(var(--u)*2.9));padding:0 calc(var(--u)*1.1);border-radius:6px;cursor:pointer;font-weight:600;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);transition:background .2s}
+.zp-pi:hover{background:rgba(255,255,255,.12)}
+.zp-pi:active{transform:scale(.97)}
 .zp-pi:disabled{opacity:.35;pointer-events:none}
-.zp-pi.on{background:linear-gradient(135deg,var(--a),var(--a2));box-shadow:0 4px 14px color-mix(in srgb,var(--a) 45%,transparent)}
+.zp-pi.on{background:var(--a);border-color:transparent;box-shadow:none}
 .zp-eg{display:grid;grid-template-columns:repeat(auto-fill,minmax(max(52px,calc(var(--u)*4.6)),1fr));gap:calc(var(--u)*.6)}
 .zp-off{display:flex;align-items:center;gap:calc(var(--u)*.8)}
 .zp-off span{min-width:4em;text-align:center;font-weight:800;font-variant-numeric:tabular-nums}
@@ -240,115 +240,330 @@
 .zp-hold svg{width:max(14px,calc(var(--u)*1.3));height:max(14px,calc(var(--u)*1.3))}
 .zp-cr{gap:calc(var(--u)*.3)}
 
-/* ── glass panels: translucent warm-dark, blurred video behind (menus, sheets, notifications) ── */
-.zp-pop,.zp-sh,.zp-toast{background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03) 60%),rgba(28,20,14,.42);backdrop-filter:blur(26px) saturate(1.7);-webkit-backdrop-filter:blur(26px) saturate(1.7);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 14px 44px rgba(0,0,0,.45)}
-.zp-pop{border-radius:18px;padding:6px}
-.zp-pop .zp-row{border-radius:12px}
-.zp-pop .zp-row:hover{background:rgba(255,255,255,.1)}
-.zp-pop .zp-row.on{background:rgba(255,255,255,.14);box-shadow:inset 3px 0 0 var(--a)}
-.zp-ft{border-radius:12px!important;border-top-color:rgba(255,255,255,.12)}
-.zp-sw{background:rgba(0,0,0,.35);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-.zp-sh{border-radius:22px 22px 0 0;border-bottom:0}
-.zp-sh-h{border-bottom-color:rgba(255,255,255,.12)}
-@media (orientation:landscape) and (max-height:620px){.zp-sh{border-radius:22px 0 0 22px;border:0;border-left:1px solid rgba(255,255,255,.16)}}
-@media (min-width:900px) and (min-height:621px){.zp-sh{border-radius:22px;border:1px solid rgba(255,255,255,.16)}}
+/* ── Minimal 2D UI: flat surfaces, no bevels, no gradient gloss, frosted glass translucency ── */
+.zp-sw {
+  background: rgba(0, 0, 0, 0.45) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  animation: none !important;
+}
 
-/* status notification at the top: caption / server / audio loading, done, failed */
-.zp-toast{position:absolute;z-index:40;left:50%;top:calc(var(--st) + var(--u)*1.6);transform:translateX(-50%);max-width:min(90%,34em);display:flex;align-items:center;gap:calc(var(--u)*.7);padding:calc(var(--u)*.6) calc(var(--u)*1.2);border-radius:99px;font-size:max(12px,calc(var(--u)*.95));font-weight:600;pointer-events:none;transition:top .3s cubic-bezier(.2,.8,.2,1);animation:zpn .3s cubic-bezier(.2,.9,.3,1) both}
-.show .zp-toast{top:calc(var(--st) + var(--u)*4.6)}
-.zp-toast span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.zp-toast svg{flex:none;width:max(15px,calc(var(--u)*1.3));height:max(15px,calc(var(--u)*1.3));color:#7dff9b}
-.zp-toast.err svg{color:#ff8a8a}
-.zp-tspin{flex:none;width:max(14px,calc(var(--u)*1.2));height:max(14px,calc(var(--u)*1.2));border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:zpo .8s linear infinite}
-@keyframes zpn{from{opacity:0;transform:translate(-50%,-8px) scale(.96)}}
+.zp-pop, .zp-sh, .zp-toast, .zp-tip {
+  background: rgba(18, 18, 24, 0.65) !important;
+  backdrop-filter: blur(24px) saturate(180%) brightness(1.1) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.5) !important;
+  text-shadow: none !important;
+  animation: none !important;
+}
+
+.zp-sh::before {
+  display: none !important;
+}
+
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .zp-sw {
+    background: rgba(0, 0, 0, 0.75) !important;
+  }
+  .zp-pop, .zp-sh, .zp-toast, .zp-tip {
+    background: rgba(18, 18, 22, 0.95) !important;
+  }
+}
+
+.zp-pop {
+  border-radius: 10px !important;
+  padding: 5px !important;
+  min-width: max(160px, calc(var(--u)*10));
+  max-width: min(300px, 80%);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  animation: none !important;
+}
+.zp-pop::-webkit-scrollbar {
+  width: 4px;
+}
+.zp-pop::-webkit-scrollbar-track {
+  background: transparent;
+}
+.zp-pop::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 99px;
+}
+.zp-pop::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Subtitles popup width & scrollable height */
+.zp-pop.zp-pop-cc {
+  min-width: min(330px, 88vw) !important;
+  max-width: min(380px, 92vw) !important;
+  max-height: min(460px, calc(100cqh - var(--bar) - var(--sb) - var(--st) - 16px)) !important;
+  padding: 8px !important;
+}
+
+/* Minimal 2D rows (NO card appearance, NO bevels, NO inset 3D bar) */
+.zp-row, .zp-pop .zp-row, .zp-sh .zp-row {
+  min-height: max(30px, calc(var(--u)*2.3));
+  border-radius: 6px !important;
+  padding: 0 8px !important;
+  font-size: 12.5px;
+  gap: 8px;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: rgba(255, 255, 255, 0.85);
+  transition: background 0.15s, color 0.15s;
+}
+.zp-row:hover, .zp-pop .zp-row:hover, .zp-sh .zp-row:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+.zp-row.on, .zp-pop .zp-row.on, .zp-sh .zp-row.on {
+  background: rgba(255, 255, 255, 0.09) !important;
+  color: #fff !important;
+  font-weight: 600;
+  box-shadow: none !important;
+}
+
+.zp-sub-row {
+  padding-left: 12px !important;
+}
+
+.zp-ph {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  opacity: 0.5;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+/* Minimal 2D Sheets */
+.zp-sh {
+  font-size: 13px;
+  width: min(100%, 430px);
+  border-radius: 14px 14px 0 0 !important;
+  border-bottom: 0 !important;
+  animation: none !important;
+}
+@media (orientation: landscape) and (max-height: 620px) {
+  .zp-sh {
+    width: min(390px, 70vw);
+    border-radius: 14px 0 0 14px !important;
+    border: 0 !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.12) !important;
+  }
+}
+@media (min-width: 900px) and (min-height: 621px) {
+  .zp-sh {
+    border-radius: 14px !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    width: min(100%, 450px);
+    max-height: 78dvh;
+  }
+}
+
+.zp-sh-h {
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+}
+.zp-sh-h h4 {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.zp-sh-h .zp-b {
+  width: 28px;
+  height: 28px;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 6px;
+}
+.zp-sh-h .zp-b svg {
+  width: 15px;
+  height: 15px;
+}
+.zp-sh-b {
+  padding: 0 12px 12px;
+  gap: 2px;
+}
+
+/* Wide episode list sheet */
+.zp-sh.zp-sh-wide {
+  width: min(100%, 540px) !important;
+  max-height: 82dvh !important;
+  height: 82dvh !important;
+}
+@media (orientation: landscape) and (max-height: 620px) {
+  .zp-sh.zp-sh-wide {
+    width: min(460px, 75vw) !important;
+    max-height: none !important;
+    height: 100% !important;
+  }
+}
+@media (min-width: 900px) and (min-height: 621px) {
+  .zp-sh.zp-sh-wide {
+    width: min(100%, 560px) !important;
+    max-height: 80dvh !important;
+    height: 80dvh !important;
+  }
+}
+.zp-sh-b.zp-sh-b-eps {
+  overflow: visible !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  padding: 0 12px 12px !important;
+}
+
+/* Flat 2D buttons and pills */
+.zp-pi, .zp-sh .zp-pi {
+  border-radius: 6px !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+  min-height: 28px !important;
+}
+.zp-pi:hover, .zp-sh .zp-pi:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+.zp-pi.on, .zp-sh .zp-pi.on {
+  background: var(--a) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+/* Color swatches in subtitle sheet */
+.zp-sw-c, .zp-sh .zp-sw-c, .zp-sh .zp-pi.zp-sw-c {
+  background: var(--c) !important;
+  min-width: max(36px, calc(var(--u) * 2.9)) !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: none !important;
+}
+.zp-sw-c:hover, .zp-sh .zp-sw-c:hover, .zp-sh .zp-pi.zp-sw-c:hover {
+  background: var(--c) !important;
+  filter: brightness(1.15);
+}
+.zp-sw-c.on, .zp-sh .zp-sw-c.on, .zp-sh .zp-pi.zp-sw-c.on {
+  background: var(--c) !important;
+  border-color: #fff !important;
+  outline: 2px solid #fff !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8) !important;
+}
+
+.zp-sec {
+  margin: 8px 0 2px;
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  opacity: 0.6;
+}
+.zp-note {
+  padding: 2px 0 4px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  opacity: 0.65;
+}
+
+/* Status toast */
+.zp-toast {
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  top: calc(var(--st) + var(--u)*1.6);
+  transform: translateX(-50%);
+  max-width: min(90%, 34em);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 99px;
+  font-size: max(11px, calc(var(--u)*0.8));
+  font-weight: 600;
+  pointer-events: none;
+  animation: zpn 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.show .zp-toast {
+  top: calc(var(--st) + var(--u)*4);
+}
+.zp-toast svg {
+  width: 13px;
+  height: 13px;
+  color: #fff;
+}
+.zp-toast.ok svg {
+  color: #7dff9b;
+}
+.zp-toast.err svg {
+  color: #ff8a8a;
+}
+.zp-tspin {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-right-color: #fff;
+  animation: zpo 0.75s linear infinite;
+  flex: none;
+}
+
+/* Seek preview tooltip */
+.zp-tip {
+  --tw: clamp(128px, calc(var(--u)*11), 180px);
+  --hw: calc(var(--u)*2.4);
+  left: clamp(var(--hw), var(--x), calc(100% - var(--hw)));
+  bottom: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  font-size: max(11px, calc(var(--u)*0.85));
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s;
+}
+.zp-tip.on {
+  opacity: 1;
+  visibility: visible;
+}
+.zp-tip.rdy {
+  --hw: calc(var(--tw)/2);
+}
+.zp-tip b {
+  font-weight: 600;
+  padding: 3px 10px;
+  font-variant-numeric: tabular-nums;
+}
+.zp-pv {
+  display: none;
+  width: var(--tw);
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  background: #000;
+  pointer-events: none;
+}
+.zp-tip.rdy .zp-pv {
+  display: block;
+}
 
 
-/* ═══ v3: real glass (light CSS, one blur layer per surface) + compact sizes + seek-bar frame preview ═══ */
-
-/* FIX: the dim backdrop used to carry its own backdrop-filter. A parent with backdrop-filter becomes the "backdrop root",
-   so the panel inside it blurred nothing and looked plain transparent. Dim only, no blur on the wrapper. */
-.zp-sw{background:rgba(0,0,0,.28);backdrop-filter:none;-webkit-backdrop-filter:none;--u:12px}
-
-.zp-pop,.zp-sh,.zp-toast,.zp-tip{
-  background:linear-gradient(145deg,rgba(255,255,255,.2) 0%,rgba(255,255,255,.06) 45%,rgba(255,255,255,.1) 100%),rgba(16,16,22,.34);
-  -webkit-backdrop-filter:blur(22px) saturate(1.9);backdrop-filter:blur(22px) saturate(1.9);
-  border:1px solid rgba(255,255,255,.22);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(255,255,255,.05),0 10px 30px rgba(0,0,0,.38);
-  text-shadow:0 1px 2px rgba(0,0,0,.35)}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .zp-pop,.zp-sh,.zp-toast,.zp-tip{background:rgba(24,24,30,.9)}}
-
-/* settings sheet: smaller everything */
-.zp-sh{font-size:13px;width:min(100%,380px);border-radius:18px 18px 0 0}
-@media (orientation:landscape) and (max-height:620px){.zp-sh{width:min(340px,62vw);border-radius:18px 0 0 18px}}
-@media (min-width:900px) and (min-height:621px){.zp-sh{border-radius:18px;max-height:70dvh}}
-.zp-sh-h{padding:10px 12px 6px}
-.zp-sh-h h4{font-size:14px;font-weight:700}
-.zp-sh-h .zp-b{width:28px;height:28px;min-width:0;min-height:0;border-radius:8px}
-.zp-sh-h .zp-b svg{width:16px;height:16px}
-.zp-sh-b{padding:0 12px 12px;gap:2px}
-.zp-sec{margin:8px 0 2px;font-size:10.5px;letter-spacing:.07em;opacity:.7}
-.zp-note{padding:2px 0 4px;font-size:11.5px;line-height:1.35;opacity:.65}
-.zp-row{min-height:34px;padding:0 10px;border-radius:10px;font-size:13px;gap:8px}
-.zp-row small{font-size:.78em}
-.zp-row:hover{background:rgba(255,255,255,.12)}
-.zp-row.on{background:rgba(255,255,255,.16);box-shadow:inset 3px 0 0 var(--a)}
-.zp-tg{width:2.3em;height:1.3em;background:rgba(255,255,255,.28)}
-.zp-tg::after{top:.15em;left:.15em;width:1em;height:1em}
-.zp-tg.on{background:var(--a)}
-.zp-tg.on::after{transform:translateX(1em)}
-.zp-pg{gap:6px}
-.zp-pi{min-width:40px;min-height:30px;padding:0 10px;border-radius:9px;font-size:12.5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.1)}
-.zp-pi:hover{background:rgba(255,255,255,.2)}
-.zp-pi.on{background:var(--a);border-color:transparent}
-.zp-eg{grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px}
-.zp-rg{height:5px;margin:6px 0}
-.zp-rg::-webkit-slider-thumb{width:15px;height:15px}
-.zp-rg::-moz-range-thumb{width:15px;height:15px}
-
-/* popups (speed / quality / audio / captions / servers) */
-.zp-pop{border-radius:14px;padding:5px;min-width:max(150px,calc(var(--u)*9));font-size:max(12px,calc(var(--u)*.9))}
-.zp-pop .zp-row{min-height:max(30px,calc(var(--u)*2.3));border-radius:9px;padding:0 calc(var(--u)*.8)}
-.zp-ph{font-size:10.5px;padding:4px 8px}
-
-/* status notification: small glass pill */
-.zp-toast{gap:6px;padding:5px 12px;font-size:max(11px,calc(var(--u)*.8));font-weight:600;top:calc(var(--st) + var(--u)*1.2)}
-.show .zp-toast{top:calc(var(--st) + var(--u)*4)}
-.zp-toast svg{width:13px;height:13px}
-.zp-tspin{width:11px;height:11px;border-width:1.5px}
-
-/* seek hover preview: frame from the video + time, glass card above the cursor */
-.zp-tip{--tw:clamp(128px,calc(var(--u)*11),180px);--hw:calc(var(--u)*2.4);
-  left:clamp(var(--hw),var(--x),calc(100% - var(--hw)));bottom:calc(100% + 6px);
-  display:flex;flex-direction:column;align-items:center;padding:0;overflow:hidden;border-radius:10px;
-  font-size:max(11px,calc(var(--u)*.85));pointer-events:none;
-  opacity:0;visibility:hidden;transition:opacity .12s}
-.zp-tip.on{opacity:1;visibility:visible}
-.zp-tip.rdy{--hw:calc(var(--tw)/2)}
-.zp-tip b{font-weight:600;padding:3px 10px;font-variant-numeric:tabular-nums}
-.zp-pv{display:none;width:var(--tw);aspect-ratio:16/9;object-fit:cover;background:#000;pointer-events:none}
-.zp-tip.rdy .zp-pv{display:block}
-
-
-/* ═══ v4: proper glass — darker tint + heavy blur ═══
-   Root cause of "no blur": .zp-sw / .zp-pop / .zp-toast ran an opacity animation with fill-mode "both". Chrome keeps such an
-   element as a backdrop root forever, so the blur of the panel inside it sees nothing and the controls show through sharp.
-   Wrapper now has no animation; panels animate with transform only / no fill. */
-.zp-sw{animation:none;background:rgba(0,0,0,.42)}
-.zp-pop,.zp-toast{animation-fill-mode:none}
-
-.zp-pop,.zp-sh,.zp-toast,.zp-tip{
-  background:linear-gradient(150deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,.03) 40%,rgba(255,255,255,.07) 100%),rgba(12,12,18,.56);
-  -webkit-backdrop-filter:blur(38px) saturate(1.6) brightness(.82);
-  backdrop-filter:blur(38px) saturate(1.6) brightness(.82);
-  border:1px solid rgba(255,255,255,.18);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.32),inset 0 0 0 1px rgba(255,255,255,.03),0 18px 50px rgba(0,0,0,.5)}
-.zp-tip{-webkit-backdrop-filter:blur(24px) saturate(1.6) brightness(.8);backdrop-filter:blur(24px) saturate(1.6) brightness(.8)}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .zp-pop,.zp-sh,.zp-toast,.zp-tip{background:rgba(18,18,24,.94)}}
-
-/* inner bits sit on the glass: keep them readable */
-.zp-sh .zp-row:hover{background:rgba(255,255,255,.1)}
-.zp-sh .zp-pi{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12)}
-.zp-sh .zp-pi.on{background:var(--a);border-color:transparent}
-.zp-sh-h{border-bottom-color:rgba(255,255,255,.1)}
+/* Subtitle sheet layout */
+.zp-prev{position:sticky;top:0;z-index:6;background-color:#0b0b10;margin:0 0 4px}
+.zp-grp{margin:16px 0 0;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--a2)}
+.zp-grp + .zp-sec{margin-top:6px}
+.zp-fg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.zp-fg .zp-pi{min-width:0;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zp-pg.seg{flex-wrap:nowrap}
+.zp-pg.seg .zp-pi{flex:1 1 0;min-width:0;padding:0 2px;font-size:13px}
+.zp-sh .zp-off{display:grid;grid-template-columns:repeat(2,1fr) auto repeat(2,1fr) 1fr;gap:6px;align-items:center}
+.zp-sh .zp-off .zp-pi{min-width:0;padding:0 4px}

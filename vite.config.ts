@@ -85,6 +85,9 @@ function zenkaiSeo(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), zenkaiApi(), zenkaiSeo()],
+  build: {
+    cssMinify: false,
+  },
   resolve: {
     alias: {
       'hls.js': 'hls.js/dist/hls.js',
