@@ -328,3 +328,27 @@
 .zp-tip b{font-weight:600;padding:3px 10px;font-variant-numeric:tabular-nums}
 .zp-pv{display:none;width:var(--tw);aspect-ratio:16/9;object-fit:cover;background:#000;pointer-events:none}
 .zp-tip.rdy .zp-pv{display:block}
+
+
+/* ═══ v4: proper glass — darker tint + heavy blur ═══
+   Root cause of "no blur": .zp-sw / .zp-pop / .zp-toast ran an opacity animation with fill-mode "both". Chrome keeps such an
+   element as a backdrop root forever, so the blur of the panel inside it sees nothing and the controls show through sharp.
+   Wrapper now has no animation; panels animate with transform only / no fill. */
+.zp-sw{animation:none;background:rgba(0,0,0,.42)}
+.zp-pop,.zp-toast{animation-fill-mode:none}
+
+.zp-pop,.zp-sh,.zp-toast,.zp-tip{
+  background:linear-gradient(150deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,.03) 40%,rgba(255,255,255,.07) 100%),rgba(12,12,18,.56);
+  -webkit-backdrop-filter:blur(38px) saturate(1.6) brightness(.82);
+  backdrop-filter:blur(38px) saturate(1.6) brightness(.82);
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.32),inset 0 0 0 1px rgba(255,255,255,.03),0 18px 50px rgba(0,0,0,.5)}
+.zp-tip{-webkit-backdrop-filter:blur(24px) saturate(1.6) brightness(.8);backdrop-filter:blur(24px) saturate(1.6) brightness(.8)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .zp-pop,.zp-sh,.zp-toast,.zp-tip{background:rgba(18,18,24,.94)}}
+
+/* inner bits sit on the glass: keep them readable */
+.zp-sh .zp-row:hover{background:rgba(255,255,255,.1)}
+.zp-sh .zp-pi{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12)}
+.zp-sh .zp-pi.on{background:var(--a);border-color:transparent}
+.zp-sh-h{border-bottom-color:rgba(255,255,255,.1)}
