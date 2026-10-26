@@ -336,6 +336,10 @@ export default function CinePlayer({
   const autoFs = useRef(false)
   const [pip, setPip] = useState(false)
   const [hover, setHover] = useState<number | null>(null)
+  const pv = useRef<HTMLVideoElement>(null) // seek-bar preview video (muted, lowest quality, starts on first hover)
+  const pvT = useRef<number | null>(null)
+  const [pvOn, setPvOn] = useState(false)
+  const [pvRdy, setPvRdy] = useState(false)
   const [scrub, setScrub] = useState<number | null>(null)
   const [levels, setLevels] = useState<{ i: number; label: string }[]>([])
   const [lvl, setLvl] = useState(-1)
@@ -411,6 +415,41 @@ export default function CinePlayer({
     poke()
     return () => clearTimeout(hideT.current)
   }, [playing, sheet, pop, poke])
+
+  /* ── seek preview: tiny second video on the lowest level, only loads after the first hover ── */
+  useEffect(() => {
+    const p = pv.current
+    setPvRdy(false)
+    if (!pvOn || !p || !streamUrl) return
+    const url = noSeg ? streamUrl.replace('&seg=1', '') : streamUrl
+    let h: Hls | null = null
+    if (!isFileSrc(streamUrl) && Hls.isSupported()) {
+      h = new Hls({ enableWorker: false, startLevel: 0, maxBufferLength: 2, maxMaxBufferLength: 4, backBufferLength: 0, capLevelToPlayerSize: false })
+      h.loadSource(url)
+      h.attachMedia(p)
+      h.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (!h || !h.levels.length) return
+        let low = 0
+        h.levels.forEach((l: any, i: number) => {
+          if ((l.bitrate || 0) < (h!.levels[low].bitrate || 0)) low = i
+        })
+        h.currentLevel = low
+      })
+      h.on(Hls.Events.ERROR, (_: any, d: any) => {
+        if (d.fatal) {
+          h?.destroy()
+          h = null
+        }
+      })
+    } else {
+      p.src = url
+    }
+    return () => {
+      h?.destroy()
+      p.removeAttribute('src')
+      p.load()
+    }
+  }, [pvOn, streamUrl, retry])
 
   /* ── HLS ── */
   useEffect(() => {
@@ -1051,14 +1090,30 @@ export default function CinePlayer({
     const r = bar.current!.getBoundingClientRect()
     return clamp((e.clientX - r.left) / r.width, 0, 1)
   }
+  // one seek at a time on the preview video; always lands on the newest hovered time
+  const pvGo = () => {
+    const p = pv.current
+    if (!p || pvT.current == null || p.seeking || p.readyState < 1) return
+    const t = pvT.current
+    pvT.current = null
+    p.currentTime = t
+  }
+  const pvSeek = (t: number) => {
+    if (!dur || (navigator as any).connection?.saveData) return
+    if (!pvOn) setPvOn(true)
+    pvT.current = clamp(t, 0, Math.max(0, dur - 0.5))
+    pvGo()
+  }
   const sDown = (e: RPointerEvent<HTMLDivElement>) => {
     if (!dur) return
     e.currentTarget.setPointerCapture(e.pointerId)
     setScrub(frac(e) * dur)
+    pvSeek(frac(e) * dur)
   }
   const sMove = (e: RPointerEvent<HTMLDivElement>) => {
     const f = frac(e)
     setHover(f)
+    pvSeek(f * dur)
     if (scrub !== null) setScrub(f * dur)
   }
   const sUp = (e: RPointerEvent<HTMLDivElement>) => {
@@ -1286,11 +1341,23 @@ export default function CinePlayer({
                   {so && <i className="zp-seg" style={so} />}
                   <i className="zp-th" style={{ left: `${pct}%` }} />
                 </div>
-                {tipF != null && dur > 0 && (
-                  <div className="zp-tip" style={{ '--x': `${tipF * 100}%` } as React.CSSProperties}>
-                    {fmt(tipF * dur)}
-                  </div>
-                )}
+                <div className={cx('zp-tip', tipF != null && dur > 0 && 'on', pvRdy && 'rdy')} style={{ '--x': `${(tipF ?? 0) * 100}%` } as CSSProperties} aria-hidden="true">
+                  <video
+                    ref={pv}
+                    className="zp-pv"
+                    muted
+                    playsInline
+                    preload="auto"
+                    disablePictureInPicture
+                    tabIndex={-1}
+                    onLoadedMetadata={pvGo}
+                    onSeeked={() => {
+                      setPvRdy(true)
+                      pvGo()
+                    }}
+                  />
+                  <b>{fmt((tipF ?? 0) * dur)}</b>
+                </div>
               </div>
               <span className="zp-tm r">{fmt(dur)}</span>
             </div>
