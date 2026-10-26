@@ -130,8 +130,8 @@ export default function ProfilePage() {
         <Row title="Preferred audio language" hint="For multi-audio streams">
           <CustomSelect label="Preferred audio language" value={lang} onChange={(v) => (setLang(v), toast(v ? `Audio language: ${langName(v)}` : 'Audio language: Auto'))} placeholder="Auto" options={[{ value: '', label: 'Auto' }, ...LANGS.map((c) => ({ value: c, label: langName(c) }))]} />
         </Row>
-        <Row title="Max quality" hint="Auto-switching never goes above this">
-          <CustomSelect label="Max quality" value={maxQ} onChange={(v) => (setMaxQ(v), toast(v ? `Max quality: ${v}p` : 'Max quality: Auto'))} placeholder="Auto" options={[{ value: '', label: 'Auto (best)' }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' }, { value: '480', label: '480p' }, { value: '360', label: '360p' }]} />
+        <Row title="Preferred quality" hint="Videos start at this quality (or the closest below)">
+          <CustomSelect label="Preferred quality" value={maxQ} onChange={(v) => (setMaxQ(v), toast(v ? `Preferred quality: ${v}p` : 'Preferred quality: Auto'))} placeholder="Auto" options={[{ value: '', label: 'Auto (best)' }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' }, { value: '480', label: '480p' }, { value: '360', label: '360p' }]} />
         </Row>
         <Row title="Preferred server" hint="Used when you open an episode">
           <CustomSelect label="Preferred server" value={prefs.server ?? 'megaplay'} onChange={(v) => setPref({ server: v })} placeholder="MegaPlay" options={DIRECT.map((s) => ({ value: s.id, label: s.name }))} />

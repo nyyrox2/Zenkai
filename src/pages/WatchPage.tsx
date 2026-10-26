@@ -182,7 +182,7 @@ export default function WatchPage() {
     if (title) document.title = `${title} · Episode ${ep} — Zenkai`
   }, [title, ep])
 
-  const playerServers = useMemo(() => SERVERS.filter((s) => s.id !== 'acdn' || acdn === true).map((s) => ({ id: s.id, name: s.name, note: s.note, disabled: s.kind === 'embed' && !s.url?.(ctx) })), [ctx, audio, acdn])
+  const playerServers = useMemo(() => DIRECT.filter((s) => s.id !== 'acdn' || acdn === true).map((s) => ({ id: s.id, name: s.name, note: s.note })), [acdn]) // direct servers only; embeds live under the player
   const tracks = (server.multi || aud.tracks.length > 1) ? aud.tracks : []
   // first visit: pause and walk through the page once the player area has rendered
   useEffect(() => {

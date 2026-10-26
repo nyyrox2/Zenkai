@@ -227,3 +227,15 @@
 .zp-sw-c.on{box-shadow:0 0 0 2px #fff!important}
 @media (orientation:landscape) and (max-height:620px){.zp-sh{border-radius:10px 0 0 10px}}
 @media (min-width:900px) and (min-height:621px){.zp-sh{border-radius:10px}}
+
+/* ── popups (speed / quality / captions / audio / servers) and press-and-hold speed ── */
+.zp-pop{position:absolute;z-index:26;right:calc(var(--sr) + var(--u)*1.6);bottom:calc(var(--sb) + var(--bar) + var(--u)*.2);min-width:max(170px,calc(var(--u)*11));max-width:min(280px,72%);max-height:calc(100cqh - var(--bar) - var(--sb) - var(--st) - var(--u)*1.6);overflow-y:auto;overscroll-behavior:contain;pointer-events:auto;padding:4px;border-radius:6px;background:rgba(24,24,24,.97);box-shadow:0 6px 24px rgba(0,0,0,.55);font-size:max(13px,calc(var(--u)*1));scrollbar-width:thin;animation:zpf .15s both}
+.zp-pop .zp-row{min-height:max(34px,calc(var(--u)*2.6));padding:0 calc(var(--u)*.9)}
+.zp-pop .zp-row small{font-size:.78em}
+.zp-ph{margin:0;padding:calc(var(--u)*.5) calc(var(--u)*.9);font-size:max(11px,calc(var(--u)*.8));font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.55}
+.zp-pad{margin:0;padding:calc(var(--u)*.3) calc(var(--u)*.9) calc(var(--u)*.6)}
+.zp-sub-row{padding-left:calc(var(--u)*2)!important}
+.zp-ft{margin-top:4px;border-top:1px solid rgba(255,255,255,.1);border-radius:0!important;opacity:.8}
+.zp-hold{position:absolute;z-index:14;top:calc(var(--st) + var(--u)*1.6);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:calc(var(--u)*.5);padding:calc(var(--u)*.35) calc(var(--u)*1);border-radius:99px;background:rgba(0,0,0,.65);font-size:max(12px,calc(var(--u)*1));font-weight:600;animation:zpf .15s both}
+.zp-hold svg{width:max(14px,calc(var(--u)*1.3));height:max(14px,calc(var(--u)*1.3))}
+.zp-cr{gap:calc(var(--u)*.3)}

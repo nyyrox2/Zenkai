@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import { createPortal } from 'react-dom'
 import Hls from 'hls.js'
 import {
-  Check, CheckCircle2, FastForward, Flag, Languages, List, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
+  CheckCircle2, ChevronDown, ChevronRight, FastForward, Flag, Languages, List, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
   Server, Settings, SkipBack, SkipForward, Upload, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { apiUrl } from '../services/api'
@@ -15,6 +15,8 @@ import { toast } from '../lib/toast'
 import './cineplayer.css'
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+const HOLD_RATE = 2 // press-and-hold on the video
+const isEn = (t: { language: string; label: string }) => /^en\b|^eng|english/i.test(t.language) || /english/i.test(t.label)
 const SUB_SIZE = { small: 1.1, medium: 1.4, large: 1.85 } as const
 const CAP_COLORS = ['#ffffff', '#ffe14d', '#5fe3ff', '#7dff9b']
 const CAP_EDGE = {
@@ -76,7 +78,8 @@ const saveNum = (k: string, v: number) => {
     /* ignore */
   }
 }
-type SheetName = null | 'subs' | 'set' | 'eps' | 'srv' | 'aud' | 'report'
+type SheetName = null | 'subs' | 'set' | 'eps' | 'report'
+type PopName = null | 'spd' | 'q' | 'cc' | 'aud' | 'srv'
 interface Track {
   id: string
   label: string
@@ -269,7 +272,7 @@ function findTrackForMode(
   return tracks[0]
 }
 
-/** Max quality preference (set on the Profile page): 0 = no cap. */
+/** Preferred quality (Profile page): 0 = auto. */
 const readMaxQuality = () => {
   try {
     return Number(localStorage.getItem('zp-q')) || 0
@@ -305,7 +308,7 @@ export default function CinePlayer({
   const tok = useRef(0)
   const skipped = useRef(-1)
   const tap = useRef({ t: 0, side: 0, timer: 0 })
-  const st = useRef({ playing: false, sheet: null as SheetName, show: true })
+  const st = useRef({ playing: false, sheet: null as SheetName, pop: null as PopName, show: true })
   const api = useRef({ togglePlay: () => {}, toggleMute: () => {}, toggleFs: () => {}, poke: () => {}, doSkip: () => {}, skipOn: false, v: 1 })
 
   const [playing, setPlaying] = useState(false)
@@ -333,6 +336,11 @@ export default function CinePlayer({
   const [audioIdx, setAudioIdx] = useState(0)
   const [fb, setFb] = useState<{ side: number; n: number; k: number } | null>(null)
   const [sheet, setSheet] = useState<SheetName>(null)
+  const [pop, setPopRaw] = useState<PopName>(null)
+  const [grp, setGrp] = useState<'en' | 'other' | null>('en')
+  const [held, setHeld] = useState(false)
+  const hold = useRef({ timer: 0, on: false, prev: 1 })
+  const setPop = (p: PopName) => setPopRaw((c) => (c === p ? null : p))
   const [reportIssue, setReportIssue] = useState('Broken / Won\'t Play')
   const [reportDetails, setReportDetails] = useState('')
   const [reportSubmitting, setReportSubmitting] = useState(false)
@@ -380,19 +388,19 @@ export default function CinePlayer({
   const [subErr, setSubErr] = useState<string | null>(null)
   const [card, setCard] = useState(true)
 
-  st.current = { playing, sheet, show }
+  st.current = { playing, sheet, pop, show }
 
   /* ── controls visibility ── */
   const poke = useCallback(() => {
     setShow(true)
     clearTimeout(hideT.current)
     const s = st.current
-    if (s.playing && !s.sheet) hideT.current = window.setTimeout(() => setShow(false), 3200)
+    if (s.playing && !s.sheet && !s.pop) hideT.current = window.setTimeout(() => setShow(false), 3200)
   }, [])
   useEffect(() => {
     poke()
     return () => clearTimeout(hideT.current)
-  }, [playing, sheet, poke])
+  }, [playing, sheet, pop, poke])
 
   /* ── HLS ── */
   useEffect(() => {
@@ -423,15 +431,17 @@ export default function CinePlayer({
       h.loadSource(noSeg ? streamUrl.replace('&seg=1', '') : streamUrl)
       h.attachMedia(v)
       h.on(Hls.Events.MANIFEST_PARSED, (_: any, d: any) => {
-        setLevels(
-          (d.levels || [])
-            .map((l: any, i: number) => ({ i, h: l.height || 0, label: l.height ? `${l.height}p` : `Level ${i + 1}` }))
-            .sort((a: any, b: any) => b.h - a.h),
-        )
-        // Profile → "Max quality": auto-switching stays on, it just never goes above the chosen height
-        const cap = readMaxQuality()
-        const ok = cap ? (d.levels || []).map((l: any, i: number) => ({ i, h: l.height || 0 })).filter((l: any) => l.h && l.h <= cap).sort((a: any, b: any) => b.h - a.h) : []
-        if (ok.length && h) h.autoLevelCapping = ok[0].i
+        const all = (d.levels || []).map((l: any, i: number) => ({ i, h: l.height || 0, br: l.bitrate || 0, label: l.height ? `${l.height}p` : `Level ${i + 1}` }))
+        // one entry per height (a stream can list several codecs of the same size): keep the richest
+        const list = all.filter((l: any) => !l.h || !all.some((o: any) => o.h === l.h && o.br > l.br)).sort((a: any, b: any) => b.h - a.h)
+        setLevels(list)
+        // Profile → "Preferred quality": start locked on that height (or the closest one below it); Auto stays one tap away
+        const want = readMaxQuality()
+        const pick = want ? list.find((l: any) => l.h && l.h <= want) ?? list[list.length - 1] : null
+        if (pick && h) {
+          h.currentLevel = pick.i
+          setLvl(pick.i)
+        }
         v.play().catch(() => {})
       })
       // Multi-audio streams (ACDN, FlixCloud, etc.): list the renditions, match audioMode or language
@@ -573,7 +583,7 @@ export default function CinePlayer({
         const res = await fetch(apiUrl(`/api/subtitles?${q}`))
         if (res.ok) {
           const data = (await res.json()) as { subtitles?: Track[] }
-          for (const s of data.subtitles ?? []) if (!all.some((c) => c.language.toLowerCase() === s.language.toLowerCase())) all.push(s)
+          for (const s of data.subtitles ?? []) if (!all.some((c) => c.url === s.url)) all.push(s) // every source, not one per language
         }
       } catch {
         /* OpenSubtitles is optional */
@@ -581,7 +591,7 @@ export default function CinePlayer({
       if (dead) return
       setTracks(all)
       setLoadingSubs(false)
-      const def = all.find((t) => t.language.toLowerCase().includes('eng')) || all[0]
+      const def = all.find(isEn) || all[0]
       if (!def) return setTrackId(null)
       // a broken default must not hide the rest: walk the list until one actually loads
       for (const t of [def, ...all.filter((x) => x !== def)]) {
@@ -864,7 +874,7 @@ export default function CinePlayer({
       const onBtn = t.tagName === 'BUTTON' || t.tagName === 'A'
       const inCtl = onBtn && !!root.current?.contains(t) // focus is on a control (TV: D-pad moves between them)
       if (k === ' ' && onBtn) return
-      if (tv && arrow && st.current.sheet) return // an open menu: the D-pad moves through it
+      if (tv && arrow && (st.current.sheet || st.current.pop)) return // an open menu: the D-pad moves through it
       if (tv && arrow && inCtl) {
         poke() // keep the controls up while the D-pad is working them
         return
@@ -899,7 +909,7 @@ export default function CinePlayer({
       else if (k === 'm') h = a.toggleMute
       else if (k === 'c') h = () => setCaps((c) => !c)
       else if (k === 'tab' && a.skipOn) h = a.doSkip
-      else if (k === 'escape' && st.current.sheet) h = () => setSheet(null)
+      else if (k === 'escape' && (st.current.sheet || st.current.pop)) h = () => (setSheet(null), setPopRaw(null))
       else if (k === 'escape' && tv && inCtl) {
         // TV: Back from the controls returns to plain seeking
         h = () => {
@@ -920,6 +930,7 @@ export default function CinePlayer({
   /* ── tap / double-tap ── */
   const onTap = (e: RPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
+    if (st.current.pop) return setPopRaw(null)
     const t = tap.current
     const now = Date.now()
     const r = e.currentTarget.getBoundingClientRect()
@@ -953,6 +964,30 @@ export default function CinePlayer({
         setShow(false)
       } else poke()
     }, 280)
+  }
+
+  /* ── hold to speed up: press and hold the video, release to go back ── */
+  const holdStart = (e: RPointerEvent) => {
+    if (e.button !== 0) return
+    const h = hold.current
+    window.clearTimeout(h.timer)
+    h.timer = window.setTimeout(() => {
+      const v = vid.current
+      if (!v || v.paused || st.current.pop) return
+      h.on = true
+      h.prev = v.playbackRate
+      v.playbackRate = HOLD_RATE
+      setHeld(true)
+    }, 400)
+  }
+  const holdEnd = () => {
+    const h = hold.current
+    window.clearTimeout(h.timer)
+    if (!h.on) return false
+    h.on = false
+    if (vid.current) vid.current.playbackRate = h.prev
+    setHeld(false)
+    return true
   }
 
   /* ── seek bar ── */
@@ -1027,7 +1062,7 @@ export default function CinePlayer({
         }}
       />
       {up && !upErr && <canvas ref={cv} className="zp-v" style={{ ...aspectStyle(ar), opacity: upInt / 100, pointerEvents: 'none' }} />}
-      <div className="zp-g" onPointerUp={onTap} />
+      <div className="zp-g" onPointerDown={holdStart} onPointerUp={(e) => holdEnd() || onTap(e)} onPointerCancel={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => e.preventDefault()} />
 
       <div className="zp-in">
         {busy && !err && <div className="zp-spn" />}
@@ -1042,6 +1077,13 @@ export default function CinePlayer({
               {episodeKind ? ` · ${episodeKind === 'mixed' ? 'Mixed canon' : episodeKind === 'recap' ? 'Recap' : 'Filler'}` : ''}
               {audioMode ? ` · ${audioMode.toUpperCase()}` : ''}
             </p>
+          </div>
+        )}
+
+        {held && (
+          <div className="zp-hold">
+            <FastForward />
+            <span>{HOLD_RATE}×</span>
           </div>
         )}
 
@@ -1100,11 +1142,8 @@ export default function CinePlayer({
               </p>
             </div>
             <div className="zp-ac">
-              <button className={cx('zp-b', caps && tracks.length > 0 && 'on')} data-tour="p-cc" onClick={() => setSheet('subs')} aria-label="Subtitles" title="Subtitles [C]">
-                <span className="zp-t">CC</span>
-              </button>
               {audioTracks.length > 1 && (
-                <button className="zp-b pill" data-tour="p-audio" onClick={() => setSheet('aud')} title="Audio track" aria-label="Audio track">
+                <button className="zp-b pill" data-tour="p-audio" onClick={() => setPop('aud')} title="Audio track" aria-label="Audio track">
                   <Languages />
                   <em>{audioTracks.find((t) => t.i === audioIdx)?.label ?? 'Audio'}</em>
                 </button>
@@ -1116,7 +1155,7 @@ export default function CinePlayer({
                 </button>
               )}
               {servers && servers.length > 0 && (
-                <button className="zp-b" data-tour="p-srv" onClick={() => setSheet('srv')} aria-label="Servers" title="Servers">
+                <button className="zp-b" data-tour="p-srv" onClick={() => setPop('srv')} aria-label="Servers" title="Servers">
                   <Server />
                 </button>
               )}
@@ -1125,9 +1164,6 @@ export default function CinePlayer({
                   <List />
                 </button>
               )}
-              <button className="zp-b" data-tour="p-set" onClick={() => setSheet('set')} aria-label="Settings" title="Settings">
-                <Settings />
-              </button>
               <button
                 className="zp-b"
                 onClick={() => {
@@ -1214,10 +1250,21 @@ export default function CinePlayer({
                   aria-label="Volume"
                 />
               </div>
-              <button className="zp-b pill" onClick={() => setSheet('set')} aria-label="Playback speed" title="Playback speed">
+              <span className="zp-flex" />
+              <button className={cx('zp-b pill', pop === 'spd' && 'on')} onClick={() => setPop('spd')} aria-label="Playback speed" title="Playback speed">
                 {speed}×
               </button>
-              <span className="zp-flex" />
+              {levels.length > 0 && (
+                <button className={cx('zp-b pill', pop === 'q' && 'on')} onClick={() => setPop('q')} aria-label="Quality" title="Quality">
+                  {lvl === -1 ? 'Auto' : levels.find((l) => l.i === lvl)?.label}
+                </button>
+              )}
+              <button className={cx('zp-b', (pop === 'cc' || (caps && tracks.length > 0)) && 'on')} data-tour="p-cc" onClick={() => setPop('cc')} aria-label="Subtitles" title="Subtitles [C]">
+                <span className="zp-t">CC</span>
+              </button>
+              <button className="zp-b" data-tour="p-set" onClick={() => (setPopRaw(null), setSheet('set'))} aria-label="Settings" title="Settings">
+                <Settings />
+              </button>
               {pip && (
                 <button className="zp-b" onClick={togglePiP} aria-label="Picture in picture" title="Picture in picture">
                   <PictureInPicture2 />
@@ -1230,6 +1277,100 @@ export default function CinePlayer({
           </div>
         </div>
 
+
+        {pop && (
+          <div className="zp-pop" role="menu" aria-label={pop}>
+            {pop === 'spd' && (
+              <>
+                <p className="zp-ph">Speed</p>
+                {SPEEDS.map((x) => (
+                  <button key={x} className={cx('zp-row', speed === x && 'on')} onClick={() => (setRate(x), setPopRaw(null))}>
+                    <span>{x === 1 ? 'Normal' : `${x}×`}</span>
+                  </button>
+                ))}
+              </>
+            )}
+            {pop === 'q' && (
+              <>
+                <p className="zp-ph">Quality</p>
+                <button className={cx('zp-row', lvl === -1 && 'on')} onClick={() => (setQuality(-1), setPopRaw(null))}>
+                  <span>Auto</span>
+                </button>
+                {levels.map((l) => (
+                  <button key={l.i} className={cx('zp-row', lvl === l.i && 'on')} onClick={() => (setQuality(l.i), setPopRaw(null))}>
+                    <span>{l.label}</span>
+                  </button>
+                ))}
+              </>
+            )}
+            {pop === 'aud' && (
+              <>
+                <p className="zp-ph">Audio</p>
+                {audioTracks.map((t) => (
+                  <button key={t.i} className={cx('zp-row', t.i === audioIdx && 'on')} onClick={() => (setAudioTrack(t), setPopRaw(null))}>
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </>
+            )}
+            {pop === 'srv' && servers && (
+              <>
+                <p className="zp-ph">Servers</p>
+                {onAudio && (
+                  <div className="zp-two zp-pad">
+                    {(['sub', 'dub'] as const).map((m) => (
+                      <button key={m} className={cx('zp-pi', audioMode === m && 'on')} onClick={() => onAudio(m)}>
+                        {m.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {servers.map((x) => (
+                  <button key={x.id} className={cx('zp-row', x.id === serverId && 'on')} onClick={() => (onServer?.(x.id), setPopRaw(null))}>
+                    <span>{x.name}</span>
+                  </button>
+                ))}
+              </>
+            )}
+            {pop === 'cc' && (
+              <>
+                <p className="zp-ph">Subtitles</p>
+                <button className={cx('zp-row', !caps && 'on')} onClick={() => (setCaps(false), setPopRaw(null))}>
+                  <span>Off</span>
+                </button>
+                {loadingSubs && <p className="zp-note zp-pad">Searching for subtitles…</p>}
+                {!loadingSubs && tracks.length === 0 && <p className="zp-note zp-pad">No subtitles found</p>}
+                {subErr && <p className="zp-note zp-pad">{subErr}</p>}
+                {([['en', 'English', tracks.filter(isEn)], ['other', 'Other languages', tracks.filter((t) => !isEn(t))]] as const).map(
+                  ([k, name, list]) =>
+                    list.length > 0 && (
+                      <div key={k}>
+                        <button className="zp-row" aria-expanded={grp === k} onClick={() => setGrp(grp === k ? null : k)}>
+                          <span>
+                            {name} ({list.length})
+                          </span>
+                          {grp === k ? <ChevronDown /> : <ChevronRight />}
+                        </button>
+                        {grp === k &&
+                          list.map((t) => (
+                            <button key={t.id} className={cx('zp-row zp-sub-row', caps && t.id === trackId && 'on')} onClick={() => (void pick(t), setPopRaw(null))}>
+                              <span>
+                                {t.label}
+                                {t.source && <small>{t.source}</small>}
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    ),
+                )}
+                <button className="zp-row zp-ft" onClick={() => (setPopRaw(null), setSheet('subs'))}>
+                  <span>Caption settings</span>
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {err && (
           <div className="zp-er">
             <p>This stream couldn't be loaded.</p>
@@ -1238,7 +1379,7 @@ export default function CinePlayer({
                 Try again
               </button>
               {servers && servers.length > 0 && (
-                <button className="zp-b pill" onClick={() => setSheet('srv')}>
+                <button className="zp-b pill" onClick={() => setPopRaw('srv')}>
                   Switch server
                 </button>
               )}
@@ -1275,19 +1416,6 @@ export default function CinePlayer({
             </button>
           </div>
 
-          <p className="zp-sec">Languages</p>
-          {loadingSubs && <p className="zp-note">Searching for subtitles…</p>}
-          {!loadingSubs && tracks.length === 0 && <p className="zp-note">No subtitles found. Upload your own below.</p>}
-          {subErr && <p className="zp-note">{subErr}</p>}
-          {tracks.map((t) => (
-            <button key={t.id} className={cx('zp-row', t.id === trackId && 'on')} onClick={() => void pick(t)}>
-              <span>
-                {t.label}
-                {t.source && <small>{t.source}</small>}
-              </span>
-              {t.id === trackId && <Check />}
-            </button>
-          ))}
           <button className="zp-row" onClick={() => file.current?.click()}>
             <Upload />
             <span>Upload subtitle file</span>
@@ -1359,55 +1487,8 @@ export default function CinePlayer({
         />
       )}
 
-      {sheet === 'aud' && audioTracks.length > 0 && (
-        <Sheet title="Audio" onClose={() => setSheet(null)} target={target}>
-          <p className="zp-sec">Audio track</p>
-          <div className="zp-rows">
-            {audioTracks.map((t) => (
-              <button
-                key={t.i}
-                className={cx('zp-row', t.i === audioIdx && 'on')}
-                onClick={() => {
-                  setAudioTrack(t)
-                  setSheet(null)
-                }}
-              >
-                <span>
-                  {t.label}
-                  {t.lang && t.lang.toLowerCase() !== t.label.toLowerCase() && <small>{t.lang}</small>}
-                </span>
-                {t.i === audioIdx && <Check />}
-              </button>
-            ))}
-          </div>
-        </Sheet>
-      )}
-
       {sheet === 'set' && (
         <Sheet title="Settings" onClose={() => setSheet(null)} target={target}>
-          <p className="zp-sec">Speed</p>
-          <div className="zp-pg">
-            {SPEEDS.map((s) => (
-              <button key={s} className={cx('zp-pi', speed === s && 'on')} onClick={() => setRate(s)}>
-                {s === 1 ? 'Normal' : `${s}×`}
-              </button>
-            ))}
-          </div>
-          {levels.length > 0 && (
-            <>
-              <p className="zp-sec">Quality</p>
-              <button className={cx('zp-row', lvl === -1 && 'on')} onClick={() => setQuality(-1)}>
-                <span>Auto</span>
-                {lvl === -1 && <Check />}
-              </button>
-              {levels.map((l) => (
-                <button key={l.i} className={cx('zp-row', lvl === l.i && 'on')} onClick={() => setQuality(l.i)}>
-                  <span>{l.label}</span>
-                  {lvl === l.i && <Check />}
-                </button>
-              ))}
-            </>
-          )}
           <p className="zp-sec">4K upscaler (GPU)</p>
           <button className="zp-row" disabled={!gpuSupported} onClick={() => setUp(!up)}>
             <span>Anime4K upscaling</span>
@@ -1458,42 +1539,6 @@ export default function CinePlayer({
               <i className={cx('zp-tg', skipFiller && 'on')} />
             </button>
           )}
-        </Sheet>
-      )}
-
-      {sheet === 'srv' && servers && (
-        <Sheet title="Servers" onClose={() => setSheet(null)} target={target}>
-          {onAudio && (
-            <>
-              <p className="zp-sec">Audio</p>
-              <div className="zp-two">
-                {(['sub', 'dub'] as const).map((m) => (
-                  <button key={m} className={cx('zp-pi', audioMode === m && 'on')} onClick={() => onAudio(m)}>
-                    {m.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          <p className="zp-sec">Source</p>
-          <div className="zp-rows">
-            {servers.map((s) => (
-              <button
-                key={s.id}
-                className={cx('zp-row', s.id === serverId && 'on', s.disabled && 'dis')}
-                onClick={() => {
-                  onServer?.(s.id)
-                  setSheet(null)
-                }}
-              >
-                <span>
-                  {s.name}
-                  <small>{s.note}</small>
-                </span>
-                {s.id === serverId && <Check />}
-              </button>
-            ))}
-          </div>
         </Sheet>
       )}
 
