@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { toast } from '../lib/toast'
+import { shareLink } from '../lib/share'
 import { useMarkDetails, useSmartBack } from '../lib/backToDetails'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, CalendarDays, Crown, ExternalLink, Heart, Play, Share2, ShieldAlert, ShieldCheck, TrendingUp, Users } from 'lucide-react'
@@ -337,18 +337,7 @@ export default function DetailsPage() {
               )}
               <ShimmerButton
                 variant="ghost"
-                onClick={async () => {
-                  const url = `${window.location.origin}/anime/${a.id}`
-                  try {
-                    if (navigator.share) await navigator.share({ title: `${title} — Zenkai`, url })
-                    else {
-                      await navigator.clipboard.writeText(url)
-                      toast('Link copied')
-                    }
-                  } catch {
-                    /* share sheet dismissed */
-                  }
-                }}
+                onClick={() => shareLink(`${window.location.origin}/anime/${a.id}`, `${title} — Zenkai`)}
                 icon={<Share2 className="size-4" />}
               >
                 Share

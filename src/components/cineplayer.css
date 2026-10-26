@@ -64,14 +64,14 @@
 .zp-flex{flex:1}
 
 /* seek */
-.zp-seek{position:relative;flex:1;height:max(28px,calc(var(--u)*2.4));display:flex;align-items:center;cursor:pointer;touch-action:none}
-.zp-tr{position:relative;width:100%;height:max(4px,calc(var(--u)*.38));border-radius:99px;background:rgba(255,255,255,.2);transition:height .18s}
-.zp-seek:hover .zp-tr,.zp-seek.drag .zp-tr{height:max(6px,calc(var(--u)*.62))}
+.zp-seek{position:relative;flex:1;height:max(24px,calc(var(--u)*2));display:flex;align-items:center;cursor:pointer;touch-action:none}
+.zp-tr{position:relative;width:100%;height:max(3px,calc(var(--u)*.26));border-radius:99px;background:rgba(255,255,255,.18);transition:height .18s}
+.zp-seek:hover .zp-tr,.zp-seek.drag .zp-tr{height:max(5px,calc(var(--u)*.42))}
 .zp-bf,.zp-pl{position:absolute;left:0;top:0;bottom:0;border-radius:inherit}
-.zp-bf{background:rgba(255,255,255,.3)}
-.zp-pl{background:linear-gradient(90deg,var(--a),var(--a2));box-shadow:0 0 calc(var(--u)*1) color-mix(in srgb,var(--a) 70%,transparent);transition:width .25s linear}
+.zp-bf{background:rgba(255,255,255,.28)}
+.zp-pl{background:linear-gradient(90deg,var(--a),var(--a2));transition:width .25s linear}
 .zp-seek.drag .zp-pl{transition:none}
-.zp-th{position:absolute;top:50%;width:calc(var(--u)*1.25);height:calc(var(--u)*1.25);min-width:12px;min-height:12px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.6);transform:translate(-50%,-50%) scale(0);transition:transform .2s cubic-bezier(.34,1.56,.64,1),left .25s linear}
+.zp-th{position:absolute;top:50%;width:calc(var(--u)*1);height:calc(var(--u)*1);min-width:10px;min-height:10px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.5);transform:translate(-50%,-50%) scale(0);transition:transform .2s cubic-bezier(.34,1.56,.64,1),left .25s linear}
 .zp-seek:hover .zp-th{transform:translate(-50%,-50%) scale(1)}
 .zp-seek.drag .zp-th{transform:translate(-50%,-50%) scale(1.3);transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
 .zp-tip{position:absolute;bottom:calc(100% - var(--u)*.2);left:clamp(calc(var(--u)*2.4),var(--x),calc(100% - var(--u)*2.4));transform:translateX(-50%);padding:.3em .7em;border-radius:.6em;font-size:max(11px,calc(var(--u)*.9));font-weight:700;font-variant-numeric:tabular-nums;background:rgba(14,14,18,.92);border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 14px rgba(0,0,0,.5);white-space:nowrap}
@@ -93,9 +93,9 @@
 .zp-sub{position:absolute;left:calc(var(--sl) + 6%);right:calc(var(--sr) + 6%);bottom:calc(var(--sb) + var(--u)*2 + var(--sp,0%));z-index:14;display:flex;justify-content:center;transition:bottom .35s cubic-bezier(.2,.8,.2,1)}
 .show .zp-sub{bottom:calc(var(--sb) + var(--bar) + var(--sp,0%))}
 .zp-sub span{max-width:100%;text-align:center;white-space:pre-line;font-weight:700;line-height:1.35;padding:.2em .65em;border-radius:.45em;}
-.zp-sk{all:unset;box-sizing:border-box;position:absolute;z-index:30;right:calc(var(--sr) + var(--u)*1.6);bottom:calc(var(--sb) + var(--u)*1.6);display:flex;align-items:center;gap:calc(var(--u)*.7);min-height:max(36px,calc(var(--u)*3.2));padding:0 calc(var(--u)*1.3);border-radius:99px;cursor:pointer;pointer-events:auto;font-size:max(12px,calc(var(--u)*1));font-weight:800;background:rgba(18,18,22,.72);border:1px solid var(--a);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 4px 20px color-mix(in srgb,var(--a) 45%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);animation:zps .35s cubic-bezier(.2,.9,.3,1) both;transition:bottom .35s cubic-bezier(.2,.8,.2,1),background .2s}
+.zp-sk{all:unset;box-sizing:border-box;position:absolute;z-index:30;right:calc(var(--sr) + var(--u)*1.6);bottom:calc(var(--sb) + var(--u)*1.6);display:flex;align-items:center;gap:calc(var(--u)*.7);min-height:max(30px,calc(var(--u)*2.6));padding:0 calc(var(--u)*1.1);border-radius:8px;cursor:pointer;pointer-events:auto;font-size:max(12px,calc(var(--u)*.95));font-weight:600;letter-spacing:.01em;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:zps .35s cubic-bezier(.2,.9,.3,1) both;transition:bottom .35s cubic-bezier(.2,.8,.2,1),background .2s}
 .show .zp-sk{bottom:calc(var(--sb) + var(--bar) + var(--u)*.6)}
-.zp-sk:hover{background:color-mix(in srgb,var(--a) 45%,rgba(18,18,22,.8))}
+.zp-sk:hover{background:rgba(255,255,255,.16)}
 .zp-sk svg{width:max(14px,calc(var(--u)*1.3));height:max(14px,calc(var(--u)*1.3))}
 .zp-sk kbd{font:inherit;font-size:.8em;opacity:.6;padding:.1em .45em;border-radius:.4em;border:1px solid rgba(255,255,255,.3)}
 @media (pointer:coarse){.zp-sk kbd{display:none}}
@@ -164,7 +164,7 @@
 .zp-card{position:absolute;z-index:13;left:calc(var(--sl) + var(--u)*1.8);bottom:30%;max-width:70%;pointer-events:none;animation:zpt 3.6s ease both;border-left:3px solid var(--a);padding-left:calc(var(--u)*.9)}
 .zp-card h3{margin:0;font-size:max(15px,calc(var(--u)*1.7));font-weight:900;letter-spacing:-.02em;text-shadow:0 2px 12px rgba(0,0,0,.8)}
 .zp-card p{margin:.25em 0 0;font-size:max(12px,calc(var(--u)*1));font-weight:700;opacity:.85}
-.zp-seg{position:absolute;top:0;bottom:0;border-radius:99px;background:rgba(255,255,255,.55);pointer-events:none}
+.zp-seg{position:absolute;top:0;bottom:0;border-radius:99px;background:#facc15;pointer-events:none;z-index:1}
 .zp-row.dis{opacity:.4;pointer-events:none}
 .zp-two{display:flex;gap:calc(var(--u)*.6)}
 .zp-two .zp-pi{flex:1}
@@ -175,3 +175,55 @@
 .zp-mini .zp-mid{opacity:1;scale:1}
 .zp-mini .zp-mid>*:not(.zp-hero){opacity:0;visibility:hidden}
 
+
+/* ── JW-style skin: flat, minimal, no glow / blur / gradients. Overrides only; all logic untouched ── */
+.zp{--a:#e50914;--a2:#e50914}
+.zp-sw{--a:#e50914;--a2:#e50914}
+.zp-sc{background:linear-gradient(rgba(0,0,0,.55),transparent 22%),linear-gradient(to top,rgba(0,0,0,.75),transparent 34%)}
+.zp-ti h3{font-weight:600;text-shadow:none}
+.zp-ti p{font-weight:500}
+.zp-tm{font-weight:500;text-shadow:none}
+
+/* buttons: bare icons */
+.zp-b{background:none;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:6px;opacity:.9;transition:opacity .15s,background .15s,transform .15s}
+.zp-b:hover{background:rgba(255,255,255,.1);opacity:1}
+.zp-b:active{transform:scale(.92)}
+.zp-b.on{background:none;border:0;color:var(--a)}
+.zp-b.pill{border-radius:6px;font-weight:600}
+.zp-b em{background:var(--a);border-radius:4px;font-weight:600}
+.zp-b:focus-visible,.zp-row:focus-visible,.zp-pi:focus-visible,.zp-sk:focus-visible{outline-color:#fff}
+
+/* centre: plain play icon on a dark disc, no ring, no glow */
+.zp-hero{border:0;border-radius:50%;background:rgba(0,0,0,.55);box-shadow:none;opacity:1}
+.zp-hero:hover{background:rgba(0,0,0,.75);filter:none}
+.zp-hero::before{display:none}
+.zp-pn,.zp-sd{background:none}
+
+/* seek: thin, flat */
+.zp-pl{background:var(--a)}
+.zp-th{background:var(--a);box-shadow:none}
+.zp-tip{border-radius:4px;background:rgba(0,0,0,.85);border:0;box-shadow:none;font-weight:500}
+
+/* skip / fb / spinner */
+.zp-fb.l,.zp-fb.r{background:rgba(255,255,255,.12);box-shadow:none}
+.zp-spn{border-width:2px;border-color:rgba(255,255,255,.2);border-top-color:#fff;border-right-color:#fff}
+.zp-ask button{border-radius:6px;font-weight:600}
+
+/* settings sheet: flat dark panel */
+.zp-sw{background:rgba(0,0,0,.5)}
+.zp-sh{background:#181818;border:0;border-radius:10px 10px 0 0;box-shadow:none}
+.zp-sh::before{display:none}
+.zp-sh-h{border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:calc(var(--u)*.5)}
+.zp-sh-h h4{font-weight:600}
+.zp-sec{font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:max(11px,calc(var(--u)*.8))}
+.zp-row{border-radius:6px;font-weight:500}
+.zp-row.on{background:rgba(255,255,255,.08);box-shadow:inset 3px 0 0 var(--a)}
+.zp-tg{background:rgba(255,255,255,.25)}
+.zp-tg.on{background:var(--a)}
+.zp-tg::after{transition:transform .18s ease}
+.zp-pi{border-radius:6px;font-weight:600;background:rgba(255,255,255,.08)}
+.zp-pi.on{background:var(--a);box-shadow:none}
+.zp-rg{border-radius:2px;background:linear-gradient(90deg,var(--a) var(--p),rgba(255,255,255,.25) var(--p))}
+.zp-sw-c.on{box-shadow:0 0 0 2px #fff!important}
+@media (orientation:landscape) and (max-height:620px){.zp-sh{border-radius:10px 0 0 10px}}
+@media (min-width:900px) and (min-height:621px){.zp-sh{border-radius:10px}}

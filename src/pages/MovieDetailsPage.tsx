@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMarkDetails, useSmartBack } from '../lib/backToDetails'
 import { motion } from 'framer-motion'
-import { Clock, Film, Play, Star, Tv, Clapperboard, ArrowLeft } from 'lucide-react'
+import { Clock, Film, Play, Star, Tv, Clapperboard, ArrowLeft, Share2 } from 'lucide-react'
 import { BlurText } from '../components/BlurText'
 import { BookRow } from '../components/BookRow'
 import { ErrorState } from '../components/ErrorState'
@@ -16,6 +16,7 @@ import { Tabs } from '../components/Tabs'
 import { TrailerModal } from '../components/TrailerModal'
 import { useAsync } from '../hooks/useAsync'
 import { toMovieCard } from '../lib/movieCards'
+import { movieShareUrl, shareLink } from '../lib/share'
 import { cn } from '../lib/utils'
 import { fetchDetails, fetchEpisodes, img, watchHref, type MediaType } from '../services/movies'
 
@@ -110,6 +111,9 @@ export default function MovieDetailsPage() {
                       <Clapperboard className="size-4" /> Trailer
                     </button>
                   )}
+                  <button type="button" onClick={() => shareLink(movieShareUrl(type, id, m.title), `${m.title} — Zenkai`)} className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3 text-sm font-semibold backdrop-blur transition hover:bg-white/20 active:scale-95">
+                    <Share2 className="size-4" /> Share
+                  </button>
                 </div>
               </>
             ) : (

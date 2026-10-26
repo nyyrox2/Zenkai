@@ -1183,9 +1183,9 @@ export default function CinePlayer({
               >
                 <div className="zp-tr">
                   <i className="zp-bf" style={{ width: `${buf * 100}%` }} />
+                  <i className="zp-pl" style={{ width: `${pct}%` }} />
                   {si && <i className="zp-seg" style={si} />}
                   {so && <i className="zp-seg" style={so} />}
-                  <i className="zp-pl" style={{ width: `${pct}%` }} />
                   <i className="zp-th" style={{ left: `${pct}%` }} />
                 </div>
                 {tipF != null && dur > 0 && (

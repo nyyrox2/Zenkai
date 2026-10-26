@@ -77,12 +77,18 @@ export default function WatchPage() {
   const [autoSkip, setAutoSkip] = useFlag('zk:autoskip', false)
   const [skipFiller, setSkipFiller] = useFlag('zk:skipfiller', false)
 
-  const sessionVerified = useShieldVerified()
+  const shieldOk = useShieldVerified()
+  // once verified, stay verified: a token refresh mid-session must not unmount the player (that kicks it out of fullscreen)
+  const [everOk, setEverOk] = useState(shieldOk)
   useEffect(() => {
-    if (!sessionVerified) {
+    if (shieldOk) setEverOk(true)
+  }, [shieldOk])
+  const sessionVerified = shieldOk || everOk
+  useEffect(() => {
+    if (!shieldOk) {
       void getToken()
     }
-  }, [sessionVerified])
+  }, [shieldOk])
   const [loadKind, setLoadKind] = useState<'episode' | 'server'>('episode')
   const [aud, setAud] = useState<{ tracks: { i: number; label: string; lang: string }[]; active: number }>({ tracks: [], active: 0 })
   const [tourOn, setTourOn] = useState(false)

@@ -75,7 +75,7 @@ function parseMapping(data, anilistId) {
   return out;
 }
 
-const mapOf = (anilistId) =>
+export const mapOf = (anilistId) =>
   cached(`map:${anilistId}`, 24 * 3600e3, async () => {
     try {
       const m = parseMapping(await getJson(ANIBRIDGE + anilistId), anilistId);
