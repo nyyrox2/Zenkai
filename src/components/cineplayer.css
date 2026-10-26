@@ -239,3 +239,25 @@
 .zp-hold{position:absolute;z-index:14;top:calc(var(--st) + var(--u)*1.6);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:calc(var(--u)*.5);padding:calc(var(--u)*.35) calc(var(--u)*1);border-radius:99px;background:rgba(0,0,0,.65);font-size:max(12px,calc(var(--u)*1));font-weight:600;animation:zpf .15s both}
 .zp-hold svg{width:max(14px,calc(var(--u)*1.3));height:max(14px,calc(var(--u)*1.3))}
 .zp-cr{gap:calc(var(--u)*.3)}
+
+/* ── glass panels: translucent warm-dark, blurred video behind (menus, sheets, notifications) ── */
+.zp-pop,.zp-sh,.zp-toast{background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03) 60%),rgba(28,20,14,.42);backdrop-filter:blur(26px) saturate(1.7);-webkit-backdrop-filter:blur(26px) saturate(1.7);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 14px 44px rgba(0,0,0,.45)}
+.zp-pop{border-radius:18px;padding:6px}
+.zp-pop .zp-row{border-radius:12px}
+.zp-pop .zp-row:hover{background:rgba(255,255,255,.1)}
+.zp-pop .zp-row.on{background:rgba(255,255,255,.14);box-shadow:inset 3px 0 0 var(--a)}
+.zp-ft{border-radius:12px!important;border-top-color:rgba(255,255,255,.12)}
+.zp-sw{background:rgba(0,0,0,.35);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.zp-sh{border-radius:22px 22px 0 0;border-bottom:0}
+.zp-sh-h{border-bottom-color:rgba(255,255,255,.12)}
+@media (orientation:landscape) and (max-height:620px){.zp-sh{border-radius:22px 0 0 22px;border:0;border-left:1px solid rgba(255,255,255,.16)}}
+@media (min-width:900px) and (min-height:621px){.zp-sh{border-radius:22px;border:1px solid rgba(255,255,255,.16)}}
+
+/* status notification at the top: caption / server / audio loading, done, failed */
+.zp-toast{position:absolute;z-index:40;left:50%;top:calc(var(--st) + var(--u)*1.6);transform:translateX(-50%);max-width:min(90%,34em);display:flex;align-items:center;gap:calc(var(--u)*.7);padding:calc(var(--u)*.6) calc(var(--u)*1.2);border-radius:99px;font-size:max(12px,calc(var(--u)*.95));font-weight:600;pointer-events:none;transition:top .3s cubic-bezier(.2,.8,.2,1);animation:zpn .3s cubic-bezier(.2,.9,.3,1) both}
+.show .zp-toast{top:calc(var(--st) + var(--u)*4.6)}
+.zp-toast span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zp-toast svg{flex:none;width:max(15px,calc(var(--u)*1.3));height:max(15px,calc(var(--u)*1.3));color:#7dff9b}
+.zp-toast.err svg{color:#ff8a8a}
+.zp-tspin{flex:none;width:max(14px,calc(var(--u)*1.2));height:max(14px,calc(var(--u)*1.2));border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:zpo .8s linear infinite}
+@keyframes zpn{from{opacity:0;transform:translate(-50%,-8px) scale(.96)}}

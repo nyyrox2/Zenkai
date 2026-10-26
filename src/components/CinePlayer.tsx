@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom'
 import Hls from 'hls.js'
 import {
   CheckCircle2, ChevronDown, ChevronRight, FastForward, Flag, Languages, List, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
-  Server, Settings, SkipBack, SkipForward, Upload, Volume1, Volume2, VolumeX, X,
+  Server, Settings, SkipBack, SkipForward, TriangleAlert, Upload, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react'
-import { apiUrl } from '../services/api'
+import { apiUrl, fetchStream } from '../services/api'
 import { LoadingGrid } from './LoadingGrid'
 import { Tour, tourDone, tourSeen, type TourStep } from './Tour'
 import { gpuSupported, startUpscale } from '../lib/upscale'
@@ -17,6 +17,13 @@ import './cineplayer.css'
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 const HOLD_RATE = 2 // press-and-hold on the video
 const isEn = (t: { language: string; label: string }) => /^en\b|^eng|english/i.test(t.language) || /english/i.test(t.label)
+const ISO: Record<string, string> = { en: 'English', eng: 'English', ar: 'Arabic', ara: 'Arabic', es: 'Spanish', spa: 'Spanish', fr: 'French', fre: 'French', fra: 'French', de: 'German', ger: 'German', deu: 'German', it: 'Italian', ita: 'Italian', pt: 'Portuguese', por: 'Portuguese', pob: 'Portuguese', ru: 'Russian', rus: 'Russian', hi: 'Hindi', hin: 'Hindi', ja: 'Japanese', jpn: 'Japanese', zh: 'Chinese', chi: 'Chinese', zho: 'Chinese', id: 'Indonesian', ind: 'Indonesian', th: 'Thai', tha: 'Thai', vi: 'Vietnamese', vie: 'Vietnamese', ko: 'Korean', kor: 'Korean', tr: 'Turkish', tur: 'Turkish', pl: 'Polish', pol: 'Polish', nl: 'Dutch', dut: 'Dutch', nld: 'Dutch' }
+/** "Arabic - Arabic", "English #2", "eng" all fold into one language name so the menu can count them */
+const langName = (t: { language: string; label: string }) => {
+  const raw = (t.language || t.label || '').split(/[-–(#]/)[0].trim()
+  return ISO[raw.toLowerCase()] ?? (raw ? raw[0].toUpperCase() + raw.slice(1) : 'Unknown')
+}
+const sourceReferer = (id?: string) => (id?.startsWith('flixcloud') ? 'https://flixcloud.cc/' : 'https://megaplay.buzz/')
 const SUB_SIZE = { small: 1.1, medium: 1.4, large: 1.85 } as const
 const CAP_COLORS = ['#ffffff', '#ffe14d', '#5fe3ff', '#7dff9b']
 const CAP_EDGE = {
@@ -337,7 +344,10 @@ export default function CinePlayer({
   const [fb, setFb] = useState<{ side: number; n: number; k: number } | null>(null)
   const [sheet, setSheet] = useState<SheetName>(null)
   const [pop, setPopRaw] = useState<PopName>(null)
-  const [grp, setGrp] = useState<'en' | 'other' | null>('en')
+  const [grp, setGrp] = useState<string | null>('English')
+  const [note, setNote] = useState<{ k: 'load' | 'ok' | 'err'; msg: string } | null>(null)
+  const [srcLeft, setSrcLeft] = useState(0) // other servers still being asked for captions
+  const noteTimer = useRef(0)
   const [held, setHeld] = useState(false)
   const hold = useRef({ timer: 0, on: false, prev: 1 })
   const setPop = (p: PopName) => setPopRaw((c) => (c === p ? null : p))
@@ -549,18 +559,36 @@ export default function CinePlayer({
     return false
   }
 
-  const pick = async (t: Track): Promise<boolean> => {
+  /** top-of-player notification; loading stays until replaced, results fade after a moment */
+  const flash = (k: 'load' | 'ok' | 'err', msg: string) => {
+    window.clearTimeout(noteTimer.current)
+    setNote({ k, msg })
+    if (k !== 'load') noteTimer.current = window.setTimeout(() => setNote(null), k === 'ok' ? 2600 : 4200)
+  }
+  useEffect(() => () => window.clearTimeout(noteTimer.current), [])
+
+  const pick = async (t: Track, quiet = false): Promise<boolean> => {
     const my = ++tok.current
+    const name = `${langName(t)}${t.source ? ` · ${t.source}` : ''}`
     setTrackId(t.id)
     setCaps(true)
     setSubErr(null)
     setCues([])
     if (t.cues) {
       setCues(t.cues)
+      if (!quiet) flash('ok', `Subtitles: ${name}`)
       return true
     }
+    if (!quiet) flash('load', `Downloading ${name}…`)
     const ok = await loadTrack(t.url, my, t.referer)
-    if (!ok && my === tok.current) setSubErr(`Couldn't load "${t.label}". Try another track.`)
+    if (my === tok.current) {
+      if (ok) {
+        if (!quiet) flash('ok', `Subtitles: ${name}`)
+      } else {
+        setSubErr(`Couldn't load "${t.label}". Try another track.`)
+        if (!quiet) flash('err', `Couldn't load ${name}. Try another track or source.`)
+      }
+    }
     return ok
   }
 
@@ -575,8 +603,8 @@ export default function CinePlayer({
         label: s.label || s.lang || `Track ${i + 1}`,
         language: s.lang || s.label || 'English',
         url: s.url,
-        source: 'Stream',
-        referer: 'https://megaplay.buzz/',
+        source: servers?.find((x) => x.id === serverId)?.name ?? 'Stream',
+        referer: sourceReferer(serverId),
       }))
       try {
         const q = new URLSearchParams({ title, ep: String(episode), id: String(animeId), format: format ?? '' })
@@ -591,11 +619,31 @@ export default function CinePlayer({
       if (dead) return
       setTracks(all)
       setLoadingSubs(false)
+
+      // ask every other direct server for its captions too; they trickle into the menu as each answers
+      const seen = new Set(all.map((t) => t.url))
+      const others = (servers ?? []).filter((x) => x.id !== serverId && x.id !== 'acdn') // ponytail: ACDN carries no caption files; add it here if that changes
+      setSrcLeft(others.length)
+      for (const x of others) {
+        fetchStream({ id: animeId, ep: episode, server: x.id, audio: audioMode, title, format })
+          .then((r) => {
+            const add: Track[] = r.subtitles
+              .filter((s) => s.file && !seen.has(s.file))
+              .map((s, i) => ({ id: `${x.id}_${i}_${s.file}`, label: s.label, language: s.label, url: s.file, source: x.name, referer: sourceReferer(x.id) }))
+            add.forEach((t) => seen.add(t.url))
+            if (!dead && add.length) setTracks((p) => [...p, ...add])
+          })
+          .catch(() => {
+            /* that server has nothing for this episode */
+          })
+          .finally(() => !dead && setSrcLeft((n) => Math.max(0, n - 1)))
+      }
+
       const def = all.find(isEn) || all[0]
       if (!def) return setTrackId(null)
       // a broken default must not hide the rest: walk the list until one actually loads
       for (const t of [def, ...all.filter((x) => x !== def)]) {
-        if (dead || (await pick(t))) break
+        if (dead || (await pick(t, true))) break
       }
     })()
     return () => {
@@ -635,6 +683,13 @@ export default function CinePlayer({
       setBuf(end / v.duration)
     }
   }
+
+  // every language with how many captions it has, English first
+  const langs = (() => {
+    const m = new Map<string, Track[]>()
+    for (const t of tracks) m.set(langName(t), [...(m.get(langName(t)) ?? []), t])
+    return [...m].sort(([a], [b]) => (a === 'English' ? -1 : b === 'English' ? 1 : a.localeCompare(b)))
+  })()
 
   const inIntro = intro != null && intro.end > 0 && time >= intro.start && time <= intro.end
   const inOutro = outro != null && outro.end > 0 && time >= outro.start && time <= outro.end
@@ -739,6 +794,7 @@ export default function CinePlayer({
     if (hls.current) hls.current.currentLevel = i
   }
   const setAudioTrack = (t: { i: number; lang: string; label: string }) => {
+    flash('ok', `Audio: ${t.label}`)
     if (hls.current) hls.current.audioTrack = t.i
     setAudioIdx(t.i)
     const l = t.label.toLowerCase()
@@ -1067,6 +1123,12 @@ export default function CinePlayer({
       <div className="zp-in">
         {busy && !err && <div className="zp-spn" />}
         {switching && <LoadingGrid label="Loading episode" className="pointer-events-none absolute bottom-16 left-4 z-30 text-white/70" />}
+        {(note || switching) && (
+          <div className={cx('zp-toast', (note?.k ?? 'load') === 'err' && 'err')} role="status" aria-live="polite" key={note?.msg ?? 'sw'}>
+            {(note?.k ?? 'load') === 'load' ? <span className="zp-tspin" /> : note?.k === 'ok' ? <CheckCircle2 /> : <TriangleAlert />}
+            <span>{note?.msg ?? 'Switching stream…'}</span>
+          </div>
+        )}
 
         {card && !err && (
           <div className="zp-card">
@@ -1319,14 +1381,14 @@ export default function CinePlayer({
                 {onAudio && (
                   <div className="zp-two zp-pad">
                     {(['sub', 'dub'] as const).map((m) => (
-                      <button key={m} className={cx('zp-pi', audioMode === m && 'on')} onClick={() => onAudio(m)}>
+                      <button key={m} className={cx('zp-pi', audioMode === m && 'on')} onClick={() => (flash('load', `Switching to ${m.toUpperCase()}…`), onAudio(m))}>
                         {m.toUpperCase()}
                       </button>
                     ))}
                   </div>
                 )}
                 {servers.map((x) => (
-                  <button key={x.id} className={cx('zp-row', x.id === serverId && 'on')} onClick={() => (onServer?.(x.id), setPopRaw(null))}>
+                  <button key={x.id} className={cx('zp-row', x.id === serverId && 'on')} onClick={() => (x.id !== serverId && flash('load', `Switching to ${x.name}…`), onServer?.(x.id), setPopRaw(null))}>
                     <span>{x.name}</span>
                   </button>
                 ))}
@@ -1339,30 +1401,37 @@ export default function CinePlayer({
                   <span>Off</span>
                 </button>
                 {loadingSubs && <p className="zp-note zp-pad">Searching for subtitles…</p>}
-                {!loadingSubs && tracks.length === 0 && <p className="zp-note zp-pad">No subtitles found</p>}
+                {!loadingSubs && tracks.length === 0 && srcLeft === 0 && <p className="zp-note zp-pad">No subtitles found</p>}
                 {subErr && <p className="zp-note zp-pad">{subErr}</p>}
-                {([['en', 'English', tracks.filter(isEn)], ['other', 'Other languages', tracks.filter((t) => !isEn(t))]] as const).map(
-                  ([k, name, list]) =>
-                    list.length > 0 && (
-                      <div key={k}>
-                        <button className="zp-row" aria-expanded={grp === k} onClick={() => setGrp(grp === k ? null : k)}>
-                          <span>
-                            {name} ({list.length})
-                          </span>
-                          {grp === k ? <ChevronDown /> : <ChevronRight />}
-                        </button>
-                        {grp === k &&
-                          list.map((t) => (
-                            <button key={t.id} className={cx('zp-row zp-sub-row', caps && t.id === trackId && 'on')} onClick={() => (void pick(t), setPopRaw(null))}>
-                              <span>
-                                {t.label}
-                                {t.source && <small>{t.source}</small>}
-                              </span>
-                            </button>
-                          ))}
-                      </div>
-                    ),
-                )}
+                {langs.map(([name, list]) => {
+                  const cur = caps && list.some((t) => t.id === trackId)
+                  return (
+                    <div key={name}>
+                      <button
+                        className={cx('zp-row', cur && 'on')}
+                        aria-expanded={list.length > 1 ? grp === name : undefined}
+                        onClick={() => (list.length > 1 ? setGrp(grp === name ? null : name) : (void pick(list[0]), setPopRaw(null)))}
+                      >
+                        <span>
+                          {name} ({list.length})
+                          {list.length === 1 && list[0].source && <small>{list[0].source}</small>}
+                        </span>
+                        {list.length > 1 && (grp === name ? <ChevronDown /> : <ChevronRight />)}
+                      </button>
+                      {list.length > 1 &&
+                        grp === name &&
+                        list.map((t) => (
+                          <button key={t.id} className={cx('zp-row zp-sub-row', caps && t.id === trackId && 'on')} onClick={() => (void pick(t), setPopRaw(null))}>
+                            <span>
+                              {t.label}
+                              {t.source && <small>{t.source}</small>}
+                            </span>
+                          </button>
+                        ))}
+                    </div>
+                  )
+                })}
+                {srcLeft > 0 && <p className="zp-note zp-pad">Checking {srcLeft} more source{srcLeft > 1 ? 's' : ''}…</p>}
                 <button className="zp-row zp-ft" onClick={() => (setPopRaw(null), setSheet('subs'))}>
                   <span>Caption settings</span>
                 </button>
