@@ -142,7 +142,7 @@ export function ChangelogModal() {
 
               <h2
                 id="changelog-title"
-                className="mt-3.5 text-2xl font-bold tracking-tight text-white sm:text-3xl"
+                className="mt-3.5 text-2xl font-bold tracking-tight text-white"
               >
                 {CURRENT_RELEASE.title}
               </h2>

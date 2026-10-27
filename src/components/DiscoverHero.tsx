@@ -46,18 +46,18 @@ export function DiscoverHero({
       )}
       <AuroraBackground />
       <Particles count={44} className="opacity-70" />
-      <span aria-hidden className="pointer-events-none absolute -right-4 top-16 select-none font-display text-[9rem] font-black leading-none text-foreground/[0.04] sm:text-[16rem]">
+      <span aria-hidden className="pointer-events-none absolute -right-4 top-16 select-none font-display text-[9rem] font-black leading-none text-foreground/[0.04]">
         {kanji}
       </span>
       <div className="relative mx-auto max-w-7xl">
         <p className="mb-3 eyebrow text-accent">
           <ShinyText speed={4}>{eyebrow}</ShinyText>
         </p>
-        <BlurText text={title} className="font-display text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl [text-wrap:balance]" />
-        <p className="font-display text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
+        <BlurText text={title} className="font-display text-4xl font-black leading-[1.05] tracking-tight [text-wrap:balance]" />
+        <p className="font-display text-4xl font-black leading-[1.05] tracking-tight">
           <GradientText>{accent}</GradientText>
         </p>
-        <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted sm:text-base">{subtitle}</p>
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted">{subtitle}</p>
 
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
           <label className="relative block w-full sm:max-w-md">

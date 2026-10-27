@@ -74,7 +74,7 @@ export function ChoiceCard({
           {/* giant kanji watermark */}
           <span
             aria-hidden
-            className="pointer-events-none absolute -bottom-6 -right-3 select-none font-display text-[7.5rem] font-black leading-none text-foreground/[0.05] transition-transform duration-500 group-hover:-translate-y-2 group-hover:scale-110 sm:text-[9rem]"
+            className="pointer-events-none absolute -bottom-6 -right-3 select-none font-display text-[7.5rem] font-black leading-none text-foreground/[0.05] transition-transform duration-500 group-hover:-translate-y-2 group-hover:scale-110"
           >
             {kanji}
           </span>
@@ -91,7 +91,7 @@ export function ChoiceCard({
 
             <div className="mt-auto pt-10">
               <p className="eyebrow text-accent">{eyebrow}</p>
-              <h2 className="mt-2 font-display text-4xl font-black tracking-tight sm:text-5xl">{title}</h2>
+              <h2 className="mt-2 font-display text-4xl font-black tracking-tight">{title}</h2>
               <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted">{blurb}</p>
               <ul className="mt-5 flex flex-wrap gap-2">
                 {chips.map((c) => (

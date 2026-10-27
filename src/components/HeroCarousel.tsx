@@ -55,7 +55,7 @@ function Heading({ title, logo }: { title: string; logo: string | null }) {
       {!ok && (
         <BlurText
           text={title}
-          className="font-display text-4xl font-black leading-[1.02] tracking-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl [text-wrap:balance] text-center lg:text-left"
+          className="font-display text-4xl font-black leading-[1.02] tracking-tight text-white drop-shadow-lg [text-wrap:balance] text-center lg:text-left"
         />
       )}
     </div>

@@ -27,7 +27,7 @@ export function BookRow({
       <div className="mb-5 flex items-end justify-between gap-4 px-4 sm:px-6">
         <div>
           {eyebrow && <p className="mb-1 eyebrow text-accent">{eyebrow}</p>}
-          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
+          <h2 className="font-display text-2xl font-bold tracking-tight">{title}</h2>
         </div>
         <div className="hidden gap-2 md:flex">
           {([-1, 1] as const).map((d) => (

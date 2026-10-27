@@ -28,7 +28,7 @@ export default function ListPage() {
     <main className="pb-24 pt-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <p className="mb-2 eyebrow text-accent">{al?.user ? `Synced with AniList · ${al.user.name}` : 'Saved on this device'}</p>
-        <h1 className="font-display text-4xl font-black tracking-tight sm:text-6xl">
+        <h1 className="font-display text-4xl font-black tracking-tight">
           <GradientText>My List</GradientText>
         </h1>
       </div>
@@ -36,7 +36,7 @@ export default function ListPage() {
       <ContinueRow className="mt-10" />
 
       <section className="mx-auto mt-10 max-w-7xl px-4 sm:px-6" aria-label="Watchlist">
-        <h2 className="mb-4 font-display text-2xl font-bold tracking-tight sm:text-3xl">Watchlist</h2>
+        <h2 className="mb-4 font-display text-2xl font-bold tracking-tight">Watchlist</h2>
         {list.length > 0 && (
           <Tabs<Filter>
             value={filter}

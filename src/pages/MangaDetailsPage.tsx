@@ -121,7 +121,7 @@ function Details({ id }: { id: string }) {
 
             <div className="min-w-0 flex-1 text-center md:text-left">
               <p className="mb-2 eyebrow text-accent">{[m?.format ?? 'Manga', m?.status, m?.year].filter(Boolean).join(' · ')}</p>
-              <h1 className="font-display text-3xl font-black leading-tight tracking-tight sm:text-5xl [text-wrap:balance]">{title}</h1>
+              <h1 className="font-display text-3xl font-black leading-tight tracking-tight [text-wrap:balance]">{title}</h1>
               {m?.nativeTitle && <p className="mt-1 text-sm text-muted">{m.nativeTitle}</p>}
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-muted md:justify-start">
@@ -150,7 +150,7 @@ function Details({ id }: { id: string }) {
               ) : (
                 desc && (
                   <>
-                    <p className={cn('mt-5 whitespace-pre-line text-sm leading-relaxed text-muted sm:text-base', !open && long && 'line-clamp-5')}>{desc}</p>
+                    <p className={cn('mt-5 whitespace-pre-line text-sm leading-relaxed text-muted', !open && long && 'line-clamp-5')}>{desc}</p>
                     {long && (
                       <button type="button" onClick={() => setOpen((o) => !o)} className="mt-2 text-sm font-semibold text-accent hover:underline">
                         {open ? 'Show less' : 'Read more'}
@@ -220,7 +220,7 @@ function Details({ id }: { id: string }) {
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="mb-1 eyebrow text-accent">Read online</p>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Chapters</h2>
+              <h2 className="font-display text-2xl font-bold tracking-tight">Chapters</h2>
             </div>
             <div className="flex items-center gap-2">
               <label className="relative block flex-1 sm:w-64 sm:flex-none">

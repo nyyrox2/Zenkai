@@ -21,14 +21,14 @@ export function ProfileCard() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-display text-lg font-black tracking-tight text-foreground sm:text-xl">
+              <span className="font-display text-lg font-black tracking-tight text-foreground">
                 Join us on Discord!
               </span>
               <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-[#5865F2]/20 px-2 py-0.5 text-[10px] font-bold text-[#5865F2]">
                 <Sparkles className="size-2.5" /> Community
               </span>
             </div>
-            <p className="truncate text-xs sm:text-sm text-muted mt-0.5">
+            <p className="truncate text-xs text-muted mt-0.5">
               Chat about anime, request shows, report stream issues &amp; join giveaways with fellow otakus.
             </p>
           </div>
@@ -54,10 +54,10 @@ export function ProfileCard() {
             <MessagesSquare className="size-6 sm:size-7" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="font-display text-lg font-black tracking-tight text-foreground sm:text-xl">
+            <span className="font-display text-lg font-black tracking-tight text-foreground">
               Zenkai Community
             </span>
-            <p className="mt-0.5 truncate text-xs text-muted sm:text-sm">
+            <p className="mt-0.5 truncate text-xs text-muted">
               Post, share recs &amp; chat with other fans right here on Zenkai.
             </p>
           </div>

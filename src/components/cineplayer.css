@@ -7,7 +7,7 @@
 .zp-v{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
 .zp-g{position:absolute;inset:0;z-index:5;touch-action:manipulation}
 .zp:not(.show) .zp-g{cursor:none}
-.zp-in{position:absolute;inset:0;pointer-events:none;--u:clamp(10px,2cqmin + 5px,18px);--bar:calc(max(28px,var(--u)*2.4) + max(36px,var(--u)*3.2) + var(--u)*1.4)}
+.zp-in{position:absolute;inset:0;pointer-events:none;--u:14px;--bar:calc(max(28px,var(--u)*2.4) + max(36px,var(--u)*3.2) + var(--u)*1.4)}
 
 /* layers */
 .zp-ui{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:space-between;padding:var(--st) var(--sr) 0 var(--sl)}
@@ -567,3 +567,69 @@
 .zp-pg.seg .zp-pi{flex:1 1 0;min-width:0;padding:0 2px;font-size:13px}
 .zp-sh .zp-off{display:grid;grid-template-columns:repeat(2,1fr) auto repeat(2,1fr) 1fr;gap:6px;align-items:center}
 .zp-sh .zp-off .zp-pi{min-width:0;padding:0 4px}
+
+/* Caption dialog */
+.zp-sw-dlg{align-items:center!important;justify-content:center!important;padding:12px!important}
+.zp-sw-dlg .zp-sh{width:min(100%,460px)!important;height:min(620px,88dvh)!important;max-height:88dvh!important;border-radius:18px!important;padding:0!important;border:1px solid rgba(255,255,255,.14)!important;animation:none!important}
+.zp-sw-dlg .zp-sh-b{padding:0 14px 14px!important;gap:8px}
+.zp-sw-dlg .zp-prev{margin:0 -14px;padding:8px 14px 0;background:#0b0b10;border-bottom:1px solid rgba(255,255,255,.08)}
+.zp-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.zp-tab{all:unset;box-sizing:border-box;flex:1 0 auto;padding:10px 12px;font-size:13px;font-weight:700;color:rgba(255,255,255,.55);cursor:pointer;border-bottom:2px solid transparent;text-align:center}
+.zp-tab.on{color:#fff;border-bottom-color:var(--a)}
+.zp-pgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.zp-pc{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:10px;background:rgba(255,255,255,.06);text-align:center}
+.zp-pc:hover{background:rgba(255,255,255,.12)}
+.zp-pc small{font-size:12px;font-weight:700}
+.zp-pcv{display:flex;align-items:center;justify-content:center;height:54px;overflow:hidden;border-radius:7px;background:linear-gradient(135deg,#4a3a5a,#1d3a4a)}
+.zp-cats{position:sticky;top:0}
+.zp-flist{display:flex;flex-direction:column;gap:6px}
+.zp-frow{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:48px;padding:0 12px;border-radius:9px;cursor:pointer;background:rgba(255,255,255,.06);font-size:12px;font-weight:700;color:#fff}
+.zp-frow span:last-child{font-size:17px;font-weight:600;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zp-frow:hover{background:rgba(255,255,255,.12)}
+.zp-frow.on{background:var(--a)}
+
+/* ═══ Layout system: ONE set of fixed tokens for every popup / sheet / dialog, identical on all devices ═══ */
+.zp-sw,.zp-pop{--u:15px;--fs:14px;--fs-sm:12px;--ctl:40px;--gap:8px;--pad:14px;--rail:210px}
+.zp-sw .zp-sh,.zp-pop{font-size:var(--fs)!important;line-height:1.35}
+.zp-sw .zp-sh-h{padding:8px var(--pad) 8px!important;min-height:52px}
+.zp-sw .zp-sh-h h4{font-size:16px!important}
+.zp-sw .zp-sh-h .zp-b{width:36px!important;height:36px!important}
+.zp-sw .zp-sh-h .zp-b svg{width:18px!important;height:18px!important}
+.zp-sw .zp-sh-b{padding:0 var(--pad) var(--pad)!important;gap:var(--gap)!important}
+.zp-sw .zp-sec,.zp-pop .zp-ph{font-size:var(--fs-sm)!important;margin:10px 0 2px!important;letter-spacing:.07em}
+.zp-sw .zp-note{font-size:var(--fs-sm)!important;line-height:1.4}
+.zp-sw .zp-row,.zp-pop .zp-row{min-height:var(--ctl)!important;padding:0 12px!important;gap:10px!important;font-size:var(--fs)!important;border-radius:8px!important}
+.zp-sw .zp-pi{min-height:var(--ctl)!important;min-width:44px!important;padding:0 12px!important;font-size:var(--fs)!important}
+.zp-sw .zp-pg{gap:var(--gap)!important}
+.zp-sw .zp-pg.seg .zp-pi,.zp-sw .zp-fg .zp-pi{padding:0 4px!important;font-size:13px!important}
+.zp-sw .zp-rg{height:6px!important;margin:12px 0!important}
+.zp-sw .zp-rg::-webkit-slider-thumb{width:22px;height:22px}
+.zp-sw .zp-rg::-moz-range-thumb{width:22px;height:22px}
+.zp-sw .zp-sw-c,.zp-sw .zp-pi.zp-sw-c{min-width:40px!important;min-height:36px!important}
+.zp-sw .zp-off{gap:6px!important}
+.zp-pop{min-width:200px!important;max-width:min(320px,calc(100% - 16px))!important}
+.zp-pop.zp-pop-cc{width:min(360px,calc(100% - 16px))!important;max-width:none!important}
+
+/* dialog: portrait / narrow → single column, tabs on top, body scrolls */
+.zp-sw-dlg{padding:calc(var(--st) + 12px) calc(var(--sr) + 12px) calc(var(--sb) + 12px) calc(var(--sl) + 12px)!important}
+.zp-sw-dlg .zp-sh{width:min(100%,480px)!important;height:min(640px,100%)!important;max-height:none!important}
+.zp-sw-dlg .zp-sh-b{padding:0!important;gap:0!important}
+.zp-sw-dlg .zp-prev{margin:0!important;padding:6px var(--pad) 0!important}
+.zp-tc{display:flex;flex-direction:column;gap:var(--gap);padding:var(--pad)}
+.zp-cats{position:static!important}
+.zp-tab{min-height:44px;display:grid!important;place-items:center;font-size:var(--fs)!important}
+
+/* dialog: landscape phones + laptops → left rail (preview + tabs), right pane scrolls on its own */
+@media (orientation:landscape) and (max-height:620px),(min-width:900px) and (min-height:621px){
+  .zp-sw-dlg .zp-sh{width:min(760px,100%)!important;height:min(560px,100%)!important}
+  .zp-sw-dlg .zp-sh-b{flex-direction:row!important;overflow:hidden!important}
+  .zp-sw-dlg .zp-prev{position:static!important;flex:0 0 var(--rail);display:flex;flex-direction:column;overflow-y:auto;padding:10px!important;border-bottom:0!important;border-right:1px solid rgba(255,255,255,.08)}
+  .zp-sw-dlg .zp-tabs{flex-direction:column;overflow:visible;gap:2px}
+  .zp-sw-dlg .zp-tab{justify-items:start;text-align:left;padding:0 12px;border-bottom:0!important;border-left:3px solid transparent;border-radius:0 8px 8px 0}
+  .zp-sw-dlg .zp-tab.on{border-left-color:var(--a);background:rgba(255,255,255,.07)}
+  .zp-sw-dlg .zp-tc{flex:1;min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+}
+/* non-dialog sheets (episodes, report): same fixed widths everywhere */
+.zp-sw:not(.zp-sw-dlg) .zp-sh{width:min(100%,480px)}
+.zp-sw:not(.zp-sw-dlg) .zp-sh.zp-sh-wide{width:min(100%,560px)!important}
+@media (orientation:landscape) and (max-height:620px){.zp-sw:not(.zp-sw-dlg) .zp-sh,.zp-sw:not(.zp-sw-dlg) .zp-sh.zp-sh-wide{width:min(440px,70vw)!important}}

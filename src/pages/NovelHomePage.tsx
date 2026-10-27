@@ -91,7 +91,7 @@ export default function NovelHomePage() {
           <section>
             <div className="mx-auto mb-5 max-w-7xl px-4 sm:px-6">
               <p className="mb-1 eyebrow text-accent">Search</p>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Results for “{term}”{everywhere && <span className="text-muted"> · all sources</span>}</h2>
+              <h2 className="font-display text-2xl font-bold tracking-tight">Results for “{term}”{everywhere && <span className="text-muted"> · all sources</span>}</h2>
             </div>
             {found.error ? (
               <ErrorState message={found.error.message} onRetry={found.reload} />
@@ -135,7 +135,7 @@ export default function NovelHomePage() {
                   <section>
                     <div className="mx-auto mb-5 max-w-7xl px-4 sm:px-6">
                       <p className="mb-1 eyebrow text-accent">Keep exploring</p>
-                      <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">More to Read</h2>
+                      <h2 className="font-display text-2xl font-bold tracking-tight">More to Read</h2>
                     </div>
                     <BookGrid items={home.data?.latest.map(toCard)} />
                   </section>

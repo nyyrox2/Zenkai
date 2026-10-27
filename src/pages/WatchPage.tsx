@@ -333,7 +333,7 @@ export default function WatchPage() {
                     <ChevronLeft className="size-3.5" /> Details
                   </Link>
                   <br />
-                  <Link to={`/anime/${id}`} onClick={backTo(`/anime/${id}`)} className="font-display text-2xl font-black tracking-tight transition-colors hover:text-accent sm:text-3xl">
+                  <Link to={`/anime/${id}`} onClick={backTo(`/anime/${id}`)} className="font-display text-2xl font-black tracking-tight transition-colors hover:text-accent">
                     {title}
                   </Link>
                   <p className="mt-1 text-sm text-muted">

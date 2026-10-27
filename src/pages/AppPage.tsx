@@ -102,7 +102,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
 function Heading({ title, text, id }: { title: string; text?: string; id?: string }) {
   return (
     <div className="mb-8 max-w-2xl">
-      <h2 id={id} className="font-display text-3xl font-black tracking-tight [text-wrap:balance] sm:text-4xl">
+      <h2 id={id} className="font-display text-3xl font-black tracking-tight [text-wrap:balance]">
         {title}
       </h2>
       {text && <p className="mt-3 text-base leading-relaxed text-muted">{text}</p>}
@@ -113,7 +113,7 @@ function Heading({ title, text, id }: { title: string; text?: string; id?: strin
 function Stat({ label, children, loading }: { label: string; children: ReactNode; loading: boolean }) {
   return (
     <div>
-      <div className="font-display text-3xl font-black tabular-nums sm:text-4xl">{loading ? <Skeleton className="h-9 w-20" /> : children}</div>
+      <div className="font-display text-3xl font-black tabular-nums">{loading ? <Skeleton className="h-9 w-20" /> : children}</div>
       <div className="mt-1 text-sm text-muted">{label}</div>
     </div>
   )
@@ -207,7 +207,7 @@ export default function AppPage() {
                 <span className="text-muted">{failed ? 'Latest release on GitHub' : 'Checking the latest release'}</span>
               )}
             </p>
-            <BlurText text="Anime, manga and novels. One Android app." className="mt-5 max-w-3xl font-display text-5xl font-black leading-[0.98] tracking-tight [text-wrap:balance] sm:text-6xl lg:text-7xl" />
+            <BlurText text="Anime, manga and novels. One Android app." className="mt-5 max-w-3xl font-display text-5xl font-black leading-[0.98] tracking-tight [text-wrap:balance]" />
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted">
               Zenkai puts anime streaming, manga and light novels in one focused app, with your library, downloads and account in sync.
             </p>
@@ -473,7 +473,7 @@ export default function AppPage() {
           <Reveal>
             <div className="relative isolate overflow-hidden rounded-[2rem] border border-border bg-card px-6 py-14 text-center sm:py-20">
               <AuroraBackground />
-              <h2 className="mx-auto max-w-2xl font-display text-4xl font-black leading-[1.02] tracking-tight [text-wrap:balance] sm:text-5xl">One place for what you watch. One place for what you read.</h2>
+              <h2 className="mx-auto max-w-2xl font-display text-4xl font-black leading-[1.02] tracking-tight [text-wrap:balance]">One place for what you watch. One place for what you read.</h2>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <ApkButton large />
                 <a href={APP_INFO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-16 items-center gap-2 rounded-full border border-border bg-background/50 px-7 text-base font-semibold backdrop-blur transition hover:bg-foreground hover:text-background active:scale-95">

@@ -83,7 +83,7 @@ function AppPromoCard({ posters }: { posters?: string[] }) {
             )}
           </p>
 
-          <h2 id="app-promo-title" className="mt-4 font-display text-3xl font-black leading-[1.05] tracking-tight [text-wrap:balance] sm:text-4xl">
+          <h2 id="app-promo-title" className="mt-4 font-display text-3xl font-black leading-[1.05] tracking-tight [text-wrap:balance]">
             Take Zenkai with you.
           </h2>
           <p className="mt-2 text-[15px] leading-relaxed text-muted">Anime, manga and novels in one Android app, with your library synced to your account.</p>

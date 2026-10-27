@@ -304,10 +304,10 @@ export default function SelfHostPage() {
             </span>
             Self-hosting guide
           </p>
-          <h1 className="mx-auto mt-6 max-w-3xl font-display text-[2.5rem] font-black leading-[1.02] tracking-tight [text-wrap:balance] sm:text-6xl">
+          <h1 className="mx-auto mt-6 max-w-3xl font-display text-[2.5rem] font-black leading-[1.02] tracking-tight [text-wrap:balance]">
             Run your own <span className="text-accent">Zenkai</span>
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted">
             We&rsquo;re on a free hosting plan with a low daily limit, so we can&rsquo;t always give you the best service. Host Zenkai yourself, on your own computer or phone, and play whenever you want.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5">
@@ -352,7 +352,7 @@ export default function SelfHostPage() {
         <section id="setup" aria-labelledby="setup-title">
           <Reveal>
             <div className="mb-8 max-w-2xl">
-              <h2 id="setup-title" className="font-display text-3xl font-black tracking-tight [text-wrap:balance] sm:text-4xl">Pick how you want to run it</h2>
+              <h2 id="setup-title" className="font-display text-3xl font-black tracking-tight [text-wrap:balance]">Pick how you want to run it</h2>
               <p className="mt-3 text-base leading-relaxed text-muted">Same Zenkai every time. Choose the option that fits you and follow the steps.</p>
             </div>
 
@@ -395,7 +395,7 @@ export default function SelfHostPage() {
                     <div className="relative">
                       <div className="flex items-center gap-4">
                         <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent font-display text-base font-black text-accent-fg">{i + 1}</span>
-                        <h3 className="min-w-0 font-display text-lg font-bold sm:text-xl">{s.title}</h3>
+                        <h3 className="min-w-0 font-display text-lg font-bold">{s.title}</h3>
                       </div>
                       <div className="mt-3 min-w-0 sm:pl-[3.25rem]">
                         {s.text && <p className="text-sm leading-relaxed text-muted">{s.text}</p>}
@@ -421,7 +421,7 @@ export default function SelfHostPage() {
         <section className="mx-auto w-full max-w-4xl" aria-labelledby="faq">
           <Reveal>
             <div className="mb-8 max-w-2xl">
-              <h2 id="faq" className="font-display text-3xl font-black tracking-tight sm:text-4xl">Questions</h2>
+              <h2 id="faq" className="font-display text-3xl font-black tracking-tight">Questions</h2>
             </div>
             <div className="divide-y divide-border overflow-hidden rounded-3xl border border-border bg-card/60 backdrop-blur">
               {FAQ.map((f) => (
@@ -441,7 +441,7 @@ export default function SelfHostPage() {
         <section aria-labelledby="help">
           <Reveal>
             <div className="mb-8 max-w-2xl">
-              <h2 id="help" className="font-display text-3xl font-black tracking-tight sm:text-4xl">Need a hand?</h2>
+              <h2 id="help" className="font-display text-3xl font-black tracking-tight">Need a hand?</h2>
               <p className="mt-3 text-base leading-relaxed text-muted">Stuck on a step? Ask the community or check the code.</p>
             </div>
             <div className="grid gap-4 md:grid-cols-3">

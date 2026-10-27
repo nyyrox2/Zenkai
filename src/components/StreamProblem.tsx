@@ -82,8 +82,8 @@ export function StreamProblem({ reason, children }: { reason?: string; onReconne
       </svg>
 
       <div className="text-center">
-        <h3 className="font-display text-sm font-bold tracking-tight text-white sm:text-xl">Server not available</h3>
-        <p className="text-[11px] text-white/55 sm:text-sm">Try another one</p>
+        <h3 className="font-display text-sm font-bold tracking-tight text-white">Server not available</h3>
+        <p className="text-[11px] text-white/55">Try another one</p>
         {children && <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2 sm:mt-3">{children}</div>}
       </div>
     </div>

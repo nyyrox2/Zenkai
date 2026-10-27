@@ -36,7 +36,7 @@ export default function BustedPage() {
       <AuroraBackground />
       <div className="relative">
         <div className="pt-14"><GhostBuddy lines={ROASTS} className="size-36 sm:size-48" /></div>
-        <h1 className="mt-6 font-display text-3xl font-black tracking-tight sm:text-5xl">Caught you peeking 👀</h1>
+        <h1 className="mt-6 font-display text-3xl font-black tracking-tight">Caught you peeking 👀</h1>
         <p className="mx-auto mt-2 max-w-sm text-muted">
           {devtools ? 'Developer Tools are open. Close them and I will take you right back.' : 'Aww, you closed it. Taking you back...'}
         </p>

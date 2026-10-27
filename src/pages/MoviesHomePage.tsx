@@ -69,7 +69,7 @@ export default function MoviesHomePage() {
           <section>
             <div className="mx-auto mb-5 max-w-7xl px-4 sm:px-6">
               <p className="mb-1 eyebrow text-accent">Search</p>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Results for “{term}”</h2>
+              <h2 className="font-display text-2xl font-bold tracking-tight">Results for “{term}”</h2>
             </div>
             {found.error ? <ErrorState message={found.error.message} onRetry={found.reload} /> : <BookGrid items={found.data?.map(toMovieCard)} loading={found.loading} empty={`Nothing found for “${term}”.`} />}
           </section>
@@ -84,7 +84,7 @@ export default function MoviesHomePage() {
             <section aria-label="Genres" className="mx-auto max-w-7xl">
               <div className="mb-5 px-4 sm:px-6">
                 <p className="mb-1 eyebrow text-accent">Pick a mood</p>
-                <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Genres</h2>
+                <h2 className="font-display text-2xl font-bold tracking-tight">Genres</h2>
               </div>
               <Marquee duration={46}>
                 {MOVIE_GENRES.map((g) => (

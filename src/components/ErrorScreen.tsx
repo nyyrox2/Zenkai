@@ -88,11 +88,11 @@ export function ErrorScreen({
       <AuroraBackground />
       <div className="relative">
         <div className="flex items-center justify-center gap-1 pt-14 font-display font-black leading-none tracking-tight sm:gap-3">
-          {c.digits && <span className="text-7xl sm:text-9xl">{c.digits[0]}</span>}
+          {c.digits && <span className="text-7xl">{c.digits[0]}</span>}
           {ghost}
-          {c.digits && <span className="text-7xl sm:text-9xl">{c.digits[1]}</span>}
+          {c.digits && <span className="text-7xl">{c.digits[1]}</span>}
         </div>
-        <h1 className="mt-6 font-display text-3xl font-black tracking-tight sm:text-4xl">{c.title}</h1>
+        <h1 className="mt-6 font-display text-3xl font-black tracking-tight">{c.title}</h1>
         <p className="mx-auto mt-2 max-w-sm text-muted">{c.text}</p>
         {message && kind !== 'notfound' && <p className="mx-auto mt-1 max-w-sm text-xs text-muted/70">{message}</p>}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">

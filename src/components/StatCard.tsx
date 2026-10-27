@@ -24,7 +24,7 @@ export function StatCard({
       {loading ? (
         <Skeleton className="mt-3 h-8 w-20" />
       ) : (
-        <p className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">{value}</p>
+        <p className="mt-2 font-display text-2xl font-bold tracking-tight">{value}</p>
       )}
       {hint && !loading && <p className="mt-1 text-xs text-muted">{hint}</p>}
     </SpotlightCard>

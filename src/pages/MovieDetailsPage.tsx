@@ -73,7 +73,7 @@ export default function MovieDetailsPage() {
                 {m.logo ? (
                   <img src={img(m.logo, 'w500') ?? ''} alt={m.title} className="mx-auto max-h-28 w-auto max-w-[80%] object-contain drop-shadow-[0_6px_28px_rgba(0,0,0,0.7)] md:mx-0 md:max-h-36 md:object-left" />
                 ) : (
-                  <BlurText text={m.title} className="font-display text-4xl font-black leading-[1.02] tracking-tight drop-shadow-lg sm:text-6xl [text-wrap:balance]" />
+                  <BlurText text={m.title} className="font-display text-4xl font-black leading-[1.02] tracking-tight drop-shadow-lg [text-wrap:balance]" />
                 )}
                 {m.tagline && <p className="mt-3 italic text-white/70">{m.tagline}</p>}
                 <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-white/85 md:justify-start">
@@ -99,7 +99,7 @@ export default function MovieDetailsPage() {
                     </Link>
                   ))}
                 </div>
-                <p className="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-white/80 sm:text-base md:mx-0">{m.overview || 'No synopsis yet.'}</p>
+                <p className="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-white/80 md:mx-0">{m.overview || 'No synopsis yet.'}</p>
                 <div className="mt-7 flex flex-wrap items-center justify-center gap-3 md:justify-start">
                   <Magnet padding={30}>
                     <ShimmerButton to={watchHref(m, 1, 1)} className="!bg-white !text-black" icon={<Play className="size-4 fill-current" />}>
@@ -138,7 +138,7 @@ export default function MovieDetailsPage() {
           <section className="mx-auto max-w-7xl">
             <div className="mb-5 px-4 sm:px-6">
               <p className="mb-1 eyebrow text-accent">Starring</p>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Cast</h2>
+              <h2 className="font-display text-2xl font-bold tracking-tight">Cast</h2>
             </div>
             <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6">
               {m.cast.map((c) => (
@@ -169,7 +169,7 @@ function Episodes({ id, seasons, season, onSeason }: { id: number; seasons: { n:
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="mb-1 eyebrow text-accent">Episodes</p>
-          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Season {season}</h2>
+          <h2 className="font-display text-2xl font-bold tracking-tight">Season {season}</h2>
         </div>
         {seasons.length > 1 && <Tabs tabs={seasons.map((s) => ({ id: String(s.n), label: `S${s.n}` }))} value={String(season)} onChange={(v) => onSeason(Number(v))} />}
       </div>

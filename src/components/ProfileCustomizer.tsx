@@ -42,7 +42,7 @@ export function ProfileHero({ me, onEdit }: { me: Profile; onEdit: (k: SectionKe
           </button>
         </motion.div>
         <div className="min-w-0 pb-2">
-          <motion.h1 initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.35 }} className="truncate font-display text-2xl font-bold sm:text-4xl">
+          <motion.h1 initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.35 }} className="truncate font-display text-2xl font-bold">
             {me.name || 'Guest'}
           </motion.h1>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }} className="mt-0.5 text-sm">
@@ -72,8 +72,8 @@ function Section({ id, icon: Icon, title, summary, open, onToggle, children }: {
             <Icon className="size-5" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block font-display text-base font-bold sm:text-lg">{title}</span>
-            <span className="block truncate text-xs text-muted sm:text-sm">{summary}</span>
+            <span className="block font-display text-base font-bold">{title}</span>
+            <span className="block truncate text-xs text-muted">{summary}</span>
           </span>
           <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.25 }} className="grid size-9 shrink-0 place-items-center rounded-full border border-border">
             <ChevronDown className="size-4" />
@@ -192,7 +192,7 @@ export function ProfileCustomizer({ me, open, setOpen }: { me: Profile; open: Se
   return (
     <section aria-label="Customize profile" className="space-y-4">
       <div className="px-1">
-        <BlurText text="Customize your profile" className="font-display text-2xl font-bold sm:text-3xl" />
+        <BlurText text="Customize your profile" className="font-display text-2xl font-bold" />
         <p className="mt-1 text-sm text-muted">Changes show in the preview above straight away.</p>
       </div>
 
@@ -234,7 +234,7 @@ export function ProfileCustomizer({ me, open, setOpen }: { me: Profile; open: Se
 
       <Section id="overlay" icon={Frame} title="Avatar overlay" summary={frame ? `${frame.name} · ${frameGroup(frame)}` : 'None'} open={open.has('overlay')} onToggle={() => toggle('overlay')}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-muted sm:text-sm">Animated. Plays everywhere your avatar appears.</p>
+          <p className="text-xs text-muted">Animated. Plays everywhere your avatar appears.</p>
           <CustomSelect label="Overlay category" value={group} onChange={(v) => (setGroup(v), setFramesShown(18))} placeholder="All overlays" options={[{ value: '', label: 'All overlays' }, ...Object.values(FRAME_GROUPS).map((g) => ({ value: g, label: g }))]} />
         </div>
         <ul className="grid grid-cols-3 gap-2.5 sm:grid-cols-5 md:grid-cols-6" role="radiogroup" aria-label="Avatar overlay">

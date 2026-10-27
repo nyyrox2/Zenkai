@@ -103,7 +103,7 @@ export default function LandingPage() {
       </header>
 
       <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 py-6 sm:px-8 lg:py-8">
-        <h1 className="animate-card-in text-balance text-center font-display text-[2rem] font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">What are you in the mood for?</h1>
+        <h1 className="animate-card-in text-balance text-center font-display text-[2rem] font-black leading-[1.05] tracking-tight">What are you in the mood for?</h1>
 
         <div
           role="group"

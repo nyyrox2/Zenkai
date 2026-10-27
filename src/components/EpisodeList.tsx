@@ -110,7 +110,7 @@ export function EpisodeList({
       )}
 
       <div className="mb-3 mt-5">
-        <h2 className="font-display text-xl font-bold sm:text-2xl">Episodes</h2>
+        <h2 className="font-display text-xl font-bold">Episodes</h2>
         <p className="text-sm text-muted">{q ? `${nums.length} found` : `${from}–${to} of ${total}`}</p>
         {anyKind && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -158,8 +158,8 @@ export function EpisodeList({
                   )}
                 </div>
                 <div className={cn('min-w-0 flex-1', card ? 'px-1 pb-1 pt-3' : 'py-0.5')}>
-                  <p className={cn('font-semibold leading-snug', card ? 'line-clamp-1 text-lg' : 'line-clamp-2 text-base sm:text-lg')}>{name}</p>
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted sm:text-sm">
+                  <p className={cn('font-semibold leading-snug', card ? 'line-clamp-1 text-lg' : 'line-clamp-2 text-base')}>{name}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                     {!card && <span>Ep {n}</span>}
                     {!card && mins ? <span>· {mins} min</span> : null}
                     {air && <span>{card ? '' : '· '}{air}</span>}

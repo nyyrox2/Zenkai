@@ -113,7 +113,7 @@ export default function SchedulePage() {
     <main className="mx-auto max-w-4xl px-4 pb-24 pt-28 sm:px-6">
       <header>
         <p className="mb-2 eyebrow text-accent">Release calendar</p>
-        <h1 className="font-display text-4xl font-black tracking-tight sm:text-6xl">
+        <h1 className="font-display text-4xl font-black tracking-tight">
           <GradientText>Schedule</GradientText>
         </h1>
         <p className="mt-3 text-muted">Episodes airing each day, in your local time{tz ? ` (${tz})` : ''}.</p>
@@ -146,7 +146,7 @@ export default function SchedulePage() {
       </div>
 
       <div className="mt-6 flex items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-bold sm:text-2xl">
+        <h2 className="font-display text-xl font-bold">
           {days[sel].toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
           {!data.loading && <span className="ml-2 text-sm font-medium text-muted">{total} episodes</span>}
         </h2>

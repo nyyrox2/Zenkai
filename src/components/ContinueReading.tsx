@@ -47,7 +47,7 @@ export function ContinueReading({ kind }: { kind: ReadKind }) {
     <section className="mx-auto w-full max-w-7xl">
       <div className="mb-5 px-4 sm:px-6">
         <p className="mb-1 eyebrow text-accent">Pick up where you left off</p>
-        <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Continue Reading</h2>
+        <h2 className="font-display text-2xl font-bold tracking-tight">Continue Reading</h2>
       </div>
       <div className="no-scrollbar flex snap-x snap-proximity scroll-pl-4 gap-4 overflow-x-auto px-4 pb-4 pt-2 sm:scroll-pl-6 sm:gap-5 sm:px-6">
         {items.map((r) => (

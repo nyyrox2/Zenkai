@@ -90,7 +90,7 @@ export const BookCard = memo(function BookCard({
           )}
 
           {rank !== undefined && (
-            <span className="absolute bottom-1 left-2.5 font-display text-5xl font-black leading-none text-white/95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)] sm:text-6xl">
+            <span className="absolute bottom-1 left-2.5 font-display text-5xl font-black leading-none text-white/95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]">
               {rank}
             </span>
           )}

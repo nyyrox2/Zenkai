@@ -154,7 +154,7 @@ export default function MovieWatchPage() {
       {/* Title + episode nav */}
       <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-display text-2xl font-black tracking-tight sm:text-3xl">{title}</h1>
+          <h1 className="font-display text-2xl font-black tracking-tight">{title}</h1>
           <p className="mt-1 text-sm text-muted">
             {type === 'tv' ? `Season ${season} · Episode ${episode}${epName ? ` · ${epName}` : ''}` : [details.data?.year, details.data?.runtime ? `${details.data.runtime} min` : null].filter(Boolean).join(' · ')}
           </p>

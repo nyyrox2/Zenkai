@@ -101,7 +101,7 @@ function Details({ source, slug }: { source: NovelSource; slug: string }) {
                   <p className="mb-2 eyebrow text-accent">
                     {NOVEL_SOURCES.find((s) => s.id === source)?.label} · {source === 'lnori' ? 'Light novel' : 'Web novel'}
                   </p>
-                  <h1 className="font-display text-3xl font-black leading-tight tracking-tight sm:text-5xl [text-wrap:balance]">{d.title}</h1>
+                  <h1 className="font-display text-3xl font-black leading-tight tracking-tight [text-wrap:balance]">{d.title}</h1>
                   <p className="mt-2 text-sm text-muted">
                     by <span className="font-medium text-foreground">{d.author}</span>
                     {list.length > 0 && <> · {list.length.toLocaleString()} {unit}s</>}
@@ -115,7 +115,7 @@ function Details({ source, slug }: { source: NovelSource; slug: string }) {
                     ))}
                   </ul>
 
-                  <p className={cn('mt-5 whitespace-pre-line text-sm leading-relaxed text-muted sm:text-base', !open && long && 'line-clamp-5')}>{synopsis}</p>
+                  <p className={cn('mt-5 whitespace-pre-line text-sm leading-relaxed text-muted', !open && long && 'line-clamp-5')}>{synopsis}</p>
                   {long && (
                     <button type="button" onClick={() => setOpen((o) => !o)} className="mt-2 text-sm font-semibold text-accent hover:underline">
                       {open ? 'Show less' : 'Read more'}
@@ -146,7 +146,7 @@ function Details({ source, slug }: { source: NovelSource; slug: string }) {
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="mb-1 eyebrow text-accent">Table of contents</p>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{unit === 'volume' ? 'Volumes' : 'Chapters'}</h2>
+              <h2 className="font-display text-2xl font-bold tracking-tight">{unit === 'volume' ? 'Volumes' : 'Chapters'}</h2>
             </div>
             <div className="flex items-center gap-2">
               <label className="relative block flex-1 sm:w-64 sm:flex-none">

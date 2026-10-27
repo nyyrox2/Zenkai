@@ -16,7 +16,6 @@ import { toast } from '../lib/toast'
 import './cineplayer.css'
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
-const HOLD_RATE = 2 // press-and-hold on the video
 const isEn = (t: { language: string; label: string }) => /^en\b|^eng|english/i.test(t.language) || /english/i.test(t.label)
 const ISO: Record<string, string> = { en: 'English', eng: 'English', ar: 'Arabic', ara: 'Arabic', es: 'Spanish', spa: 'Spanish', fr: 'French', fre: 'French', fra: 'French', de: 'German', ger: 'German', deu: 'German', it: 'Italian', ita: 'Italian', pt: 'Portuguese', por: 'Portuguese', pob: 'Portuguese', ru: 'Russian', rus: 'Russian', hi: 'Hindi', hin: 'Hindi', ja: 'Japanese', jpn: 'Japanese', zh: 'Chinese', chi: 'Chinese', zho: 'Chinese', id: 'Indonesian', ind: 'Indonesian', th: 'Thai', tha: 'Thai', vi: 'Vietnamese', vie: 'Vietnamese', ko: 'Korean', kor: 'Korean', tr: 'Turkish', tur: 'Turkish', pl: 'Polish', pol: 'Polish', nl: 'Dutch', dut: 'Dutch', nld: 'Dutch' }
 /** "Arabic - Arabic", "English #2", "eng" all fold into one language name so the menu can count them */
@@ -53,20 +52,29 @@ const SUB_SIZE = {
 
 // Web fonts only (loaded in index.html) — system stacks render as garbage on some Android OEM fonts.
 const SUB_FONT_LIST = [
-  ['sans', 'Inter', '"Inter", Arial, sans-serif'],
-  ['fansub', 'Roboto', '"Roboto", Arial, sans-serif'],
-  ['rounded', 'Rounded', '"Outfit", "Nunito", sans-serif'],
-  ['nunito', 'Nunito', '"Nunito", sans-serif'],
-  ['poppins', 'Poppins', '"Poppins", Arial, sans-serif'],
-  ['montserrat', 'Montserrat', '"Montserrat", Arial, sans-serif'],
-  ['oswald', 'Oswald', '"Oswald", Impact, sans-serif'],
-  ['bebas', 'Bebas Neue', '"Bebas Neue", Impact, sans-serif'],
-  ['atkinson', 'Hyperlegible', '"Atkinson Hyperlegible", Arial, sans-serif'],
-  ['serif', 'Serif', '"Merriweather", Georgia, serif'],
-  ['mono', 'Mono', '"Roboto Mono", "Courier New", monospace'],
-  ['comic', 'Comic', '"Comic Neue", "Comic Sans MS", cursive'],
-  ['bangers', 'Bangers', '"Bangers", Impact, cursive'],
+  ['sans', 'Inter', '"Inter", Arial, sans-serif', 'sans'],
+  ['fansub', 'Roboto', '"Roboto", Arial, sans-serif', 'sans'],
+  ['rounded', 'Outfit', '"Outfit", "Nunito", sans-serif', 'sans'],
+  ['nunito', 'Nunito', '"Nunito", sans-serif', 'sans'],
+  ['poppins', 'Poppins', '"Poppins", Arial, sans-serif', 'sans'],
+  ['montserrat', 'Montserrat', '"Montserrat", Arial, sans-serif', 'sans'],
+  ['opensans', 'Open Sans', '"Open Sans", Arial, sans-serif', 'sans'],
+  ['lato', 'Lato', '"Lato", Arial, sans-serif', 'sans'],
+  ['atkinson', 'Hyperlegible', '"Atkinson Hyperlegible", Arial, sans-serif', 'sans'],
+  ['serif', 'Merriweather', '"Merriweather", Georgia, serif', 'serif'],
+  ['playfair', 'Playfair', '"Playfair Display", Georgia, serif', 'serif'],
+  ['lora', 'Lora', '"Lora", Georgia, serif', 'serif'],
+  ['mono', 'Roboto Mono', '"Roboto Mono", "Courier New", monospace', 'mono'],
+  ['jetbrains', 'JetBrains Mono', '"JetBrains Mono", "Courier New", monospace', 'mono'],
+  ['oswald', 'Oswald', '"Oswald", Impact, sans-serif', 'display'],
+  ['bebas', 'Bebas Neue', '"Bebas Neue", Impact, sans-serif', 'display'],
+  ['bangers', 'Bangers', '"Bangers", Impact, cursive', 'display'],
+  ['lobster', 'Lobster', '"Lobster", cursive', 'display'],
+  ['marker', 'Marker', '"Permanent Marker", cursive', 'display'],
+  ['comic', 'Comic Neue', '"Comic Neue", "Comic Sans MS", cursive', 'hand'],
+  ['caveat', 'Caveat', '"Caveat", cursive', 'hand'],
 ] as const
+const FONT_CATS = [['all', 'All'], ['sans', 'Sans'], ['serif', 'Serif'], ['mono', 'Mono'], ['display', 'Display'], ['hand', 'Handwriting']] as const
 type SubFont = (typeof SUB_FONT_LIST)[number][0]
 const SUB_FONTS = Object.fromEntries(SUB_FONT_LIST.map(([k, , f]) => [k, f])) as Record<SubFont, string>
 const SUB_FONT_LABELS = Object.fromEntries(SUB_FONT_LIST.map(([k, l]) => [k, l])) as Record<SubFont, string>
@@ -236,6 +244,15 @@ const saveNum = (k: string, v: number) => {
     /* ignore */
   }
 }
+const PF_DEFAULT = { seek: 10, hold: 2, hide: 3200, flip: false, zoom: 100 }
+type Pf = typeof PF_DEFAULT
+const loadPf = (): Pf => {
+  try {
+    return { ...PF_DEFAULT, ...JSON.parse(localStorage.getItem('zp-pf') || '{}') }
+  } catch {
+    return PF_DEFAULT
+  }
+}
 type SheetName = null | 'subs' | 'set' | 'eps' | 'report'
 type PopName = null | 'spd' | 'q' | 'cc' | 'aud' | 'srv'
 interface Track {
@@ -320,6 +337,7 @@ function Sheet({
   target,
   className,
   bodyClassName,
+  dialog,
   children,
 }: {
   title: string
@@ -327,10 +345,11 @@ function Sheet({
   target: HTMLElement
   className?: string
   bodyClassName?: string
+  dialog?: boolean
   children: React.ReactNode
 }) {
   return createPortal(
-    <div className="zp-sw" onClick={onClose}>
+    <div className={cx('zp-sw', dialog && 'zp-sw-dlg')} onClick={onClose}>
       <div className={cx('zp-sh', className)} role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="zp-sh-h">
           <h4>{title}</h4>
@@ -584,7 +603,7 @@ function Episodes({
                 <div className="min-w-0 flex-1 py-0.5">
                   <p
                     className={cx(
-                      'line-clamp-1 text-xs sm:text-sm leading-snug font-medium',
+                      'line-clamp-1 text-xs leading-snug font-medium',
                       on ? 'text-white font-semibold' : 'text-white/90 group-hover:text-white'
                     )}
                   >
@@ -770,6 +789,8 @@ export default function CinePlayer({
   const [audioIdx, setAudioIdx] = useState(0)
   const [fb, setFb] = useState<{ side: number; n: number; k: number } | null>(null)
   const [sheet, setSheet] = useState<SheetName>(null)
+  const [capTab, setCapTab] = useState<'presets' | 'font' | 'text' | 'box' | 'sync'>('presets')
+  const [capCat, setCapCat] = useState<string>('all')
   const [pop, setPopRaw] = useState<PopName>(null)
   const [grp, setGrp] = useState<string | null>('English')
   const [subSearch, setSubSearch] = useState('')
@@ -840,6 +861,18 @@ export default function CinePlayer({
     if (vfx.saturation !== 100) list.push(`saturate(${vfx.saturation}%)`)
     return list.length ? list.join(' ') : undefined
   }, [vfx])
+  const [pf, setPfRaw] = useState<Pf>(loadPf)
+  const pfRef = useRef(pf)
+  pfRef.current = pf
+  const setPf = (p: Partial<Pf>) =>
+    setPfRaw((c) => {
+      const n = { ...c, ...p }
+      try {
+        localStorage.setItem('zp-pf', JSON.stringify(n))
+      } catch {}
+      return n
+    })
+  const [setTab, setSetTab] = useState<'video' | 'picture' | 'play'>('video')
   const [ar, setArRaw] = useState<Aspect>(loadAspect)
   const setAr = (a: Aspect) => {
     setArRaw(a)
@@ -863,7 +896,7 @@ export default function CinePlayer({
   const [loadingSubs, setLoadingSubs] = useState(false)
   const [subErr, setSubErr] = useState<string | null>(null)
   const [card, setCard] = useState(true)
-const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale', min: number, max: number, step: number, unit = '%') => (
+const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale' | 'bg' | 'pos', min: number, max: number, step: number, unit = '%') => (
     <>
       <p className="zp-sec">{label} ({cs[key]}{unit})</p>
       <input
@@ -906,7 +939,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     setShow(true)
     clearTimeout(hideT.current)
     const s = st.current
-    if (s.playing && !s.sheet && !s.pop) hideT.current = window.setTimeout(() => setShow(false), 3200)
+    if (s.playing && !s.sheet && !s.pop && pfRef.current.hide) hideT.current = window.setTimeout(() => setShow(false), pfRef.current.hide)
   }, [])
   useEffect(() => {
     poke()
@@ -1487,7 +1520,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         poke() // keep the controls up while the D-pad is working them
         return
       }
-      const step = e.shiftKey ? 30 : 10
+      const step = e.shiftKey ? 30 : pfRef.current.seek
       let h: (() => void) | null = null
       if (k === ' ' || k === 'k' || (key === 'Enter' && !onBtn)) h = a.togglePlay
       else if (key === 'MediaPlayPause') h = a.togglePlay
@@ -1499,8 +1532,8 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       else if (key === 'MediaRewind') h = () => kk.seek(-30)
       else if (k === 'arrowleft') h = () => kk.seek(-step)
       else if (k === 'arrowright') h = () => kk.seek(step)
-      else if (k === 'j') h = () => kk.seek(-10)
-      else if (k === 'l') h = () => kk.seek(10)
+      else if (k === 'j') h = () => kk.seek(-pfRef.current.seek)
+      else if (k === 'l') h = () => kk.seek(pfRef.current.seek)
       else if (tv && (k === 'arrowup' || k === 'arrowdown')) {
         // TV: Up / Down bring up the controls and put focus on Play (the remote has its own volume keys)
         h = () => root.current?.querySelector<HTMLElement>('.zp-hero')?.focus()
@@ -1555,7 +1588,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     }
     if (side && (dbl || now - fbAt.current < 700)) {
       t.t = 0
-      seek(side * 10, true)
+      seek(side * pfRef.current.seek, true)
       return
     }
     if (dbl) {
@@ -1584,7 +1617,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       if (!v || v.paused || st.current.pop) return
       h.on = true
       h.prev = v.playbackRate
-      v.playbackRate = HOLD_RATE
+      v.playbackRate = pfRef.current.hold
       setHeld(true)
     }, 400)
   }
@@ -1660,7 +1693,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       <video
         ref={vid}
         className="zp-v"
-        style={{ ...aspectStyle(ar), filter: videoFilterStyle }}
+        style={{ ...aspectStyle(ar), filter: videoFilterStyle, transform: pf.flip || pf.zoom !== 100 ? `scale(${pf.zoom / 100}) scaleX(${pf.flip ? -1 : 1})` : undefined }}
         playsInline
         preload="auto"
         onTimeUpdate={onTime}
@@ -1713,7 +1746,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         {held && (
           <div className="zp-hold">
             <FastForward />
-            <span>{HOLD_RATE}×</span>
+            <span>{pf.hold}×</span>
           </div>
         )}
 
@@ -1807,17 +1840,17 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
             <button className="zp-b zp-pn" disabled={!hasPrevEpisode} onClick={() => onPrevEpisode?.()} aria-label="Previous episode" title="Previous episode">
               <SkipBack />
             </button>
-            <button className="zp-b zp-sd" onClick={() => seek(-10)} aria-label="Back 10 seconds" title="Back 10s [J]">
+            <button className="zp-b zp-sd" onClick={() => seek(-pf.seek)} aria-label={`Back ${pf.seek} seconds`} title={`Back ${pf.seek}s [J]`}>
               <RotateCcw />
-              <span className="zp-n">10</span>
+              <span className="zp-n">{pf.seek}</span>
             </button>
             <button className="zp-b zp-hero" data-tour="p-play" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} title="Play / pause [Space]">
               <Play className={cx('zp-ic pl', playing && 'off')} fill="currentColor" />
               <Pause className={cx('zp-ic', !playing && 'off')} fill="currentColor" />
             </button>
-            <button className="zp-b zp-sd" onClick={() => seek(10)} aria-label="Forward 10 seconds" title="Forward 10s [L]">
+            <button className="zp-b zp-sd" onClick={() => seek(pf.seek)} aria-label={`Forward ${pf.seek} seconds`} title={`Forward ${pf.seek}s [L]`}>
               <RotateCw />
-              <span className="zp-n">10</span>
+              <span className="zp-n">{pf.seek}</span>
             </button>
             <button className="zp-b zp-pn" disabled={!hasNextEpisode} onClick={() => onNextEpisode?.()} aria-label="Next episode" title="Next episode">
               <SkipForward />
@@ -2181,198 +2214,173 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       </div>
 
       {sheet === 'subs' && (
-        <Sheet title="Subtitles" onClose={() => setSheet(null)} target={target}>
-          {/* Live Interactive Preview */}
-          <div className="zp-prev relative overflow-hidden rounded-lg border border-white/10 bg-gradient-to-b from-black/80 to-black/95 p-3 text-center">
-            <span className="text-[10px] font-semibold tracking-wider uppercase text-white/40 block mb-1.5">Live Preview</span>
-            <div className="flex items-center justify-center min-h-[44px]">
-              <span
-                style={capCss(cs, '14px')}
-              >
-                I'm gonna be King of the Pirates!
-              </span>
+        <Sheet title="Caption settings" onClose={() => setSheet(null)} target={target} dialog>
+          <div className="zp-prev">
+            <div className="flex min-h-[48px] items-center justify-center p-2 text-center">
+              <span style={capCss(cs, '14px')}>I'm gonna be King of the Pirates!</span>
+            </div>
+            <div className="zp-tabs" role="tablist">
+              {([['presets', 'Presets'], ['font', 'Font'], ['text', 'Text'], ['box', 'Box'], ['sync', 'Sync']] as const).map(([k, l]) => (
+                <button key={k} role="tab" aria-selected={capTab === k} className={cx('zp-tab', capTab === k && 'on')} onClick={() => setCapTab(k)}>
+                  {l}
+                </button>
+              ))}
             </div>
           </div>
 
-          <p className="zp-sec">Presets</p>
-          <div className="zp-pg">
-            {CAP_PRESETS.map(([n, v]) => (
-              <button key={n} className="zp-pi" onClick={() => setCs({ ...CAP_DEFAULT, pos: cs.pos, ...v })}>
-                {n}
+          {capTab === 'presets' && (
+            <div className="zp-tc">
+              <button className="zp-row" onClick={() => setCaps((c) => !c)}>
+                <span>Show subtitles</span>
+                <i className={cx('zp-tg', caps && 'on')} />
               </button>
-            ))}
-          </div>
-
-          <button className="zp-row" onClick={() => setCaps((c) => !c)}>
-            <span>Show subtitles</span>
-            <i className={cx('zp-tg', caps && 'on')} />
-          </button>
-
-          <p className="zp-sec">Sync (subtitle delay)</p>
-          <div className="zp-off">
-            {[-0.5, -0.1].map((d) => (
-              <button key={d} className="zp-pi" onClick={() => adj(d)} aria-label={`Subtitles ${-d}s earlier`}>
-                {d}
-              </button>
-            ))}
-            <span>
-              {offset > 0 ? '+' : ''}
-              {offset.toFixed(1)}s
-            </span>
-            {[0.1, 0.5].map((d) => (
-              <button key={d} className="zp-pi" onClick={() => adj(d)} aria-label={`Subtitles ${d}s later`}>
-                +{d}
-              </button>
-            ))}
-            <button className="zp-pi" onClick={() => setOffset(0)} disabled={offset === 0}>
-              Reset
-            </button>
-          </div>
-
-          <button className="zp-row" onClick={() => file.current?.click()}>
-            <Upload />
-            <span>Upload subtitle file</span>
-          </button>
-          <input ref={file} type="file" accept=".srt,.vtt,.txt" hidden onChange={uploadSub} />
-
-          <h5 className="zp-grp">Text</h5>
-          <p className="zp-sec">Font Family</p>
-          <div className="zp-fg">
-            {SUB_FONT_LIST.map(([k]) => (
-              <button
-                key={k}
-                className={cx('zp-pi', cs.font === k && 'on')}
-                style={{ fontFamily: SUB_FONTS[k] }}
-                onClick={() => setCs({ font: k })}
-              >
-                {SUB_FONT_LABELS[k]}
-              </button>
-            ))}
-          </div>
-
-          <p className="zp-sec">Text size</p>
-          <div className="zp-pg seg">
-            {(Object.keys(SUB_SIZE) as (keyof typeof SUB_SIZE)[]).map((k) => (
-              <button key={k} className={cx('zp-pi', cs.size === k && 'on')} onClick={() => setCs({ size: k })}>
-                {k[0].toUpperCase() + k.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          <p className="zp-sec">Font Weight</p>
-          <div className="zp-pg seg">
-            {[
-              { w: 400, label: 'Light' },
-              { w: 500, label: 'Normal' },
-              { w: 700, label: 'Bold' },
-              { w: 900, label: 'Heavy' },
-            ].map(({ w, label }) => (
-              <button key={w} className={cx('zp-pi', cs.weight === w && 'on')} onClick={() => setCs({ weight: w })}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <p className="zp-sec">Text color</p>
-          <div className="zp-pg">
-            {swatch(CAP_COLORS, 'color')}
-          </div>
-
-          {slider('Text opacity', 'opacity', 20, 100, 5)}
-          {slider('Line height', 'lh', 100, 200, 5)}
-
-          <h5 className="zp-grp">Edge</h5>
-          <p className="zp-sec">Text edge / Outline</p>
-          <div className="zp-pg">
-            {EDGE_KEYS.map((k) => (
-              <button key={k} className={cx('zp-pi', cs.edge === k && 'on')} onClick={() => setCs({ edge: k })}>
-                {k[0].toUpperCase() + k.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          <p className="zp-sec">Edge color</p>
-          <div className="zp-pg">{swatch(EDGE_COLORS, 'edgeColor')}</div>
-
-          <h5 className="zp-grp">Background</h5>
-          <p className="zp-sec">Background style</p>
-          <div className="zp-pg">
-            {(Object.keys(CAP_BOX) as (keyof typeof CAP_BOX)[]).map((k) => (
-              <button key={k} className={cx('zp-pi', cs.boxStyle === k && 'on')} onClick={() => setCs({ boxStyle: k })}>
-                {CAP_BOX[k]}
-              </button>
-            ))}
-          </div>
-
-          {cs.boxStyle !== 'none' && (
-            <>
-              <p className="zp-sec">Background opacity ({cs.bg}%)</p>
-              <input
-                type="range" className="zp-rg" min={0} max={100} step={5} value={cs.bg}
-                style={{ '--p': `${cs.bg}%` } as CSSProperties}
-                onChange={(e) => setCs({ bg: +e.target.value })}
-                aria-label="Caption background opacity"
-              />
-            </>
+              <p className="zp-sec">Style presets</p>
+              <div className="zp-pgrid">
+                {CAP_PRESETS.map(([n, v]) => (
+                  <button key={n} className="zp-pc" onClick={() => setCs({ ...CAP_DEFAULT, pos: cs.pos, ...v })}>
+                    <div className="zp-pcv">
+                      <span style={capCss({ ...CAP_DEFAULT, ...v }, '9px')}>Subtitle</span>
+                    </div>
+                    <small>{n}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
-          {cs.boxStyle !== 'none' && (
-            <>
-              <p className="zp-sec">Background color</p>
-              <div className="zp-pg">{swatch(BG_COLORS, 'bgColor')}</div>
-              {slider('Background blur', 'blur', 0, 20, 1, 'px')}
-            </>
+          {capTab === 'font' && (
+            <div className="zp-tc">
+              <div className="zp-pg seg zp-cats">
+                {FONT_CATS.map(([k, l]) => (
+                  <button key={k} className={cx('zp-pi', capCat === k && 'on')} onClick={() => setCapCat(k)}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div className="zp-flist">
+                {SUB_FONT_LIST.filter(([, , , c]) => capCat === 'all' || c === capCat).map(([k, l, f]) => (
+                  <button key={k} className={cx('zp-frow', cs.font === k && 'on')} onClick={() => setCs({ font: k })}>
+                    <span>{l}</span>
+                    <span style={{ fontFamily: f }}>The quick brown fox</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
-          <p className="zp-sec">Style</p>
-          <div className="zp-pg">
-            <button className={cx('zp-pi', cs.italic && 'on')} onClick={() => setCs({ italic: !cs.italic })}>Italic</button>
-            <button className={cx('zp-pi', cs.upper && 'on')} onClick={() => setCs({ upper: !cs.upper })}>UPPERCASE</button>
-          </div>
+          {capTab === 'text' && (
+            <div className="zp-tc">
+              <p className="zp-sec">Size</p>
+              <div className="zp-pg seg">
+                {(Object.keys(SUB_SIZE) as (keyof typeof SUB_SIZE)[]).map((k) => (
+                  <button key={k} className={cx('zp-pi', cs.size === k && 'on')} onClick={() => setCs({ size: k })}>
+                    {k[0].toUpperCase() + k.slice(1)}
+                  </button>
+                ))}
+              </div>
+              {slider('Size fine-tune', 'scale', 50, 200, 5)}
 
-          <p className="zp-sec">Size fine-tune ({cs.scale}%)</p>
-          <input
-            type="range" className="zp-rg" min={50} max={200} step={5} value={cs.scale}
-            style={{ '--p': `${((cs.scale - 50) / 150) * 100}%` } as CSSProperties}
-            onChange={(e) => setCs({ scale: +e.target.value })}
-            aria-label="Caption size fine-tune"
-          />
+              <p className="zp-sec">Weight</p>
+              <div className="zp-pg seg">
+                {[[400, 'Light'], [500, 'Normal'], [700, 'Bold'], [900, 'Heavy']].map(([w, l]) => (
+                  <button key={w} className={cx('zp-pi', cs.weight === w && 'on')} onClick={() => setCs({ weight: w as number })}>
+                    {l}
+                  </button>
+                ))}
+              </div>
 
-          <p className="zp-sec">Letter Spacing</p>
-          <div className="zp-pg seg">
-            {[
-              { id: 'tight', label: 'Tight' },
-              { id: 'normal', label: 'Normal' },
-              { id: 'wide', label: 'Wide' },
-            ].map(({ id, label }) => (
-              <button key={id} className={cx('zp-pi', cs.spacing === id && 'on')} onClick={() => setCs({ spacing: id as any })}>
-                {label}
+              <p className="zp-sec">Style</p>
+              <div className="zp-pg seg">
+                <button className={cx('zp-pi', cs.italic && 'on')} onClick={() => setCs({ italic: !cs.italic })}>Italic</button>
+                <button className={cx('zp-pi', cs.upper && 'on')} onClick={() => setCs({ upper: !cs.upper })}>UPPERCASE</button>
+              </div>
+
+              <p className="zp-sec">Letter spacing</p>
+              <div className="zp-pg seg">
+                {(['tight', 'normal', 'wide'] as const).map((id) => (
+                  <button key={id} className={cx('zp-pi', cs.spacing === id && 'on')} onClick={() => setCs({ spacing: id })}>
+                    {id[0].toUpperCase() + id.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              <p className="zp-sec">Color</p>
+              <div className="zp-pg">{swatch(CAP_COLORS, 'color')}</div>
+              {slider('Opacity', 'opacity', 20, 100, 5)}
+
+              <p className="zp-sec">Edge</p>
+              <div className="zp-pg seg">
+                {EDGE_KEYS.map((k) => (
+                  <button key={k} className={cx('zp-pi', cs.edge === k && 'on')} onClick={() => setCs({ edge: k })}>
+                    {k[0].toUpperCase() + k.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <div className="zp-pg">{swatch(EDGE_COLORS, 'edgeColor')}</div>
+            </div>
+          )}
+
+          {capTab === 'box' && (
+            <div className="zp-tc">
+              <p className="zp-sec">Background</p>
+              <div className="zp-pg seg">
+                {(Object.keys(CAP_BOX) as (keyof typeof CAP_BOX)[]).map((k) => (
+                  <button key={k} className={cx('zp-pi', cs.boxStyle === k && 'on')} onClick={() => setCs({ boxStyle: k })}>
+                    {CAP_BOX[k]}
+                  </button>
+                ))}
+              </div>
+              {cs.boxStyle !== 'none' && (
+                <>
+                  {slider('Background opacity', 'bg', 0, 100, 5)}
+                  <div className="zp-pg">{swatch(BG_COLORS, 'bgColor')}</div>
+                  {slider('Background blur', 'blur', 0, 20, 1, 'px')}
+                </>
+              )}
+
+              <p className="zp-sec">Alignment</p>
+              <div className="zp-pg seg">
+                {(['left', 'center', 'right'] as const).map((a) => (
+                  <button key={a} className={cx('zp-pi', cs.align === a && 'on')} onClick={() => setCs({ align: a })}>
+                    {a[0].toUpperCase() + a.slice(1)}
+                  </button>
+                ))}
+              </div>
+              {slider('Max width', 'width', 30, 100, 5)}
+              {slider('Line height', 'lh', 100, 200, 5)}
+              {slider('Height from bottom', 'pos', 0, 70, 5)}
+            </div>
+          )}
+
+          {capTab === 'sync' && (
+            <div className="zp-tc">
+              <p className="zp-sec">Subtitle delay</p>
+              <div className="zp-off">
+                {[-0.5, -0.1].map((d) => (
+                  <button key={d} className="zp-pi" onClick={() => adj(d)} aria-label={`Subtitles ${-d}s earlier`}>
+                    {d}
+                  </button>
+                ))}
+                <span>
+                  {offset > 0 ? '+' : ''}
+                  {offset.toFixed(1)}s
+                </span>
+                {[0.1, 0.5].map((d) => (
+                  <button key={d} className="zp-pi" onClick={() => adj(d)} aria-label={`Subtitles ${d}s later`}>
+                    +{d}
+                  </button>
+                ))}
+                <button className="zp-pi" onClick={() => setOffset(0)} disabled={offset === 0}>
+                  Reset
+                </button>
+              </div>
+              <button className="zp-row" onClick={() => file.current?.click()}>
+                <Upload />
+                <span>Upload subtitle file</span>
               </button>
-            ))}
-          </div>
-
-          <h5 className="zp-grp">Position</h5>
-          <p className="zp-sec">Alignment</p>
-          <div className="zp-pg seg">
-            {(['left', 'center', 'right'] as const).map((a) => (
-              <button key={a} className={cx('zp-pi', cs.align === a && 'on')} onClick={() => setCs({ align: a })}>
-                {a[0].toUpperCase() + a.slice(1)}
-              </button>
-            ))}
-          </div>
-          {slider('Max width', 'width', 30, 100, 5)}
-
-          <p className="zp-sec">Vertical position ({cs.pos}% up from bottom)</p>
-          <input
-            type="range" className="zp-rg" min={0} max={70} step={5} value={cs.pos}
-            style={{ '--p': `${(cs.pos / 70) * 100}%` } as CSSProperties}
-            onChange={(e) => setCs({ pos: +e.target.value })}
-            aria-label="Caption vertical position"
-          />
-
-          <button className="zp-pi" style={{ marginTop: '8px' }} onClick={() => setCs(CAP_DEFAULT)}>
-            Reset style
-          </button>
+              <input ref={file} type="file" accept=".srt,.vtt,.txt" hidden onChange={uploadSub} />
+            </div>
+          )}
         </Sheet>
       )}
 
@@ -2389,7 +2397,39 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       )}
 
       {sheet === 'set' && (
-        <Sheet title="Settings" onClose={() => setSheet(null)} target={target}>
+        <Sheet title="Settings" onClose={() => setSheet(null)} target={target} dialog>
+          <div className="zp-prev">
+            <div className="zp-tabs" role="tablist">
+              {([['video', 'Video'], ['picture', 'Picture'], ['play', 'Playback']] as const).map(([k, l]) => (
+                <button key={k} role="tab" aria-selected={setTab === k} className={cx('zp-tab', setTab === k && 'on')} onClick={() => setSetTab(k)}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {setTab === 'video' && (
+            <div className="zp-tc">
+          <p className="zp-sec">Aspect ratio</p>
+          <div className="zp-pg">
+            {ASPECTS.map((a) => (
+              <button key={a} className={cx('zp-pi', ar === a && 'on')} onClick={() => setAr(a)}>
+                {a}
+              </button>
+            ))}
+          </div>
+
+              <p className="zp-sec">Zoom ({pf.zoom}%)</p>
+              <input
+                type="range" className="zp-rg" min={100} max={150} step={5} value={pf.zoom}
+                style={{ '--p': `${(pf.zoom - 100) * 2}%` } as CSSProperties}
+                onChange={(e) => setPf({ zoom: +e.target.value })}
+                aria-label="Video zoom"
+              />
+              <button className="zp-row" onClick={() => setPf({ flip: !pf.flip })}>
+                <span>Mirror video</span>
+                <i className={cx('zp-tg', pf.flip && 'on')} />
+              </button>
           <p className="zp-sec">4K upscaler (GPU)</p>
           <button className="zp-row" disabled={!gpuSupported} onClick={() => { setUpErr(null); setUp(!up); }}>
             <span>Anime4K WebGPU upscaling</span>
@@ -2430,6 +2470,12 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                 : 'Runs in real-time on your GPU with WebGPU neural shaders. Best on 720p–1080p anime.'}
           </p>
 
+
+            </div>
+          )}
+
+          {setTab === 'picture' && (
+            <div className="zp-tc">
           <p className="zp-sec">Visual Enhancements &amp; Shaders</p>
           <div className="zp-pg">
             {[
@@ -2483,15 +2529,13 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
             </button>
           )}
 
-          <p className="zp-sec">Aspect ratio</p>
-          <div className="zp-pg">
-            {ASPECTS.map((a) => (
-              <button key={a} className={cx('zp-pi', ar === a && 'on')} onClick={() => setAr(a)}>
-                {a}
-              </button>
-            ))}
-          </div>
-          <p className="zp-sec">Playback</p>
+
+            </div>
+          )}
+
+          {setTab === 'play' && (
+            <div className="zp-tc">
+          <p className="zp-sec">Automation</p>
           {onAutoNext && (
             <button className="zp-row" onClick={() => onAutoNext(!autoNext)}>
               <span>Autoplay next episode</span>
@@ -2509,6 +2553,39 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               <span>Skip filler episodes</span>
               <i className={cx('zp-tg', skipFiller && 'on')} />
             </button>
+          )}
+
+          <p className="zp-sec">Skip step (buttons, double-tap, J / L)</p>
+          <div className="zp-pg seg">
+            {[[5, "5s"], [10, "10s"], [15, "15s"], [30, "30s"]].map(([v, l]) => (
+              <button key={String(v)} className={cx('zp-pi', pf.seek === v && 'on')} onClick={() => setPf({ seek: v as any })}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          <p className="zp-sec">Hold-to-speed rate</p>
+          <div className="zp-pg seg">
+            {[[1.5, "1.5×"], [2, "2×"], [3, "3×"], [4, "4×"]].map(([v, l]) => (
+              <button key={String(v)} className={cx('zp-pi', pf.hold === v && 'on')} onClick={() => setPf({ hold: v as any })}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          <p className="zp-sec">Auto-hide controls</p>
+          <div className="zp-pg seg">
+            {[[2000, "2s"], [3200, "3s"], [5000, "5s"], [0, "Never"]].map(([v, l]) => (
+              <button key={String(v)} className={cx('zp-pi', pf.hide === v && 'on')} onClick={() => setPf({ hide: v as any })}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+              <button className="zp-pi" style={{ marginTop: '8px' }} onClick={() => setPf(PF_DEFAULT)}>
+                Reset playback options
+              </button>
+            </div>
           )}
         </Sheet>
       )}

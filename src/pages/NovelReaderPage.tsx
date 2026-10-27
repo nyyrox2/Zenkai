@@ -229,7 +229,7 @@ function Reader({ source, slug, chapterSlug }: { source: NovelSource; slug: stri
           </div>
         ) : content.data ? (
           <motion.div key={chapterSlug} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-            <h1 className="mx-auto font-display text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl" style={{ maxWidth: WIDTHS[prefs.width] }}>
+            <h1 className="mx-auto font-display text-2xl font-extrabold leading-tight tracking-tight" style={{ maxWidth: WIDTHS[prefs.width] }}>
               {content.data.title}
             </h1>
             <div

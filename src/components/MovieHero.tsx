@@ -52,7 +52,7 @@ export function MovieHero({ items, loading }: { items?: MovieItem[]; loading?: b
                 <span className="rounded-full border border-white/40 px-2 py-0.5">{m.type === 'tv' ? 'Series' : 'Film'}</span>
                 Trending this week
               </p>
-              <BlurText text={m.title} className="font-display text-4xl font-black leading-[1.02] tracking-tight drop-shadow-lg sm:text-6xl [text-wrap:balance]" />
+              <BlurText text={m.title} className="font-display text-4xl font-black leading-[1.02] tracking-tight drop-shadow-lg [text-wrap:balance]" />
               <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-white/85">
                 {m.rating && (
                   <span className="inline-flex items-center gap-1 font-semibold">
@@ -62,7 +62,7 @@ export function MovieHero({ items, loading }: { items?: MovieItem[]; loading?: b
                 )}
                 {m.year && <span>{m.year}</span>}
               </div>
-              <p className="mt-4 line-clamp-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">{m.overview}</p>
+              <p className="mt-4 line-clamp-3 max-w-xl text-sm leading-relaxed text-white/75">{m.overview}</p>
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <Magnet padding={30}>
                   <ShimmerButton to={watchHref(m)} className="!bg-white !text-black" icon={<Play className="size-4 fill-current" />}>

@@ -372,8 +372,8 @@ export default function DetailsPage() {
                   className="mx-auto mb-2 max-h-24 w-auto max-w-full object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)] sm:max-h-28 lg:mx-0 lg:object-left"
                 />
               )}
-              <h1 className={tmdb?.logo && logoOk ? 'sr-only' : 'font-display text-3xl font-black leading-tight tracking-tight sm:text-5xl [text-wrap:balance]'}>{title}</h1>
-              {subtitle && <p className="mt-2 text-sm text-muted sm:text-base">{subtitle}</p>}
+              <h1 className={tmdb?.logo && logoOk ? 'sr-only' : 'font-display text-3xl font-black leading-tight tracking-tight [text-wrap:balance]'}>{title}</h1>
+              {subtitle && <p className="mt-2 text-sm text-muted">{subtitle}</p>}
               {tmdb?.tagline && <p className="mt-2 text-sm italic text-muted">“{tmdb.tagline}”</p>}
             </div>
 
@@ -583,7 +583,7 @@ export default function DetailsPage() {
                         <div className="grid size-8 place-items-center rounded-xl bg-accent/15 text-accent">
                           <ShieldCheck className="size-4" />
                         </div>
-                        <h2 className="font-display text-lg font-bold sm:text-xl">Official Streaming Sources</h2>
+                        <h2 className="font-display text-lg font-bold">Official Streaming Sources</h2>
                       </div>
                       {tmdb?.watchProviders?.link && (
                         <a
@@ -598,7 +598,7 @@ export default function DetailsPage() {
                       )}
                     </div>
 
-                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3.5 sm:p-4 text-xs sm:text-sm text-muted leading-relaxed mb-4">
+                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3.5 sm:p-4 text-xs text-muted leading-relaxed mb-4">
                       <span className="font-semibold text-foreground">Support the Creators:</span> We strongly recommend streaming on official licensed platforms whenever available. Your support helps fund animators, voice actors, and future seasons.
                     </div>
 
@@ -665,9 +665,9 @@ export default function DetailsPage() {
                       <div className="grid size-8 place-items-center rounded-xl bg-muted/15 text-muted">
                         <ShieldAlert className="size-4" />
                       </div>
-                      <h2 className="font-display text-base font-bold sm:text-lg">Legal Notice &amp; Disclaimer</h2>
+                      <h2 className="font-display text-base font-bold">Legal Notice &amp; Disclaimer</h2>
                     </div>
-                    <div className="space-y-2 text-xs sm:text-sm text-muted leading-relaxed">
+                    <div className="space-y-2 text-xs text-muted leading-relaxed">
                       <p>
                         Zenkai is a non-commercial, open-source anime catalog and media aggregator. We do not host, store, or upload any video files, media, or copyrighted content on our own servers.
                       </p>

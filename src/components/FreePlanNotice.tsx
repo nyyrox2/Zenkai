@@ -46,7 +46,7 @@ export function FreePlanNotice() {
           <Server className="size-5" />
         </span>
         <div className="min-w-0 flex-1 pr-6 sm:pr-0">
-          <p className="font-display text-base font-extrabold tracking-tight sm:text-lg">We&rsquo;re on a free plan, and the daily limit is low</p>
+          <p className="font-display text-base font-extrabold tracking-tight">We&rsquo;re on a free plan, and the daily limit is low</p>
           <p className="mt-1 text-[13px] leading-snug text-muted sm:hidden">Free plan, low daily limit, so it can get slow. Host your own: <span className="font-semibold text-foreground">0 ads, 0 cost</span>.</p>
           <p className="mt-1 hidden text-sm leading-relaxed text-muted sm:block">
             Zenkai is free and ad-free, but our hosting has a daily request limit. On busy days, pages and streams can be slow or briefly unavailable.

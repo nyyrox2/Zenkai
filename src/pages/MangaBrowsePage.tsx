@@ -142,7 +142,7 @@ export default function MangaBrowsePage() {
     <main className="mx-auto max-w-7xl px-4 pb-24 pt-28 sm:px-6">
       <header>
         <p className="mb-2 eyebrow text-accent">Find your next read</p>
-        <h1 className="font-display text-4xl font-black tracking-tight sm:text-6xl">
+        <h1 className="font-display text-4xl font-black tracking-tight">
           <GradientText>Browse</GradientText>
         </h1>
         <p className="mt-3 max-w-xl text-muted">Filter manga, manhwa and manhua by genre, theme, year and status. Open a title and it is looked up on every server.</p>

@@ -139,7 +139,7 @@ export default function CatalogPage({ preset }: { preset: Preset }) {
     <main className="mx-auto max-w-7xl px-4 pb-24 pt-28 sm:px-6">
       <header>
         <p className="mb-2 eyebrow text-accent">{copy.eyebrow}</p>
-        <h1 className="font-display text-4xl font-black tracking-tight sm:text-6xl">
+        <h1 className="font-display text-4xl font-black tracking-tight">
           <GradientText>{copy.title}</GradientText>
         </h1>
         <p className="mt-3 max-w-xl text-muted">{copy.sub}</p>

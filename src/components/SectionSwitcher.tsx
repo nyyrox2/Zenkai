@@ -17,7 +17,7 @@ export function SectionSwitcher({ current, className }: { current: Section | nul
             to={s.to}
             role="tab"
             aria-selected={active}
-            className={cn('relative rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:px-4 sm:text-sm', active ? 'text-background' : 'text-muted hover:text-foreground')}
+            className={cn('relative rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:px-4', active ? 'text-background' : 'text-muted hover:text-foreground')}
           >
             {active && (
               <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-foreground" transition={{ type: 'spring', stiffness: 380, damping: 32 }} />

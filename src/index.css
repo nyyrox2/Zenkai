@@ -367,3 +367,26 @@ html[data-tv] a:focus-visible, html[data-tv] button:focus-visible { box-shadow: 
 @keyframes zk-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes zk-shadow { 0%, 100% { transform: scaleX(1); opacity: 0.5; } 50% { transform: scaleX(0.6); opacity: 0.25; } }
 @media (prefers-reduced-motion: reduce) { .zk-shadow, .zk-pageload { animation: none; } }
+
+/* ---------- Fixed size system ----------
+   One root for the whole app: every rem (Tailwind spacing, type, radii) resolves from --root-fs, so a button,
+   a heading or a card is the same CSS size on a phone, tablet and laptop. Only the layout (columns) adapts.
+   Change --root-fs here to rescale the entire app at once. TV mode keeps its deliberate 10-foot scale. */
+:root {
+  --root-fs: 16px;
+  --ctl-h: 44px;      /* tap target: buttons, inputs, rows */
+  --ctl-h-sm: 36px;
+  --nav-h: 64px;
+  --dock-h: 64px;
+  --page-pad: 1rem;
+  --page-max: 80rem;
+}
+html {
+  font-size: var(--root-fs);
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+html[data-tv] { font-size: calc(var(--root-fs) * 1.125); }
+body { min-width: 320px; }
+input, select, textarea { font-size: max(16px, 1em); } /* stops iOS zooming into fields */

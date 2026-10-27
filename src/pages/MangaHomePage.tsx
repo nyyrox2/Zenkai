@@ -135,7 +135,7 @@ export default function MangaHomePage() {
           <section>
             <div className="mx-auto mb-5 max-w-7xl px-4 sm:px-6">
               <p className="mb-1 eyebrow text-accent">Search</p>
-              <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Results for “{term}”{everywhere && <span className="text-muted"> · all servers</span>}</h2>
+              <h2 className="font-display text-2xl font-bold tracking-tight">Results for “{term}”{everywhere && <span className="text-muted"> · all servers</span>}</h2>
             </div>
             {kindPicker}
             <div className="h-5" />

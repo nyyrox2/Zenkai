@@ -124,7 +124,7 @@ function Finder({ kind, title, alt, cover }: { kind: Kind; title: string; alt: s
         {cover && <img src={cover} alt="" referrerPolicy="no-referrer" className="aspect-[2/3] w-20 shrink-0 rounded-2xl border border-border object-cover shadow-xl sm:w-28" />}
         <div className="min-w-0">
           <p className="mb-1 eyebrow text-accent">Read the {cfg.noun}</p>
-          <h1 className="font-display text-3xl font-black leading-tight tracking-tight sm:text-5xl [text-wrap:balance]">{title}</h1>
+          <h1 className="font-display text-3xl font-black leading-tight tracking-tight [text-wrap:balance]">{title}</h1>
           <p className="mt-2 flex items-center gap-2 text-sm text-muted" role="status">
             {searching > 0 ? (
               <>
