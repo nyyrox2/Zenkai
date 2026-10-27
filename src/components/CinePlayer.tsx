@@ -77,7 +77,6 @@ const SUB_FONT_LIST = [
 const FONT_CATS = [['all', 'All'], ['sans', 'Sans'], ['serif', 'Serif'], ['mono', 'Mono'], ['display', 'Display'], ['hand', 'Handwriting']] as const
 type SubFont = (typeof SUB_FONT_LIST)[number][0]
 const SUB_FONTS = Object.fromEntries(SUB_FONT_LIST.map(([k, , f]) => [k, f])) as Record<SubFont, string>
-const SUB_FONT_LABELS = Object.fromEntries(SUB_FONT_LIST.map(([k, l]) => [k, l])) as Record<SubFont, string>
 
 const CAP_COLORS = [
   '#ffffff', // White
