@@ -5,9 +5,11 @@ import App from './App'
 import { SearchProvider } from './context/SearchContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { startShield } from './lib/shield'
+import { initAniListSync } from './lib/anilist'
 import './index.css'
 
 startShield()
+initAniListSync()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

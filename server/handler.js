@@ -1,6 +1,13 @@
 // One Web-standard handler shared by Cloudflare Pages Functions and the Vite dev server.
 // handle(request) -> Response | null (null = not an API route)
-import { resolveDirectStreamWorker } from "./direct-stream.js";
+if (typeof globalThis.process !== "undefined" && globalThis.process?.versions?.node) {
+  try {
+    const dns = await import("node:dns");
+    dns.setDefaultResultOrder?.("ipv4first");
+  } catch {}
+}
+
+import { resolveDirectStreamWorker, checkEpisodeAudioAvailability } from "./direct-stream.js";
 import { resolveFlixCloud, resolveReanimeEmbed } from "./flixcloud.js";
 import { extractAnimeSaltPlayer } from "./animesalt.js";
 import { resolveAcdn } from "./acdn.js";
@@ -213,7 +220,8 @@ async function proxy(request, url, proxyBase = "/proxy") {
   try {
     up = await fetch(t, { headers });
   } catch (e) {
-    return json({ error: "Proxy fetch failed: " + e.message }, 502);
+    const cause = e.cause?.message || e.cause?.code || "";
+    return json({ error: "Proxy fetch failed: " + e.message + " " + cause }, 502);
   }
 
   const out = new Headers(CORS);
@@ -396,7 +404,56 @@ export async function handle(request, env) {
 
   if (path === "/proxy" || path === "/api/proxy") return proxy(request, url, proxyBase);
 
+  if (path === "/api" || path === "/api/" || path === "/api/docs") {
+    const accept = request.headers.get("accept") || "";
+    if (accept.includes("text/html")) {
+      return new Response(null, { status: 302, headers: { Location: "/api", ...CORS } });
+    }
+    return json({
+      name: "Zenkai Streaming API",
+      version: "1.0.0",
+      description: "Direct streaming endpoints and CinePlayer embed infrastructure",
+      documentation: "/api",
+      routes: {
+        embed: "/embed?id={anilistId}&ep={episode}&server={server}&audio={sub|dub}",
+        servers: "/api/servers?id={anilistId}&ep={episode}",
+        stream: "/api/stream?id={anilistId}&ep={episode}&server={server}&audio={sub|dub}",
+        subtitles: "/api/subtitles?id={anilistId}&ep={episode}",
+      },
+    });
+  }
+
+  
+  if (path === "/api/servers-available" || path === "/api/stream/servers" || path === "/api/servers") {
+    const anilistId = parseInt(q("id", "0"), 10);
+    const episode = parseInt(q("ep", "1"), 10) || 1;
+    const title = q("title");
+    if (!anilistId && !title) return json({ error: "Missing id or title" }, 400);
+
+    const key = `avail:${anilistId}:${episode}:${title}`;
+    const result = await cached(key, 10 * 60e3, () =>
+      checkEpisodeAudioAvailability(anilistId, episode, title)
+    );
+    return json({ success: true, servers: result }, 200, 600);
+  }
   if (path === "/api/stream") {
+    // Direct stream extraction is private. Only Zenkai Player embed is provided.
+    const referer = request.headers.get("Referer") || "";
+    const isEmbedPlayer = referer.includes("/embed") || referer.includes("/watch") || request.headers.has("X-Zenkai-Embed");
+    const secSite = request.headers.get("Sec-Fetch-Site");
+    const originHdr = request.headers.get("Origin");
+    if (!isEmbedPlayer) {
+      if (originHdr) {
+        try {
+          if (new URL(originHdr).host !== new URL(request.url).host) {
+            return json({ error: "Direct stream extraction is private. Please use the Zenkai Player embed at /embed." }, 403);
+          }
+        } catch {}
+      }
+      if (secSite === "cross-site") {
+        return json({ error: "Direct stream extraction is private. Please use the Zenkai Player embed at /embed." }, 403);
+      }
+    }
     const anilistId = parseInt(q("id", "0"), 10);
     const episode = parseInt(q("ep", "1"), 10) || 1;
     const server = q("server", "megaplay").toLowerCase();
@@ -440,7 +497,12 @@ export async function handle(request, env) {
           server: "FlixCloud",
           audio: r.audio,
           streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://flixcloud.cc/")}`,
-          subtitles: r.subtitles || [],
+          subtitles: (r.subtitles || []).map((s) => ({
+          ...s,
+          file: s.file && !s.file.startsWith("/proxy") && !s.file.startsWith("http://localhost")
+            ? `${proxyBase}?url=${encodeURIComponent(s.file)}&referer=${encodeURIComponent(r.referer || "https://flixcloud.cc/")}`
+            : s.file,
+        })),
           intro: r.intro,
           outro: r.outro,
         });
@@ -457,7 +519,12 @@ export async function handle(request, env) {
         server: r.server,
         audio: r.audio,
         streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://megaplay.buzz/")}&seg=1`,
-        subtitles: r.subtitles || [],
+        subtitles: (r.subtitles || []).map((s) => ({
+        ...s,
+        file: s.file && !s.file.startsWith("/proxy") && !s.file.startsWith("http://localhost")
+          ? `${proxyBase}?url=${encodeURIComponent(s.file)}&referer=${encodeURIComponent(r.referer || "https://megaplay.buzz/")}`
+          : s.file,
+      })),
         intro: r.intro,
         outro: r.outro,
       });

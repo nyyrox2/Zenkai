@@ -99,13 +99,36 @@ const prefs = cell<Prefs>('zk:prefs', {})
 
 export const useHistory = () => {
   const raw = useSyncExternalStore(history.subscribe, history.get)
-  return isArr(raw, emptyHistory).slice().sort((a, b) => (b.t ?? 0) - (a.t ?? 0))
+  const arr = isArr(raw, emptyHistory)
+  const seen = new Set<number>()
+  const deduped: HistoryItem[] = []
+  const sorted = arr.slice().sort((a, b) => (Number(b.t) || 0) - (Number(a.t) || 0))
+  for (const item of sorted) {
+    const id = Number(item.id)
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    deduped.push({ ...item, id })
+  }
+  return deduped
 }
 export const useList = () => {
   const raw = useSyncExternalStore(list.subscribe, list.get)
-  return isArr(raw, emptyList).slice().sort((a, b) => (b.updatedAt ?? b.addedAt ?? 0) - (a.updatedAt ?? a.addedAt ?? 0))
+  const arr = isArr(raw, emptyList)
+  const seen = new Set<number>()
+  const deduped: ListItem[] = []
+  const sorted = arr.slice().sort((a, b) => (Number(b.updatedAt ?? b.addedAt) || 0) - (Number(a.updatedAt ?? a.addedAt) || 0))
+  for (const item of sorted) {
+    const id = Number(item.id)
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    deduped.push({ ...item, id })
+  }
+  return deduped
 }
-export const useListItem = (id: number) => useList().find((i) => i.id === id)
+export const useListItem = (id: number) => {
+  const nid = Number(id)
+  return useList().find((i) => Number(i.id) === nid)
+}
 
 const isArr = <T,>(v: unknown, empty: T[]): T[] => (Array.isArray(v) ? (v as T[]) : empty)
 const hist = () => isArr(history.get(), emptyHistory)
@@ -122,15 +145,20 @@ export function savePrefs(p: Prefs) {
 }
 
 /* ---------- history ---------- */
-export const getHistory = (id: number) => hist().find((h) => h.id === id)
+export const getHistory = (id: number) => {
+  const nid = Number(id)
+  return hist().find((h) => Number(h.id) === nid)
+}
 
 /** Record what is being watched. Moving to another episode resets the position. */
 export function touchHistory(m: Meta, p: { ep: number; server: string; audio: Audio; pos?: number; dur?: number }) {
-  const all = hist().filter((h) => h.id !== m.id)
-  const old = getHistory(m.id)
+  const mid = Number(m.id)
+  const all = hist().filter((h) => Number(h.id) !== mid)
+  const old = getHistory(mid)
   const same = old?.ep === p.ep
   const next: HistoryItem = {
     ...meta(m),
+    id: mid,
     ep: p.ep,
     server: p.server,
     audio: p.audio,
@@ -138,30 +166,49 @@ export function touchHistory(m: Meta, p: { ep: number; server: string; audio: Au
     dur: p.dur ?? (same ? old?.dur ?? 0 : 0),
     t: Date.now(),
   }
+  // Newly touched/watched anime is immediately at index 0
   history.set([next, ...all].slice(0, MAX_HISTORY))
-  // watched far enough (direct servers) → count the episode
-  if (next.dur > 0 && next.pos / next.dur >= 0.85) markProgress(m, p.ep)
-  // moved on to the very next episode on a server that reports no position (iframes) → the previous one was watched
-  else if (old && old.ep + 1 === p.ep && old.dur === 0) markProgress(m, old.ep)
-  // starting something from the watchlist moves it to "Watching"
-  const li = items().find((i) => i.id === m.id)
-  if (li && li.status === 'planning') setStatus(m.id, 'watching')
-  else markProgress(m, p.ep)
+
+  // Update watchlist & sync to AniList
+  const li = items().find((i) => Number(i.id) === mid)
+  const total = m.episodes ?? 0
+  const isDone = next.dur > 0 && next.pos / next.dur >= 0.85
+  const status: ListStatus = isDone && total > 0 && p.ep >= total ? 'completed' : 'watching'
+  const curProg = li?.progress ?? 0
+  const progress = Math.max(curProg, p.ep)
+
+  const needUpdate = !li || li.status !== status || progress > curProg
+  if (needUpdate) {
+    const now = Date.now()
+    const updatedItem: ListItem = {
+      ...(li ?? meta(m)),
+      id: mid,
+      status,
+      progress,
+      addedAt: li?.addedAt ?? now,
+      updatedAt: now,
+    }
+    list.set([updatedItem, ...items().filter((i) => Number(i.id) !== mid)])
+    syncHooks.push?.(mid, { status, progress, label: `${m.title} · ep ${p.ep}` })
+  }
 }
 
 export function removeHistory(id: number) {
-  history.set(hist().filter((h) => h.id !== id))
+  const nid = Number(id)
+  history.set(hist().filter((h) => Number(h.id) !== nid))
 }
 
 /** Episode finished: queue up the next one, or finish the series. */
 export function finishEpisode(m: Meta, ep: number, hasNext: boolean) {
-  const all = hist().filter((h) => h.id !== m.id)
-  const old = getHistory(m.id)
+  const mid = Number(m.id)
+  const all = hist().filter((h) => Number(h.id) !== mid)
+  const old = getHistory(mid)
   const nextEp = hasNext ? ep + 1 : ep
   const dur = old?.dur || 1440
   const p = getPrefs()
   const nextItem: HistoryItem = {
     ...meta(m),
+    id: mid,
     server: old?.server ?? p.server ?? 'flixcloud',
     audio: old?.audio ?? p.audio ?? 'sub',
     ...old,
@@ -176,37 +223,46 @@ export function finishEpisode(m: Meta, ep: number, hasNext: boolean) {
 
 /** An episode counts as watched: update the list entry (and AniList). Never moves progress backwards. */
 export function markProgress(m: Meta, ep: number, last = false) {
-  const li = items().find((i) => i.id === m.id)
-  if (li && (li.progress ?? 0) >= ep && !last) return
-  if (li?.status === 'completed' && !last) return // re-watching a finished show: leave it alone
+  const mid = Number(m.id)
+  const li = items().find((i) => Number(i.id) === mid)
   const total = m.episodes ?? 0
   const done = last || (total > 0 && ep >= total)
   const status: ListStatus = done ? 'completed' : 'watching'
-  const progress = done && total > 0 ? total : ep
+  const progress = done && total > 0 ? total : Math.max(li?.progress ?? 0, ep)
   const now = Date.now()
-  if (li) list.set([{ ...li, status, progress, updatedAt: now }, ...items().filter((i) => i.id !== m.id)])
-  else list.set([{ ...meta(m), status, progress, addedAt: now, updatedAt: now }, ...items()])
-  syncHooks.push?.(m.id, { status, progress, label: `${m.title} · ep ${ep}` })
+  const updatedItem: ListItem = {
+    ...(li ?? meta(m)),
+    id: mid,
+    status,
+    progress,
+    addedAt: li?.addedAt ?? now,
+    updatedAt: now,
+  }
+  list.set([updatedItem, ...items().filter((i) => Number(i.id) !== mid)])
+  syncHooks.push?.(mid, { status, progress, label: `${m.title} · ep ${ep}` })
 }
 
 /* ---------- watchlist ---------- */
 export function addToList(m: Meta, status: ListStatus = 'planning') {
-  if (items().some((i) => i.id === m.id)) return
+  const mid = Number(m.id)
+  if (items().some((i) => Number(i.id) === mid)) return
   const now = Date.now()
-  list.set([{ ...meta(m), status, addedAt: now, updatedAt: now }, ...items()])
-  syncHooks.push?.(m.id, { status })
+  list.set([{ ...meta(m), id: mid, status, addedAt: now, updatedAt: now }, ...items()])
+  syncHooks.push?.(mid, { status, progress: 0 })
 }
 export function removeFromList(id: number) {
-  list.set(items().filter((i) => i.id !== id))
-  syncHooks.remove?.(id)
+  const mid = Number(id)
+  list.set(items().filter((i) => Number(i.id) !== mid))
+  syncHooks.remove?.(mid)
 }
 export function setStatus(id: number, status: ListStatus) {
-  const li = items().find((i) => i.id === id)
+  const mid = Number(id)
+  const li = items().find((i) => Number(i.id) === mid)
   if (!li || li.status === status) return
   const progress = status === 'completed' && li.episodes ? li.episodes : li.progress
-  const rest = items().filter((i) => i.id !== id)
-  list.set([{ ...li, status, progress, updatedAt: Date.now() }, ...rest])
-  syncHooks.push?.(id, { status })
+  const rest = items().filter((i) => Number(i.id) !== mid)
+  list.set([{ ...li, id: mid, status, progress, updatedAt: Date.now() }, ...rest])
+  syncHooks.push?.(mid, { status, progress })
 }
 
 /* ---------- AniList pull (no hooks, so nothing is pushed back) ---------- */
@@ -221,27 +277,66 @@ export interface RemoteEntry {
 /** Merge the AniList list in: statuses and progress follow AniList; "Watching" shows are queued in Continue Watching at the next episode. */
 export function applyRemote(entries: RemoteEntry[], server: string, audio: Audio) {
   const cur = items()
-  const byId = new Map(cur.map((i) => [i.id, i]))
+  const byId = new Map(cur.map((i) => [Number(i.id), i]))
   for (const e of entries) {
-    const old = byId.get(e.meta.id)
-    byId.set(e.meta.id, { ...meta(e.meta), status: e.status, progress: e.progress, addedAt: old?.addedAt ?? e.updated, updatedAt: e.updated })
+    const eid = Number(e.meta.id)
+    const old = byId.get(eid)
+    byId.set(eid, {
+      ...meta(e.meta),
+      id: eid,
+      status: e.status,
+      progress: e.progress,
+      addedAt: old?.addedAt ?? e.updated,
+      updatedAt: Math.max(old?.updatedAt ?? 0, e.updated || 0),
+    })
   }
-  list.set([...byId.values()].sort((a, b) => (b.updatedAt ?? b.addedAt ?? 0) - (a.updatedAt ?? a.addedAt ?? 0)))
+  list.set([...byId.values()].sort((a, b) => (Number(b.updatedAt ?? b.addedAt) || 0) - (Number(a.updatedAt ?? a.addedAt) || 0)))
 
-  const h = new Map(hist().map((x) => [x.id, x]))
+  const h = new Map(hist().map((x) => [Number(x.id), x]))
   for (const e of entries) {
-    if (e.status === 'completed' || e.status === 'dropped') h.delete(e.meta.id)
-    else if (e.status === 'watching') {
-      const next = e.progress + 1
+    const eid = Number(e.meta.id)
+    if (e.status === 'completed' || e.status === 'dropped') {
       const total = e.meta.episodes ?? 0
-      const old = h.get(e.meta.id)
+      if (e.status === 'dropped' || (total > 0 && (e.progress ?? 0) >= total)) {
+        h.delete(eid)
+      }
+    } else if (e.status === 'watching') {
+      const next = (e.progress ?? 0) + 1
+      const total = e.meta.episodes ?? 0
+      const old = h.get(eid)
       if (total > 0 && next > total) continue
-      if (!old || old.ep < next) h.set(e.meta.id, { ...meta(e.meta), ep: next, server: old?.server ?? server, audio: old?.audio ?? audio, pos: 0, dur: 0, t: e.updated })
+      // Ensure remote timestamp is never set to the current time so freshly watched shows stay first
+      const remoteT = Math.min(Number(e.updated) || 1, Date.now() - 1000)
+      if (!old) {
+        h.set(eid, {
+          ...meta(e.meta),
+          id: eid,
+          ep: next,
+          server: server,
+          audio: audio,
+          pos: 0,
+          dur: 0,
+          t: remoteT,
+        })
+      } else if (old.ep < next) {
+        // Newer episode tracked on AniList
+        h.set(eid, {
+          ...old,
+          ...meta(e.meta),
+          id: eid,
+          ep: next,
+          pos: 0,
+          dur: 0,
+          t: Math.max(old.t ?? 0, remoteT),
+        })
+      }
+      // If old exists and old.ep >= next, leave it untouched so local watch time and position stay first!
     }
   }
-  history.set([...h.values()].sort((a, b) => b.t - a.t).slice(0, MAX_HISTORY))
+  history.set([...h.values()].sort((a, b) => (Number(b.t) || 0) - (Number(a.t) || 0)).slice(0, MAX_HISTORY))
 }
 export function toggleList(m: Meta) {
-  if (items().some((i) => i.id === m.id)) removeFromList(m.id)
+  const mid = Number(m.id)
+  if (items().some((i) => Number(i.id) === mid)) removeFromList(mid)
   else addToList(m)
 }

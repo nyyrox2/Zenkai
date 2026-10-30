@@ -526,24 +526,7 @@ export async function resolveFlixCloud({ anilistId, episode = 1, audio = "sub", 
     }
   }
 
-  // Tier 2: Seamless Fallback to Verified HLS Providers (MegaPlay / Vidstream)
-  // Exactly matching ReAnimeResolver.kt lines 62-76
-  try {
-    const fallback =
-      (await resolveMegaPlay(anilistId, episode, targetAudio, "bcdn", title)) ||
-      (await resolveMegaPlay(anilistId, episode, targetAudio, "vidstream", title));
-
-    if (fallback && fallback.audio?.toLowerCase() === targetAudio) {
-      return {
-        ...fallback,
-        server: "FlixCloud",
-        serverId: `flixcloud-${targetAudio}`
-      };
-    }
-  } catch (e) {
-    console.warn("FlixCloud Tier 2 fallback error:", e.message);
-  }
-
+  // No fallback to other servers - strictly return null if FlixCloud does not have it
   return null;
 }
 

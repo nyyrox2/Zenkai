@@ -1,3 +1,5 @@
+import { resolveCandidate } from "./acdn.js";
+
 const isCaption = (t) => !/thumbnail/i.test(`${t?.kind || ""} ${t?.label || ""}`) && (t?.file || t?.url);
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -101,10 +103,22 @@ export async function resolveFromAnikotoSite(animeTitle, episode = 1, audio = "s
     if (!searchRes.ok) return null;
     const searchHtml = await searchRes.text();
 
-    const slugMatch = searchHtml.match(/<a\s+class="name d-title"\s+href="https?:\/\/anikototv\.to\/watch\/([^"\/]+)/)
-                   || searchHtml.match(/<a\s+href="https?:\/\/anikototv\.to\/watch\/([^"\/]+)/);
-    if (!slugMatch) return null;
-    const slug = slugMatch[1];
+    // Extract candidate watch links ONLY from search results, matching title keywords (never side items)
+    const searchCards = [...searchHtml.matchAll(/<div class="ani poster tip"[^>]*>[\s\S]*?<a href="https?:\/\/anikototv\.to\/watch\/([^"\/]+)\/ep-1"[^>]*><img src="[^"]*"\s+alt="([^"]+)"/g)];
+    let matchedSlug = null;
+    const cleanTitle = animeTitle.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const titleKeywords = cleanTitle.split(/\s+/).filter(w => !['season', 'part', 'tv', '2nd', '3rd', '4th', 'the', 'of', 'in', 'and'].includes(w));
+
+    for (const card of searchCards) {
+      const cSlug = card[1].toLowerCase();
+      const cName = card[2].toLowerCase();
+      if (titleKeywords.length > 0 && titleKeywords.every(kw => cSlug.includes(kw) || cName.includes(kw))) {
+        matchedSlug = card[1];
+        break;
+      }
+    }
+    if (!matchedSlug) return null;
+    const slug = matchedSlug;
 
     const watchUrl = `https://anikototv.to/watch/${slug}`;
     const watchRes = await fetch(watchUrl, {
@@ -140,18 +154,17 @@ export async function resolveFromAnikotoSite(animeTitle, episode = 1, audio = "s
     const sectionMatch = isDub
       ? serverHtml.match(/data-type=["']dub["'][\s\S]*?<\/ul>/i)
       : serverHtml.match(/data-type=["']sub["'][\s\S]*?<\/ul>/i);
-    const secHtml = sectionMatch ? sectionMatch[0] : serverHtml;
+    if (!sectionMatch) return null;
+    const secHtml = sectionMatch[0];
 
     let linkId = null;
     if (isVidstream) {
       const vm = secHtml.match(/<li\s+[^>]*data-link-id=["']([^"']+)["'][^>]*>(?:[^<]*Vidstream[^<]*)<\/li>/i)
               || secHtml.match(/data-link-id=["']([^"']+)["'][^>]*>[^<]*vidstream/i);
       linkId = vm ? vm[1] : null;
-    }
-    if (!linkId) {
+    } else {
       const hm = secHtml.match(/<li\s+[^>]*data-link-id=["']([^"']+)["'][^>]*>(?:[^<]*HD-1[^<]*)<\/li>/i)
-              || secHtml.match(/data-link-id=["']([^"']+)["'][^>]*>[^<]*hd-1/i)
-              || secHtml.match(/data-link-id=["']([^"']+)["']/);
+              || secHtml.match(/data-link-id=["']([^"']+)["'][^>]*>[^<]*hd-1/i);
       linkId = hm ? hm[1] : null;
     }
     if (!linkId) return null;
@@ -228,8 +241,6 @@ export async function resolveMegaPlay(anilistId, episode = 1, audio = "sub", ser
   // Tier 1: Client-Side Direct MegaPlay Extraction via AniList ID
   if (anilistId) {
     const srvList = [srv];
-    if (srv === "vidstream") srvList.push("bcdn", "tcdn");
-    else srvList.push("vidstream", "tcdn");
 
     for (const testSrv of srvList) {
       try {
@@ -308,13 +319,165 @@ export async function resolveDirectStreamWorker({ anilistId, episode = 1, audio 
   const isVidstream = norm.includes("vidstream") || norm === "hd2" || norm === "hd3";
 
   if (isVidstream) {
-    const res = await resolveMegaPlay(anilistId, episode, targetAudio, "vidstream", title);
-    if (res) return res;
-    return await resolveMegaPlay(anilistId, episode, targetAudio, "bcdn", title);
+    return await resolveMegaPlay(anilistId, episode, targetAudio, "vidstream", title);
   }
 
-  // MegaPlay default
-  const res = await resolveMegaPlay(anilistId, episode, targetAudio, "bcdn", title);
-  if (res) return res;
-  return await resolveMegaPlay(anilistId, episode, targetAudio, "vidstream", title);
+  // MegaPlay default (bcdn) - no fallback to Vidstream
+  return await resolveMegaPlay(anilistId, episode, targetAudio, "bcdn", title);
+}
+
+
+export async function checkEpisodeAudioAvailability(anilistId, episode, title) {
+  const flixcloud = { sub: false, dub: false };
+  const megaplay = { sub: false, dub: false };
+  const vidstream = { sub: false, dub: false };
+
+  const p1 = (async () => {
+    if (!anilistId) return;
+    try {
+      const res = await fetch(`https://reanime.to/api/flix/${anilistId}/${episode}`, {
+        headers: { "User-Agent": UA, Accept: "application/json" },
+        signal: AbortSignal.timeout(4000)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.success && Array.isArray(json.servers)) {
+          for (const s of json.servers) {
+            const dt = (s.dataType || "").toLowerCase();
+            if (dt.includes("dub")) flixcloud.dub = true;
+            if (dt.includes("sub") || dt.includes("raw")) flixcloud.sub = true;
+          }
+        }
+      }
+    } catch {}
+  })();
+
+  const p2 = (async () => {
+    if (anilistId) {
+      await Promise.all([
+        (async () => {
+          try {
+            const r = await fetch(`https://megaplay.buzz/stream/ani/${anilistId}/${episode}/sub?s=bcdn`, {
+              headers: { "User-Agent": UA, "Referer": "https://megaplay.buzz/" },
+              signal: AbortSignal.timeout(4000)
+            });
+            if (r.ok && /data-id=["']\d+["']/.test(await r.text())) megaplay.sub = true;
+          } catch {}
+        })(),
+        (async () => {
+          try {
+            const r = await fetch(`https://megaplay.buzz/stream/ani/${anilistId}/${episode}/dub?s=bcdn`, {
+              headers: { "User-Agent": UA, "Referer": "https://megaplay.buzz/" },
+              signal: AbortSignal.timeout(4000)
+            });
+            if (r.ok && /data-id=["']\d+["']/.test(await r.text())) megaplay.dub = true;
+          } catch {}
+        })(),
+        (async () => {
+          try {
+            const r = await fetch(`https://megaplay.buzz/stream/ani/${anilistId}/${episode}/sub?s=vidstream`, {
+              headers: { "User-Agent": UA, "Referer": "https://megaplay.buzz/" },
+              signal: AbortSignal.timeout(4000)
+            });
+            if (r.ok && /data-id=["']\d+["']/.test(await r.text())) vidstream.sub = true;
+          } catch {}
+        })(),
+        (async () => {
+          try {
+            const r = await fetch(`https://megaplay.buzz/stream/ani/${anilistId}/${episode}/dub?s=vidstream`, {
+              headers: { "User-Agent": UA, "Referer": "https://megaplay.buzz/" },
+              signal: AbortSignal.timeout(4000)
+            });
+            if (r.ok && /data-id=["']\d+["']/.test(await r.text())) vidstream.dub = true;
+          } catch {}
+        })(),
+      ]);
+    }
+
+    // Only if MegaPlay / Vidstream had 0 matches via AniList ID do we attempt Anikoto title search
+    if (!megaplay.sub && !megaplay.dub && !vidstream.sub && !vidstream.dub && title) {
+      try {
+        const searchUrl = "https://anikototv.to/filter?keyword=" + encodeURIComponent(title);
+        const searchRes = await fetch(searchUrl, {
+          headers: { "User-Agent": UA, "Referer": "https://anikototv.to/" },
+          signal: AbortSignal.timeout(4000)
+        });
+        if (searchRes.ok) {
+          const searchHtml = await searchRes.text();
+          const cleanTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+          const titleKeywords = cleanTitle.split(/\s+/).filter(w => !['season', 'part', 'tv', '2nd', '3rd', '4th', 'the', 'of', 'in', 'and'].includes(w));
+
+          const searchCards = [...searchHtml.matchAll(/<div class="ani poster tip"[^>]*>[\s\S]*?<a href="https?:\/\/anikototv\.to\/watch\/([^"\/]+)\/ep-1"[^>]*><img src="[^"]*"\s+alt="([^"]+)"/g)];
+          let matchedSlug = null;
+          for (const card of searchCards) {
+            const cSlug = card[1].toLowerCase();
+            const cName = card[2].toLowerCase();
+            if (titleKeywords.length > 0 && titleKeywords.every(kw => cSlug.includes(kw) || cName.includes(kw))) {
+              matchedSlug = card[1];
+              break;
+            }
+          }
+
+          if (matchedSlug) {
+            const watchUrl = `https://anikototv.to/watch/${matchedSlug}`;
+            const watchRes = await fetch(watchUrl, {
+              headers: { "User-Agent": UA, "Referer": "https://anikototv.to/" },
+              signal: AbortSignal.timeout(4000)
+            });
+            if (watchRes.ok) {
+              const watchHtml = await watchRes.text();
+              const showIdMatch = watchHtml.match(/data-id="(\d+)"/);
+              if (showIdMatch) {
+                const listRes = await fetch(`https://anikototv.to/ajax/episode/list/${showIdMatch[1]}`, {
+                  headers: { "User-Agent": UA, "X-Requested-With": "XMLHttpRequest", "Referer": watchUrl },
+                  signal: AbortSignal.timeout(4000)
+                });
+                if (listRes.ok) {
+                  const listJson = await listRes.json();
+                  const epRegex = new RegExp(`<a\\s+[^>]*data-ids="([^"]+)"[^>]*data-num="${episode}"|<a\\s+[^>]*data-num="${episode}"[^>]*data-ids="([^"]+)"`, "i");
+                  const epMatch = listJson.result?.match(epRegex);
+                  if (epMatch) {
+                    const serverIds = epMatch[1] || epMatch[2];
+                    const serverRes = await fetch(`https://anikototv.to/ajax/server/list?servers=${encodeURIComponent(serverIds)}`, {
+                      headers: { "User-Agent": UA, "X-Requested-With": "XMLHttpRequest", "Referer": watchUrl },
+                      signal: AbortSignal.timeout(4000)
+                    });
+                    if (serverRes.ok) {
+                      const serverJson = await serverRes.json();
+                      const serverHtml = serverJson.result || "";
+                      const subMatch = serverHtml.match(/data-type=["']sub["'][\s\S]*?<\/ul>/i);
+                      const dubMatch = serverHtml.match(/data-type=["']dub["'][\s\S]*?<\/ul>/i);
+                      const subHtml = subMatch ? subMatch[0] : "";
+                      const dubHtml = dubMatch ? dubMatch[0] : "";
+                      if (/HD-1/i.test(subHtml)) megaplay.sub = true;
+                      if (/HD-1/i.test(dubHtml)) megaplay.dub = true;
+                      if (/Vidstream/i.test(subHtml)) vidstream.sub = true;
+                      if (/Vidstream/i.test(dubHtml)) vidstream.dub = true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+  })();
+
+  await Promise.all([p1, p2]);
+
+  let acdnAvail = { sub: false, dub: false, multi: false };
+  try {
+    const cand = resolveCandidate({ anilistId, episode, title });
+    if (cand && cand.saltId) {
+      acdnAvail = { sub: true, dub: true, multi: true };
+    }
+  } catch {}
+
+  return {
+    megaplay,
+    vidstream,
+    flixcloud,
+    acdn: acdnAvail,
+  };
 }

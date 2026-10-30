@@ -46,6 +46,8 @@ const CommunityPage = lazy(() => import('./pages/CommunityPage'))
 const AniListCallbackPage = lazy(() => import('./pages/AniListCallbackPage'))
 const FindPage = lazy(() => import('./pages/FindPage'))
 const BustedPage = lazy(() => import('./pages/BustedPage'))
+const EmbedPage = lazy(() => import('./pages/EmbedPage'))
+const DocsPage = lazy(() => import('./pages/DocsPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 export default function App() {
@@ -53,7 +55,9 @@ export default function App() {
   const { pathname } = useLocation()
   const gate = pathname === '/'
   const reader = isReaderPath(pathname) // Novel / manga readers are full-screen too
-  const bare = gate || pathname === '/busted' || reader || isWatchPath(pathname)
+  const isEmbed = pathname === '/embed' || pathname.startsWith('/embed/')
+  const isApi = pathname === '/api' || pathname.startsWith('/api') || pathname === '/docs'
+  const bare = gate || pathname === '/busted' || isEmbed || reader || isWatchPath(pathname)
   const section = sectionOf(pathname)
 
   useTrackHistory()
@@ -69,10 +73,10 @@ export default function App() {
   return (
     <>
       <TopLoader />
-      {!bare && <ScrollProgress />}
+      {!bare && !isApi && <ScrollProgress />}
       <ScrollToTop />
-      {!bare && <AniListDownBanner />}
-      {!bare && !isDetailsPath(pathname) && <Navbar />}
+      {!bare && !isApi && <AniListDownBanner />}
+      {!bare && !isDetailsPath(pathname) && !isApi && <Navbar />}
       <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -88,7 +92,7 @@ export default function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/auth/anilist" element={<AniListCallbackPage />} />
- {/* Novels */}
+          {/* Novels */}
           <Route path="/novel" element={<NovelHomePage />} />
           <Route path="/novel/find" element={<FindPage />} />
           <Route path="/manga/find" element={<FindPage />} />
@@ -107,15 +111,21 @@ export default function App() {
           <Route path="/watch/:id" element={<WatchPage />} />
           <Route path="/anime/:id" element={<DetailsPage />} />
           <Route path="/mal/:id" element={<DetailsPage />} />
+          <Route path="/embed" element={<EmbedPage />} />
+          <Route path="/embed/:id" element={<EmbedPage />} />
+          <Route path="/embed/:id/:ep" element={<EmbedPage />} />
+          <Route path="/api" element={<DocsPage />} />
+          <Route path="/api/docs" element={<DocsPage />} />
+          <Route path="/docs" element={<DocsPage />} />
           <Route path="/busted" element={<BustedPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
       </ErrorBoundary>
-      {!bare && <Footer />}
-      {!bare && <MobileDock />}
-      {!bare && section === 'anime' && <SearchModal />}
-      {!bare && section === 'movies' && <MovieSearchModal />}
+      {!bare && !isApi && <Footer />}
+      {!bare && !isApi && <MobileDock />}
+      {!bare && !isApi && section === 'anime' && <SearchModal />}
+      {!bare && !isApi && section === 'movies' && <MovieSearchModal />}
       <Toaster />
       <ShortcutsHelp />
       <ShieldGate />

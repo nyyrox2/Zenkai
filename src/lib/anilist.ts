@@ -36,7 +36,14 @@ const store = cell<Link | null>('zk:anilist', null)
 export const useAniList = () => useSyncExternalStore(store.subscribe, store.get)
 export const getAniListToken = () => {
   const l = store.get()
-  return l && l.expires > Date.now() ? l.token : null
+  if (!l || !l.token) return null
+  const exp = l.expires ? (l.expires < 1e11 ? l.expires * 1000 : l.expires) : Infinity
+  return exp > Date.now() ? l.token : null
+}
+
+export const listsOn = () => {
+  const l = store.get()
+  return !!getAniListToken() && l?.lists !== false
 }
 
 export const connectAniList = () => {
@@ -146,7 +153,7 @@ export async function finishAniListLogin(hash: string, local: Profile): Promise<
   const token = q.get('access_token')
   if (!token) return q.get('error_description') ?? q.get('error') ?? 'AniList did not return a login.'
   const ttl = Number(q.get('expires_in')) || 31536000
-  store.set({ token, expires: Date.now() + ttl * 1000 - 60000, user: null, sync: true })
+  store.set({ token, expires: Date.now() + ttl * 1000 - 60000, user: null, sync: true, lists: true })
   try {
     await pullAniListProfile(local)
     await pullAniListLists().catch(() => 0)
@@ -165,12 +172,9 @@ interface QItem extends SyncPatch {
   del?: boolean
 }
 const queue = cell<QItem[]>('zk:al:queue', [])
-const listsOn = () => {
-  const l = store.get()
-  return !!l && l.lists !== false && l.expires > Date.now()
-}
+// listsOn is defined above
 
-const SAVE = 'mutation($id:Int,$status:MediaListStatus,$progress:Int){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress){id}}'
+const SAVE = 'mutation($id:Int,$status:MediaListStatus,$progress:Int){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress){id status progress}}'
 const FIND = 'query($id:Int,$uid:Int){MediaList(mediaId:$id,userId:$uid){id}}'
 const DEL = 'mutation($id:Int){DeleteMediaListEntry(id:$id){deleted}}'
 
@@ -178,13 +182,26 @@ let timer = 0
 const enqueue = (it: QItem) => {
   if (!listsOn()) return
   const cur = queue.get()
-  const old = cur.find((x) => x.id === it.id)
+  const id = Number(it.id)
+  const old = cur.find((x) => Number(x.id) === id)
+  const nextProg = it.progress !== undefined ? Math.round(Number(it.progress)) : old?.progress
+  const nextStatus = it.status ?? old?.status ?? 'watching'
+  if (old && !old.del && !it.del && old.status === nextStatus && old.progress === nextProg) return
+
   const merged: QItem = it.del
-    ? { id: it.id, del: true }
-    : { ...old, ...it, del: false, progress: Math.max(old?.progress ?? 0, it.progress ?? 0) || undefined, status: it.status ?? old?.status, label: it.label ?? old?.label }
-  queue.set([...cur.filter((x) => x.id !== it.id), merged])
+    ? { id, del: true }
+    : {
+        ...old,
+        ...it,
+        id,
+        del: false,
+        progress: nextProg,
+        status: nextStatus,
+        label: it.label ?? old?.label,
+      }
+  queue.set([...cur.filter((x) => Number(x.id) !== id), merged])
   window.clearTimeout(timer)
-  timer = window.setTimeout(() => void flushAniList(true), 1200)
+  timer = window.setTimeout(() => void flushAniList(true), 400)
 }
 
 let flushing = false
@@ -200,24 +217,28 @@ export async function flushAniList(announce = false) {
       try {
         if (it.del) {
           const uid = store.get()?.user?.id
-          const found = await gql<{ MediaList: { id: number } | null }>(FIND, token, { id: it.id, uid }).catch((e) => {
+          const found = await gql<{ MediaList: { id: number } | null }>(FIND, token, { id: Number(it.id), uid: Number(uid) }).catch((e) => {
             if (e instanceof ALError && e.status === 404) return { MediaList: null }
             throw e
           })
-          if (found.MediaList) await gql(DEL, token, { id: found.MediaList.id })
+          if (found.MediaList) await gql(DEL, token, { id: Number(found.MediaList.id) })
         } else {
-          await gql(SAVE, token, { id: it.id, status: it.status ? TO_AL[it.status] : undefined, progress: it.progress })
+          await gql(SAVE, token, {
+            id: Math.round(Number(it.id)),
+            status: (it.status && TO_AL[it.status]) || 'CURRENT',
+            progress: it.progress !== undefined ? Math.round(Number(it.progress)) : undefined,
+          })
           if (announce && it.label && it.progress) toast(`Synced to AniList · ${it.label}`, 'info')
         }
       } catch (e) {
         if (e instanceof ALError && e.kind === 'api') {
-          queue.set(queue.get().filter((x) => x !== it)) // AniList refused this one: do not block the rest
+          queue.set(queue.get().filter((x) => Number(x.id) !== Number(it.id))) // AniList refused this one: do not block the rest
           continue
         }
         break // offline, rate limited or logged out: keep the queue
       }
-      const now = queue.get().find((x) => x.id === it.id)
-      if (JSON.stringify(now) === JSON.stringify(it)) queue.set(queue.get().filter((x) => x.id !== it.id))
+      const now = queue.get().find((x) => Number(x.id) === Number(it.id))
+      if (JSON.stringify(now) === JSON.stringify(it)) queue.set(queue.get().filter((x) => Number(x.id) !== Number(it.id)))
       await new Promise((r) => setTimeout(r, 350))
     }
   } finally {
@@ -248,7 +269,7 @@ export async function pullAniListLists(): Promise<number> {
       if (!st || pending.has(e.media.id) || seen.has(e.media.id)) continue
       const m = e.media
       const card: Meta = { id: m.id, title: pickTitle(m.title), image: m.coverImage.large || m.coverImage.extraLarge || '', color: m.coverImage.color, score: m.averageScore, format: m.format, episodes: m.episodes, year: m.seasonYear }
-      seen.set(m.id, { meta: card, status: st, progress: e.progress ?? 0, updated: (e.updatedAt ?? 0) * 1000 || Date.now() })
+      seen.set(m.id, { meta: card, status: st, progress: e.progress ?? 0, updated: (e.updatedAt ?? 0) * 1000 || (m.seasonYear ? new Date(m.seasonYear, 0).getTime() : 1000) })
     }
   const prefs = getPrefs()
   applyRemote([...seen.values()], prefs.server ?? 'megaplay', prefs.audio ?? 'sub')
@@ -269,15 +290,34 @@ async function autoPull() {
   }
 }
 
+// Wire syncHooks immediately at top-level
+syncHooks.active = listsOn
+syncHooks.push = (id, p) => enqueue({ id: Number(id), ...p })
+syncHooks.remove = (id) => enqueue({ id: Number(id), del: true })
+
 let started = false
 /** Call once at app start: wires local changes to AniList, then keeps the list fresh. */
 export function initAniListSync() {
+  syncHooks.active = listsOn
+  syncHooks.push = (id, p) => enqueue({ id: Number(id), ...p })
+  syncHooks.remove = (id) => enqueue({ id: Number(id), del: true })
   if (started) return
   started = true
-  syncHooks.active = listsOn
-  syncHooks.push = (id, p) => enqueue({ id, ...p })
-  syncHooks.remove = (id) => enqueue({ id, del: true })
-  window.addEventListener('online', () => void flushAniList(false))
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && void autoPull())
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => void flushAniList(false))
+    window.addEventListener('beforeunload', () => void flushAniList(false))
+    window.addEventListener('pagehide', () => void flushAniList(false))
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        void flushAniList(false)
+      } else if (document.visibilityState === 'visible') {
+        void autoPull()
+      }
+    })
+  }
   void flushAniList(false).then(autoPull)
+}
+
+if (typeof window !== 'undefined') {
+  initAniListSync()
 }

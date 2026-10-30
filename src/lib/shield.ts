@@ -167,7 +167,10 @@ export function haltAllMedia() {
 
 function install() {
   window.fetch = async (input, init) => {
-    if (state.devtools || state.bot) {
+    const inIframe = typeof window !== 'undefined' && window.self !== window.top;
+    const path = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isExcluded = inIframe || path === '/embed' || path.startsWith('/embed/');
+    if (!isExcluded && (state.devtools || state.bot)) {
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
       if (!urlStr.includes('/api/shield/')) {
         haltAllMedia()
@@ -208,16 +211,20 @@ const looksAutomated = () =>
 
 function checkDevTools() {
   if (state.bot || import.meta.env.DEV) return // DEV: never stall or lock the dev's own DevTools
-  const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-  let open = !mobile && (window.outerWidth - window.innerWidth > 175 || window.outerHeight - window.innerHeight > 175)
-  // Function() so the minifier cannot drop the debugger statement; it only stalls while DevTools is open.
-  try {
-    const t = performance.now()
-    Function('debugger')()
-    if (performance.now() - t > 100) open = true
-  } catch {
-    /* CSP without unsafe-eval: the size check above still runs */
+  const inIframe = typeof window !== 'undefined' && window.self !== window.top;
+  const path = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isExcluded = inIframe || path === '/embed' || path.startsWith('/embed/');
+  if (isExcluded) {
+    if (state.devtools) set({ devtools: false });
+    return;
   }
+  const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  let open = !mobile && (window.outerWidth - window.innerWidth > 175 || window.outerHeight - window.innerHeight > 175);
+  try {
+    const t = performance.now();
+    Function('debugger')();
+    if (performance.now() - t > 100) open = true;
+  } catch {}
   if (open !== state.devtools) {
     set({ devtools: open })
     if (open) {

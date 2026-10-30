@@ -1,20 +1,23 @@
-// Manga servers. WeebCentral, ComicK, Manhua and Asura Scans go through the Zenkai manga worker that the
+// Manga servers. WeebCentral, ComicK, Manhua, Asura Scans and Demonic Scans go through the Zenkai manga worker that the
 // Android app uses (the server is chosen with its `source` parameter); MangaDex is queried directly (mangadex.js).
 // Every payload is normalised here, so the UI only ever sees { id, title, poster, source, ... },
 // { chapterId, number, title } and string[] of page urls, whichever server it came from.
 import * as dex from "./mangadex.js";
+import * as demonic from "./demonicscans.js";
 
 const WORKER = "https://brhgxkmnoken-mud-a7f7nyroxx.ammhfoo.workers.dev";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-export const SOURCES = ["comick", "manhua", "asura", "weebcentral", "mangadex"];
+export const SOURCES = ["weebcentral", "demonicscans", "comick", "manhua", "asura", "mangadex"];
 export const DEFAULT_SOURCE = "weebcentral";
 
 /** Unknown or missing ids mean the default server. "mh" is the Manhua alias, as in the app. */
 export function parseSource(id) {
   const s = String(id || "").trim().toLowerCase();
-  const v = s === "mh" ? "manhua" : s;
-  return SOURCES.includes(v) ? v : DEFAULT_SOURCE;
+  if (s === "mh") return "manhua";
+  if (s === "ds" || s === "demonic" || s === "demonicscans") return "demonicscans";
+  if (s === "wc" || s === "weeb" || s === "webtoon") return "weebcentral";
+  return SOURCES.includes(s) ? s : DEFAULT_SOURCE;
 }
 
 async function call(params, source) {
@@ -57,6 +60,7 @@ const dedupe = (arr) => {
 
 export async function getHome(source = DEFAULT_SOURCE) {
   if (source === "mangadex") return dex.getHome();
+  if (source === "demonicscans") return demonic.getHome();
   const d = await call({ action: "home" }, source);
   const pick = (...k) => dedupe(listOf(d, ...k).map((m) => normalizeManga(m, source)));
   return { trending: pick("trending"), latest: pick("latest"), newRelease: pick("newRelease", "new", "newReleases") };
@@ -64,12 +68,14 @@ export async function getHome(source = DEFAULT_SOURCE) {
 
 export async function search(q, source = DEFAULT_SOURCE) {
   if (source === "mangadex") return dex.search(q);
+  if (source === "demonicscans") return demonic.search(q);
   const d = await call({ action: "search", q }, source);
   return { results: dedupe(listOf(d, "results", "data").map((m) => normalizeManga(m, source))) };
 }
 
 export async function getChapters(id, source = DEFAULT_SOURCE) {
   if (source === "mangadex") return dex.getChapters(id);
+  if (source === "demonicscans") return demonic.getChapters(id);
   const d = await call({ action: "chapters", id }, source);
   const chapters = listOf(d, "chapters", "results", "data")
     .map((c, i) => {
@@ -92,6 +98,7 @@ export async function getChapters(id, source = DEFAULT_SOURCE) {
 
 export async function getPages(chapterId, source = DEFAULT_SOURCE) {
   if (source === "mangadex") return dex.getPages(chapterId);
+  if (source === "demonicscans") return demonic.getPages(chapterId);
   const d = await call({ action: "pages", chapterId }, source);
   const pages = listOf(d, "pages", "images", "data")
     .map((p) => (typeof p === "string" ? p : p?.url || p?.src || ""))

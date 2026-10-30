@@ -137,9 +137,11 @@ export async function shield(request, env, path, json) {
   const retry = limited(clientIp(request), cat);
   if (retry) return json({ error: "Too many requests", retryAfter: retry }, 429);
 
-  // Media (hls.js / <img>) and iframe embeds (/api/embed/*) can't send custom headers: they only get the rate limit. The Android app is let through the same way.
+  // Media (hls.js / <img>), iframe embeds (/api/embed/*) and server/audio availability queries can't or shouldn't block initial load: they get rate-limited.
   const app = /Aniverse\/|Zenkai/i.test(request.headers.get("User-Agent") || "") || request.headers.has("X-Zenkai-Client");
-  if (cat === "proxy" || app || path.startsWith("/api/embed/")) return null;
+  const referer = request.headers.get("Referer") || "";
+  const isEmbedReq = referer.includes("/embed") || request.headers.has("X-Zenkai-Embed");
+  if (cat === "proxy" || app || isEmbedReq || path.startsWith("/api/embed/") || path.startsWith("/api/servers-available") || path.startsWith("/api/stream/servers")) return null;
 
   const token = request.headers.get("X-Zenkai-Shield");
   if (!token) return json({ error: "Verification required", code: "SHIELD_VERIFICATION_REQUIRED" }, 401);

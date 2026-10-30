@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent as RMouseEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowUpRight, ChevronDown, MessageSquare, Shuffle, Smartphone } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Code2, MessageSquare, Shuffle, Smartphone } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { FadeSlideshow } from '../components/FadeSlideshow'
 import { Logo } from '../components/Logo'
@@ -94,6 +94,10 @@ export default function LandingPage() {
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 pt-5 sm:px-8 sm:pt-7">
         <Logo size={38} />
         <div className="flex items-center gap-1.5">
+          <Link to="/api" className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold text-muted transition hover:bg-foreground/5 hover:text-foreground active:scale-95">
+            <Code2 className="size-4" />
+            API
+          </Link>
           <Link to="/community" className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold text-muted transition hover:bg-foreground/5 hover:text-foreground active:scale-95">
             <MessageSquare className="size-4" />
             Community
@@ -124,6 +128,10 @@ export default function LandingPage() {
       </section>
 
       <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-2 px-5 pb-6 text-xs text-muted sm:px-8">
+        <Link to="/api" className="inline-flex items-center gap-1.5 font-medium transition hover:text-foreground">
+          <Code2 className="size-3.5" />
+          API &amp; Embed Docs
+        </Link>
         <Link to="/app" className="inline-flex items-center gap-1.5 font-medium transition hover:text-foreground">
           <Smartphone className="size-3.5" />
           Get the Android app

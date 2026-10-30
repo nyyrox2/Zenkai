@@ -1,7 +1,12 @@
+import dns from 'node:dns'
 import { Readable } from 'node:stream'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+
+try {
+  dns.setDefaultResultOrder('ipv4first')
+} catch {}
 
 /** Serves /api/* and /proxy in dev with the same handler Cloudflare Pages Functions use in production. */
 function zenkaiApi(): Plugin {
@@ -10,7 +15,8 @@ function zenkaiApi(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url ?? ''
-        if (!url.startsWith('/api/') && !url.startsWith('/proxy')) return next()
+        if ((url === '/api' || url === '/api/' || url === '/api/docs') && req.headers.accept?.includes('text/html')) return next()
+        if (!url.startsWith('/api/') && url !== '/api' && !url.startsWith('/proxy')) return next()
         try {
           const { handle } = await server.ssrLoadModule('/server/handler.js')
           const headers = new Headers()

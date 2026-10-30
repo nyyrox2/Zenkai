@@ -13,6 +13,7 @@ import { gpuSupported, startUpscale, type Anime4KMode } from '../lib/upscale'
 import { findActiveCue, parseSubtitleText, type Cue } from '../lib/subtitles'
 import { submitStreamReport } from '../lib/supabase'
 import { toast } from '../lib/toast'
+import { attachPlayerSecurity } from '../lib/playerSecurity'
 import './cineplayer.css'
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -268,6 +269,7 @@ export interface PlayerServer {
   id: string
   name: string
   note: string
+  tags?: string[]
   disabled?: boolean
 }
 
@@ -284,6 +286,9 @@ export interface CinePlayerProps {
   format?: string | null
   directSubtitles?: { id: string; label: string; lang?: string; url: string }[]
   audioMode?: 'sub' | 'dub'
+  hasDub?: boolean
+  hasSub?: boolean
+  preview?: boolean
   onAudio?: (m: 'sub' | 'dub') => void
   /** reports the stream's audio renditions (and the active one) so the page can list them; [] when the player goes away */
   onAudioTracks?: (tracks: { i: number; label: string; lang: string }[], active: number) => void
@@ -299,6 +304,7 @@ export interface CinePlayerProps {
   onNextEpisode?: () => void
   onPrevEpisode?: () => void
   onSelectEpisode?: (n: number) => void
+  onPlay?: () => void
   onEnded?: () => void
   /** called every few seconds while playing, for continue-watching */
   onProgress?: (pos: number, dur: number) => void
@@ -739,8 +745,8 @@ const readPos = (id: number, ep: number) => {
 
 export default function CinePlayer({
   streamUrl, intro, outro, title, episode, episodeTitle = '', totalEpisodes, availableEpisodes, animeId, format,
-  directSubtitles = [], audioMode = 'sub', onAudio, onAudioTracks, audioSel, tourReady = true, servers, serverId, onServer,
-  hasNextEpisode = false, hasPrevEpisode = false, onNextEpisode, onPrevEpisode, onSelectEpisode, onEnded, onProgress,
+  directSubtitles = [], audioMode = 'sub', hasDub = true, hasSub = true, preview = false, onAudio, onAudioTracks, audioSel, tourReady = true, servers, serverId, onServer,
+  hasNextEpisode = false, hasPrevEpisode = false, onNextEpisode, onPrevEpisode, onSelectEpisode, onPlay, onEnded, onProgress,
   autoNext = true, onAutoNext, autoSkip = false, onAutoSkip,
   nextEpisode, episodeKind, skipFiller = false, onSkipFiller, switching = false,
   episodesInfo, fallbackImg, defaultRuntime, kinds,
@@ -748,6 +754,44 @@ export default function CinePlayer({
   const vid = useRef<HTMLVideoElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const hls = useRef<Hls | null>(null)
+
+  // Anti-Debug, Anti-DevTools & Anti-Scraping Protection (Scoped exclusively to CinePlayer)
+  useEffect(() => {
+    return attachPlayerSecurity(root.current, vid.current, { isPreview: preview })
+  }, [preview])
+
+  // Dynamic Anonymous Function Debugger Trap & Auto Clear Console direct in CinePlayer
+  useEffect(() => {
+    if (preview) return
+
+    // Dynamic Anonymous Function Debugger Trap (triggers VM... script in DevTools)
+    const _0x3779a6 = () => {
+      try {
+        ;(function () {}['constructor']('debugger')())
+      } catch {}
+      try {
+        Function('debugger')()
+      } catch {}
+    }
+
+    const debugTimer = window.setInterval(_0x3779a6, 100)
+
+    // Auto Clear Console: Constantly wipes console output
+    const clearTimer = window.setInterval(() => {
+      try {
+        console.clear()
+      } catch {}
+    }, 200)
+
+    try {
+      console.clear()
+    } catch {}
+
+    return () => {
+      window.clearInterval(debugTimer)
+      window.clearInterval(clearTimer)
+    }
+  }, [preview])
   const bar = useRef<HTMLDivElement>(null)
   const file = useRef<HTMLInputElement>(null)
   const hideT = useRef(0)
@@ -798,7 +842,45 @@ export default function CinePlayer({
   const noteTimer = useRef(0)
   const [held, setHeld] = useState(false)
   const hold = useRef({ timer: 0, on: false, prev: 1 })
-  const setPop = (p: PopName) => setPopRaw((c) => (c === p ? null : p))
+  const [popAnchor, setPopAnchor] = useState<{ left?: number; right?: number; top?: number; bottom?: number } | null>(null)
+  const closePop = () => {
+    setPopRaw(null)
+    setPopAnchor(null)
+  }
+  const setPop = (p: PopName, target?: HTMLElement | null) => {
+    setPopRaw((c) => {
+      if (c === p || !p) {
+        setPopAnchor(null)
+        return null
+      }
+      if (target && root.current) {
+        const rootRect = root.current.getBoundingClientRect()
+        const btnRect = target.getBoundingClientRect()
+        const isTop = (btnRect.top - rootRect.top) < (rootRect.height / 2)
+        const maxW = p === 'cc' ? 360 : 260
+        const isLeft = (btnRect.left + btnRect.width / 2 - rootRect.left) < (rootRect.width / 2)
+
+        const anchor: { left?: number; right?: number; top?: number; bottom?: number } = {}
+        if (isTop) {
+          anchor.top = Math.max(8, Math.round(btnRect.bottom - rootRect.top + 8))
+        } else {
+          anchor.bottom = Math.max(48, Math.round(rootRect.bottom - btnRect.top + 8))
+        }
+
+        if (isLeft) {
+          const maxLeft = Math.max(8, Math.round(rootRect.width - maxW - 8))
+          anchor.left = Math.max(8, Math.min(maxLeft, Math.round(btnRect.left - rootRect.left)))
+        } else {
+          const maxRight = Math.max(8, Math.round(rootRect.width - maxW - 8))
+          anchor.right = Math.max(8, Math.min(maxRight, Math.round(rootRect.right - btnRect.right)))
+        }
+        setPopAnchor(anchor)
+      } else {
+        setPopAnchor(null)
+      }
+      return p
+    })
+  }
   const [reportIssue, setReportIssue] = useState('Broken / Won\'t Play')
   const [reportDetails, setReportDetails] = useState('')
   const [reportSubmitting, setReportSubmitting] = useState(false)
@@ -1090,17 +1172,19 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   /* remember position every 5s */
   useEffect(() => {
     if (!playing) return
-    const id = window.setInterval(() => {
+    const tick = () => {
       const v = vid.current
       if (!v || !v.duration) return
-      if (v.currentTime > 10) onProgress?.(Math.floor(v.currentTime), Math.floor(v.duration))
+      onProgress?.(Math.floor(v.currentTime), Math.floor(v.duration))
       try {
-        if (v.currentTime > 10 && v.currentTime < v.duration - 45) localStorage.setItem(posKey(animeId, episode), String(Math.floor(v.currentTime)))
-        else localStorage.removeItem(posKey(animeId, episode))
+        if (v.currentTime > 3 && v.currentTime < v.duration - 45) localStorage.setItem(posKey(animeId, episode), String(Math.floor(v.currentTime)))
+        else if (v.currentTime >= v.duration - 45) localStorage.removeItem(posKey(animeId, episode))
       } catch {
         /* storage unavailable */
       }
-    }, 5000)
+    }
+    tick()
+    const id = window.setInterval(tick, 5000)
     return () => window.clearInterval(id)
   }, [playing, animeId, episode])
 
@@ -1110,9 +1194,19 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     if (!url) return false
     const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname))
     const streamProxy = !isDev ? (import.meta.env.VITE_STREAM_PROXY_URL as string | undefined)?.trim() : undefined
-    const proxyBase = streamProxy ? (streamProxy.includes('/proxy') ? streamProxy : `${streamProxy.replace(/\/+$/, '')}/api/public/proxy`) : apiUrl('/api/proxy')
-    const proxied = `${proxyBase}?url=${encodeURIComponent(url)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`
-    for (const u of [proxied, url]) {
+    const proxyBase = streamProxy ? (streamProxy.includes('/proxy') ? streamProxy : `${streamProxy.replace(/\/+$/, '')}/api/public/proxy`) : apiUrl('/proxy')
+    const candidates: string[] = []
+    if (url.startsWith('/proxy') || url.startsWith('/api/proxy') || url.includes('/proxy?')) {
+      candidates.push(apiUrl(url))
+      try {
+        const raw = new URL(url, 'http://localhost').searchParams.get('url')
+        if (raw) candidates.push(raw)
+      } catch {}
+    } else {
+      const proxied = `${proxyBase}?url=${encodeURIComponent(url)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`
+      candidates.push(proxied, url)
+    }
+    for (const u of candidates) {
       try {
         const res = await fetch(u)
         if (!res.ok) continue
@@ -1127,13 +1221,24 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     return false
   }
 
-  /** top-of-player notification; loading stays until replaced, results fade after a moment */
+  /** top-of-player notification */
   const flash = (k: 'load' | 'ok' | 'err', msg: string) => {
     window.clearTimeout(noteTimer.current)
     setNote({ k, msg })
-    if (k !== 'load') noteTimer.current = window.setTimeout(() => setNote(null), k === 'ok' ? 2600 : 4200)
+    // Only auto-dismiss completed/error notices; 'load' stays until ready, with a 5s safety timeout
+    const timeout = k === 'ok' ? 2600 : k === 'err' ? 4200 : 5000
+    noteTimer.current = window.setTimeout(() => {
+      setNote((n) => (n?.msg === msg ? null : n))
+    }, timeout)
   }
   useEffect(() => () => window.clearTimeout(noteTimer.current), [])
+
+  // Auto-dismiss stream switching / loading notification once both playback and subtitles are ready
+  useEffect(() => {
+    if (!switching && !loadingSubs && (playing || !busy)) {
+      setNote((n) => (n?.k === 'load' ? null : n))
+    }
+  }, [switching, loadingSubs, playing, busy])
 
   const pick = async (t: Track, quiet = false): Promise<boolean> => {
     const my = ++tok.current
@@ -1186,7 +1291,6 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       }
       if (dead) return
       setTracks(all)
-      setLoadingSubs(false)
 
       // ask every other direct server for its captions too; they trickle into the menu as each answers
       const seen = new Set(all.map((t) => t.url))
@@ -1208,11 +1312,15 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       }
 
       const def = all.find(isEn) || all[0]
-      if (!def) return setTrackId(null)
+      if (!def) {
+        if (!dead) setLoadingSubs(false)
+        return setTrackId(null)
+      }
       // a broken default must not hide the rest: walk the list until one actually loads
       for (const t of [def, ...all.filter((x) => x !== def)]) {
         if (dead || (await pick(t, true))) break
       }
+      if (!dead) setLoadingSubs(false)
     })()
     return () => {
       dead = true
@@ -1549,7 +1657,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       else if (k === 'm') h = a.toggleMute
       else if (k === 'c') h = () => setCaps((c) => !c)
       else if (k === 'tab' && a.skipOn) h = a.doSkip
-      else if (k === 'escape' && (st.current.sheet || st.current.pop)) h = () => (setSheet(null), setPopRaw(null))
+      else if (k === 'escape' && (st.current.sheet || st.current.pop)) h = () => (setSheet(null), closePop())
       else if (k === 'escape' && tv && inCtl) {
         // TV: Back from the controls returns to plain seeking
         h = () => {
@@ -1570,7 +1678,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   /* ── tap / double-tap ── */
   const onTap = (e: RPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
-    if (st.current.pop) return setPopRaw(null)
+    if (st.current.pop) return closePop()
     const t = tap.current
     const now = Date.now()
     const r = e.currentTarget.getBoundingClientRect()
@@ -1697,11 +1805,23 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         preload="auto"
         onTimeUpdate={onTime}
         onDurationChange={() => setDur(vid.current?.duration || 0)}
-        onPlay={() => setPlaying(true)}
+        onPlay={() => {
+          setPlaying(true)
+          if (!loadingSubs) setNote((n) => (n?.k === 'load' ? null : n))
+          onPlay?.()
+        }}
         onPause={() => setPlaying(false)}
         onWaiting={() => setBusy(true)}
-        onCanPlay={() => setBusy(false)}
-        onPlaying={() => setBusy(false)}
+        onCanPlay={() => {
+          setBusy(false)
+          if (!loadingSubs) setNote((n) => (n?.k === 'load' ? null : n))
+        }}
+        onPlaying={() => {
+          setBusy(false)
+          if (!loadingSubs) setNote((n) => (n?.k === 'load' ? null : n))
+          const v = vid.current
+          if (v && v.duration) onProgress?.(Math.floor(v.currentTime), Math.floor(v.duration))
+        }}
         onVolumeChange={() => {
           const v = vid.current
           if (!v) return
@@ -1800,19 +1920,25 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
             </div>
             <div className="zp-ac">
               {audioTracks.length > 1 && (
-                <button className="zp-b pill" data-tour="p-audio" onClick={() => setPop('aud')} title="Audio track" aria-label="Audio track">
+                <button className="zp-b pill" data-tour="p-audio" onClick={(e) => setPop('aud', e.currentTarget)} title="Audio track" aria-label="Audio track">
                   <Languages />
                   <em>{audioTracks.find((t) => t.i === audioIdx)?.label ?? 'Audio'}</em>
                 </button>
               )}
               {onAudio && audioTracks.length < 2 && (
-                <button className="zp-b pill" data-tour="p-audio" onClick={() => onAudio(audioMode === 'sub' ? 'dub' : 'sub')} title="Switch audio" aria-label="Switch audio">
+                <button
+                  className="zp-b pill"
+                  data-tour="p-audio"
+                  onClick={() => onAudio(audioMode === 'sub' ? 'dub' : 'sub')}
+                  title="Switch audio"
+                  aria-label="Switch audio"
+                >
                   <Music />
                   <em>{audioMode.toUpperCase()}</em>
                 </button>
               )}
               {servers && servers.length > 0 && (
-                <button className="zp-b" data-tour="p-srv" onClick={() => setPop('srv')} aria-label="Servers" title="Servers">
+                <button className="zp-b" data-tour="p-srv" onClick={(e) => setPop('srv', e.currentTarget)} aria-label="Servers" title="Servers">
                   <Server />
                 </button>
               )}
@@ -1920,18 +2046,18 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                 />
               </div>
               <span className="zp-flex" />
-              <button className={cx('zp-b pill', pop === 'spd' && 'on')} onClick={() => setPop('spd')} aria-label="Playback speed" title="Playback speed">
+              <button className={cx('zp-b pill', pop === 'spd' && 'on')} onClick={(e) => setPop('spd', e.currentTarget)} aria-label="Playback speed" title="Playback speed">
                 {speed}×
               </button>
               {levels.length > 0 && (
-                <button className={cx('zp-b pill', pop === 'q' && 'on')} onClick={() => setPop('q')} aria-label="Quality" title="Quality">
+                <button className={cx('zp-b pill', pop === 'q' && 'on')} onClick={(e) => setPop('q', e.currentTarget)} aria-label="Quality" title="Quality">
                   {lvl === -1 ? 'Auto' : levels.find((l) => l.i === lvl)?.label}
                 </button>
               )}
-              <button className={cx('zp-b', (pop === 'cc' || (caps && tracks.length > 0)) && 'on')} data-tour="p-cc" onClick={() => setPop('cc')} aria-label="Subtitles" title="Subtitles [C]">
+              <button className={cx('zp-b', (pop === 'cc' || (caps && tracks.length > 0)) && 'on')} data-tour="p-cc" onClick={(e) => setPop('cc', e.currentTarget)} aria-label="Subtitles" title="Subtitles [C]">
                 <span className="zp-t">CC</span>
               </button>
-              <button className="zp-b" data-tour="p-set" onClick={() => (setPopRaw(null), setSheet('set'))} aria-label="Settings" title="Settings">
+              <button className="zp-b" data-tour="p-set" onClick={() => (closePop(), setSheet('set'))} aria-label="Settings" title="Settings">
                 <Settings />
               </button>
               {pip && (
@@ -1948,12 +2074,26 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
 
 
         {pop && (
-          <div className={cx('zp-pop', pop === 'cc' && 'zp-pop-cc')} role="menu" aria-label={pop}>
+          <div
+            className={cx('zp-pop', pop === 'cc' && 'zp-pop-cc')}
+            role="menu"
+            aria-label={pop}
+            style={
+              popAnchor
+                ? {
+                    top: popAnchor.top !== undefined ? `${popAnchor.top}px` : 'auto',
+                    bottom: popAnchor.bottom !== undefined ? `${popAnchor.bottom}px` : 'auto',
+                    left: popAnchor.left !== undefined ? `${popAnchor.left}px` : 'auto',
+                    right: popAnchor.right !== undefined ? `${popAnchor.right}px` : 'auto',
+                  }
+                : undefined
+            }
+          >
             {pop === 'spd' && (
               <>
                 <p className="zp-ph">Speed</p>
                 {SPEEDS.map((x) => (
-                  <button key={x} className={cx('zp-row', speed === x && 'on')} onClick={() => (setRate(x), setPopRaw(null))}>
+                  <button key={x} className={cx('zp-row', speed === x && 'on')} onClick={() => (setRate(x), closePop())}>
                     <span>{x === 1 ? 'Normal' : `${x}×`}</span>
                     {speed === x && <Check className="size-3.5 shrink-0" />}
                   </button>
@@ -1963,12 +2103,12 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
             {pop === 'q' && (
               <>
                 <p className="zp-ph">Quality</p>
-                <button className={cx('zp-row', lvl === -1 && 'on')} onClick={() => (setQuality(-1), setPopRaw(null))}>
+                <button className={cx('zp-row', lvl === -1 && 'on')} onClick={() => (setQuality(-1), closePop())}>
                   <span>Auto</span>
                   {lvl === -1 && <Check className="size-3.5 shrink-0" />}
                 </button>
                 {levels.map((l) => (
-                  <button key={l.i} className={cx('zp-row', lvl === l.i && 'on')} onClick={() => (setQuality(l.i), setPopRaw(null))}>
+                  <button key={l.i} className={cx('zp-row', lvl === l.i && 'on')} onClick={() => (setQuality(l.i), closePop())}>
                     <span>{l.label}</span>
                     {lvl === l.i && <Check className="size-3.5 shrink-0" />}
                   </button>
@@ -1979,7 +2119,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               <>
                 <p className="zp-ph">Audio</p>
                 {audioTracks.map((t) => (
-                  <button key={t.i} className={cx('zp-row', t.i === audioIdx && 'on')} onClick={() => (setAudioTrack(t), setPopRaw(null))}>
+                  <button key={t.i} className={cx('zp-row', t.i === audioIdx && 'on')} onClick={() => (setAudioTrack(t), closePop())}>
                     <span>{t.label}</span>
                     {t.i === audioIdx && <Check className="size-3.5 shrink-0" />}
                   </button>
@@ -1991,16 +2131,38 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                 <p className="zp-ph">Servers</p>
                 {onAudio && (
                   <div className="zp-two zp-pad">
-                    {(['sub', 'dub'] as const).map((m) => (
-                      <button key={m} className={cx('zp-pi', audioMode === m && 'on')} onClick={() => (flash('load', `Switching to ${m.toUpperCase()}…`), onAudio(m))}>
-                        {m.toUpperCase()}
-                      </button>
-                    ))}
+                    {(['sub', 'dub'] as const).map((m) => {
+                      const avail = m === 'sub' ? hasSub : hasDub
+                      return (
+                        <button
+                          key={m}
+                          className={cx('zp-pi', audioMode === m && 'on', !avail && 'opacity-60')}
+                          onClick={() => {
+                            if (audioMode !== m) {
+                              flash('load', `Switching to ${m.toUpperCase()}…`)
+                              onAudio(m)
+                            }
+                          }}
+                        >
+                          <span>{m.toUpperCase()}</span>
+                          {!avail && <span className="ml-1 text-[9px] opacity-70">(N/A)</span>}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
                 {servers.map((x) => (
-                  <button key={x.id} className={cx('zp-row', x.id === serverId && 'on')} onClick={() => (x.id !== serverId && flash('load', `Switching to ${x.name}…`), onServer?.(x.id), setPopRaw(null))}>
-                    <span>{x.name}</span>
+                  <button key={x.id} className={cx('zp-row', x.id === serverId && 'on')} onClick={() => (x.id !== serverId && flash('load', `Switching to ${x.name}…`), onServer?.(x.id), closePop())}>
+                    <span className="flex items-center gap-2">
+                      <span>{x.name}</span>
+                      {x.tags && x.tags.length > 0 && (
+                        <span className="flex items-center gap-1 text-[10px] text-white/50">
+                          {x.tags.map((t) => (
+                            <span key={t} className="rounded bg-white/10 px-1 py-0.5">{t}</span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
                     {x.id === serverId && <Check className="size-3.5 shrink-0" />}
                   </button>
                 ))}
@@ -2016,7 +2178,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   <button
                     type="button"
                     onClick={() => {
-                      setPopRaw(null)
+                      closePop()
                       setSheet('subs')
                     }}
                     title="Customize subtitle styling & sync"
@@ -2055,7 +2217,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   type="button"
                   onClick={() => {
                     setCaps(false)
-                    setPopRaw(null)
+                    closePop()
                   }}
                   className={cx(
                     'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs font-medium transition',
@@ -2097,7 +2259,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                           type="button"
                           onClick={() => {
                             void pick(t)
-                            setPopRaw(null)
+                            closePop()
                           }}
                           className={cx(
                             'group flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left transition',
@@ -2154,7 +2316,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                                   type="button"
                                   onClick={() => {
                                     void pick(t)
-                                    setPopRaw(null)
+                                    closePop()
                                   }}
                                   className={cx(
                                     'group flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left transition',
@@ -2203,7 +2365,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                 Try again
               </button>
               {servers && servers.length > 0 && (
-                <button className="zp-b pill" onClick={() => setPopRaw('srv')}>
+                <button className="zp-b pill" onClick={(e) => setPop('srv', e.currentTarget)}>
                   Switch server
                 </button>
               )}

@@ -19,7 +19,9 @@ async function getJson<T>(path: string, timeout = 20000): Promise<T> {
   const ctl = new AbortController()
   const t = window.setTimeout(() => ctl.abort(), timeout)
   try {
-    const res = await fetch(apiUrl(path), { signal: ctl.signal })
+    const isEmbed = typeof window !== 'undefined' && (window.self !== window.top || window.location.pathname.startsWith('/embed'))
+    const headers: Record<string, string> = isEmbed ? { 'X-Zenkai-Embed': '1' } : {}
+    const res = await fetch(apiUrl(path), { signal: ctl.signal, headers })
     const data = await res.json().catch(() => null)
     if (!res.ok) throw new Error(failMsg(res, data as { error?: string } | null))
     return data as T
@@ -179,7 +181,14 @@ export async function fetchStream(p: { id: number; ep: number; server: string; a
   const q = new URLSearchParams({ id: String(p.id), ep: String(p.ep), server: p.server, audio: p.audio, title: p.title })
   if (p.format) q.set('format', p.format)
   const r = await getJson<StreamResult & { success: boolean }>(`/api/stream?${q}`, 40000)
-  return { ...r, streamUrl: apiUrl(r.streamUrl) }
+  return {
+    ...r,
+    streamUrl: apiUrl(r.streamUrl),
+    subtitles: (r.subtitles || []).map((s) => ({
+      ...s,
+      file: apiUrl(s.file),
+    })),
+  }
 }
 
 export async function fetchAnimeSalt(p: { id: number; ep: number; title: string; format?: string | null; server: '1' | '2' }): Promise<string> {
@@ -198,5 +207,25 @@ export async function acdnMapped(id: number): Promise<boolean> {
   } catch {
     acdnMap = undefined
     return true
+  }
+}
+
+
+export interface ServerAudioInfo {
+  sub: boolean
+  dub: boolean
+  multi?: boolean
+}
+
+export type ServerAudioMap = Record<string, ServerAudioInfo>
+
+export async function fetchEpisodeServers(id: number, ep: number, title?: string): Promise<ServerAudioMap> {
+  const q = new URLSearchParams({ id: String(id), ep: String(ep) })
+  if (title) q.set('title', title)
+  try {
+    const res = await getJson<{ success: boolean; servers: ServerAudioMap }>(`/api/servers-available?${q}`, 15000)
+    return res.servers || {}
+  } catch {
+    return {}
   }
 }

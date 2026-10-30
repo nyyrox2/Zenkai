@@ -134,7 +134,7 @@ export function mangaKind(type: string | null | undefined, source?: MangaSourceI
   if (c === 'CN' || c === 'TW' || c === 'HK') return 'Manhua'
   if (c === 'JP') return 'Manga'
   if (source === 'manhua') return 'Manhua'
-  if (source === 'asura') return 'Manhwa'
+  if (source === 'asura' || source === 'demonicscans') return 'Manhwa'
   if (source === 'weebcentral') return 'Manga'
   return null
 }

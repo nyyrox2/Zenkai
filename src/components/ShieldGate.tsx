@@ -88,10 +88,17 @@ export function ShieldGate() {
   const { devtools, bot, captcha } = useShield()
   const navigate = useNavigate()
   const { pathname, search } = useLocation()
-  // DevTools open: send them to the roast page (it sends them back once they close); it remembers where they were.
+  const inIframe = typeof window !== 'undefined' && window.self !== window.top
+  const isEmbed = inIframe || pathname === '/embed' || pathname.startsWith('/embed/')
+
+  // DevTools open: send them to the roast page on all other pages (except /embed)
   useEffect(() => {
-    if (devtools && !bot && pathname !== '/busted') navigate('/busted', { state: { from: pathname + search } })
-  }, [devtools, bot, pathname, search, navigate])
+    if (!isEmbed && devtools && !bot && pathname !== '/busted') {
+      navigate('/busted', { state: { from: pathname + search } })
+    }
+  }, [isEmbed, devtools, bot, pathname, search, navigate])
+
+  if (isEmbed) return null
 
   return (
     <AnimatePresence>

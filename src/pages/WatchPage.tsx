@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
-import { ChevronLeft, ChevronRight, ExternalLink, Flag, Info, Lock, ShieldCheck, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ExternalLink, Flag, Info, Loader2, Lock, ShieldCheck, X } from 'lucide-react'
 import { submitStreamReport } from '../lib/supabase'
 import { fetchAnimeLite } from '../services/anilist'
-import { acdnMapped, fetchAnimeSalt, fetchStream, tmdbImg } from '../services/api'
+import { acdnMapped, fetchAnimeSalt, fetchStream, fetchEpisodeServers, type ServerAudioMap, tmdbImg } from '../services/api'
 import { useAsync } from '../hooks/useAsync'
 import { useTmdb } from '../hooks/useTmdb'
 import { useEpisodes } from '../hooks/useEpisodes'
@@ -108,6 +108,11 @@ export default function WatchPage() {
   // URL wins, then what this title last used, then the last server/audio used anywhere
   const saved = useMemo(() => ({ ...getPrefs(), ...getHistory(id) }), [id])
   const acdn = useAsync(() => acdnMapped(id), [id]).data
+  const serverAudioQuery = useAsync(
+    () => (a ? fetchEpisodeServers(id, ep, title) : Promise.resolve({} as ServerAudioMap)),
+    [id, ep, title, sessionVerified]
+  )
+  const serverAudio = serverAudioQuery.data
   const wanted = serverById(sp.get('server') ?? saved.server ?? 'megaplay')
   const server = wanted.id === 'acdn' && acdn === false ? serverById('megaplay') : wanted
   const directList = DIRECT.filter((s) => s.id !== 'acdn' || acdn === true)
@@ -168,21 +173,38 @@ export default function WatchPage() {
     if (a) saveEpisode(id, ep)
   }, [a, id, ep])
 
-  // Remember episode / server / audio once playback has really started (not for a server that fails to load)
   const ready = !!(a && (server.kind === 'direct' ? stream.data : server.kind === 'animesalt' ? salt.data : embedSrc))
+  // Save episode, prefs and touch continue watching immediately so this show is instantly first
   useEffect(() => {
-    if (!a || !ready) return
-    const t = window.setTimeout(() => {
-      touchHistory(mediaToCard(a), { ep, server: server.id, audio })
-      savePrefs({ server: server.id, ...(server.audio ? { audio } : {}) })
-    }, 2000)
-    return () => window.clearTimeout(t)
-  }, [a, ready, ep, server.id, server.audio, audio])
+    if (!a) return
+    touchHistory(mediaToCard(a), { ep, server: server.id, audio })
+    savePrefs({ server: server.id, ...(server.audio ? { audio } : {}) })
+  }, [a, ep, server.id, server.audio, audio])
   useEffect(() => {
     if (title) document.title = `${title} · Episode ${ep} — Zenkai`
   }, [title, ep])
 
-  const playerServers = useMemo(() => DIRECT.filter((s) => s.id !== 'acdn' || acdn === true).map((s) => ({ id: s.id, name: s.name, note: s.note })), [acdn]) // direct servers only; embeds live under the player
+  const playerServers = useMemo(
+    () =>
+      directList.map((s) => {
+        const info = serverAudio?.[s.id]
+        let tags: string[] = []
+        if (serverAudioQuery.loading) {
+          tags = ['CHECKING…']
+        } else if (info) {
+          if (info.sub) tags.push('SUB')
+          if (info.dub) tags.push('DUB')
+          if (tags.length === 0) tags.push('N/A')
+        }
+        return {
+          id: s.id,
+          name: s.name,
+          note: tags.length ? tags.join(' · ') : s.note,
+          tags,
+        }
+      }),
+    [directList, serverAudio, serverAudioQuery.loading]
+  )
   const tracks = (server.multi || aud.tracks.length > 1) ? aud.tracks : []
   // first visit: pause and walk through the page once the player area has rendered
   useEffect(() => {
@@ -212,7 +234,33 @@ export default function WatchPage() {
     )
   }
 
-  const direct: ServerOpt[] = directList.map((s) => ({ id: s.id, name: s.name, label: s.multi ? 'Zenkai player · Multi audio' : 'Zenkai player', tags: ['SUB', 'DUB'] }))
+  const direct: ServerOpt[] = directList.map((s) => {
+    const info = serverAudio?.[s.id]
+    let tags = serverAudioQuery.loading ? ['CHECKING…'] : ['SUB', 'DUB']
+    if (info) {
+      tags = []
+      if (info.sub) tags.push('SUB')
+      if (info.dub) tags.push('DUB')
+      if (tags.length === 0) tags = ['N/A']
+    }
+    return {
+      id: s.id,
+      name: s.name,
+      label: s.multi ? 'Zenkai player · Multi audio' : 'Zenkai player',
+      tags,
+    }
+  })
+
+  const currentServerInfo = serverAudio?.[server.id]
+  const hasDub = currentServerInfo ? currentServerInfo.dub : false
+  const hasSub = currentServerInfo ? currentServerInfo.sub : true
+
+  // If currently selected server does not have DUB for this episode, auto fallback to SUB
+  useEffect(() => {
+    if (currentServerInfo && !currentServerInfo.dub && audio === 'dub' && currentServerInfo.sub) {
+      go({ audio: 'sub' })
+    }
+  }, [currentServerInfo, audio])
 
   return (
     <main className="relative pb-10">
@@ -252,6 +300,7 @@ export default function WatchPage() {
               <Frame>
                 <CinePlayer
                   key={server.id}
+                  hasDub={hasDub}
                   switching={stream.loading}
                   streamUrl={cur.d.streamUrl}
                   intro={cur.d.intro}
@@ -280,6 +329,7 @@ export default function WatchPage() {
                   skipFiller={skipFiller}
                   onSkipFiller={setSkipFiller}
                   onSelectEpisode={(n) => go({ ep: n }, false)}
+                  onPlay={() => touchHistory(mediaToCard(a), { ep: cur.ep, server: server.id, audio })}
                   onProgress={(pos, dur) => touchHistory(mediaToCard(a), { ep: cur.ep, server: server.id, audio, pos, dur })}
                   onEnded={() => {
                     finishEpisode(mediaToCard(a), ep, hasNext)
@@ -385,7 +435,9 @@ export default function WatchPage() {
                         {t.label}
                       </button>
                     ))
-                  : (['sub', 'dub'] as const).map((m) => (
+                  : (['sub', 'dub'] as const)
+                      .filter((m) => (m === 'dub' ? hasDub : hasSub))
+                      .map((m) => (
                       <button
                         key={m}
                         disabled={!server.audio}
@@ -396,7 +448,12 @@ export default function WatchPage() {
                       </button>
                     ))}
               </div>
-              {!server.audio && !tracks.length && <span className="text-xs text-muted">{server.kind === 'animesalt' ? 'Multi audio' : server.multi ? (stream.loading ? 'Multi audio · loading tracks…' : 'Multi audio') : 'Set in player'}</span>}
+              {serverAudioQuery.loading && (
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+                  <Loader2 className="size-3 animate-spin text-accent" /> Searching servers…
+                </span>
+              )}
+              {!server.audio && !tracks.length && !serverAudioQuery.loading && <span className="text-xs text-muted">{server.kind === 'animesalt' ? 'Multi audio' : server.multi ? (stream.loading ? 'Multi audio · loading tracks…' : 'Multi audio') : 'Set in player'}</span>}
             </div>
             <div data-tour="w-servers">
               <ServerPopup servers={direct} value={server.id} onPick={(sid) => (go({ server: sid }), toast(`Switched to ${direct.find((d) => d.id === sid)?.name ?? 'new server'}`))} />

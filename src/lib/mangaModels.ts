@@ -5,7 +5,7 @@
  */
 
 /* ---------------- MangaSource ---------------- */
-export type MangaSourceId = 'comick' | 'manhua' | 'asura' | 'weebcentral' | 'mangadex'
+export type MangaSourceId = 'weebcentral' | 'demonicscans' | 'comick' | 'manhua' | 'asura' | 'mangadex'
 
 export interface MangaSourceInfo {
   id: MangaSourceId
@@ -16,21 +16,24 @@ export interface MangaSourceInfo {
 
 /** Same order as the Kotlin enum, which is the order of the server tabs in the app. */
 export const MANGA_SOURCES: readonly MangaSourceInfo[] = [
+  { id: 'weebcentral', displayName: 'WeebCentral', baseUrl: 'https://weebcentral.com', badge: 'Classic' },
+  { id: 'demonicscans', displayName: 'Demonic Scans', baseUrl: 'https://demonicscans.org', badge: 'Action / Manhwa' },
   { id: 'comick', displayName: 'ComicK', baseUrl: 'https://comick.art', badge: 'Manhwa & Manga' },
   { id: 'manhua', displayName: 'Manhua', baseUrl: 'https://comick.art', badge: 'Cultivation & Action' },
   { id: 'asura', displayName: 'Asura Scans', baseUrl: 'https://asuracomic.net', badge: 'Action / Regression' },
-  { id: 'weebcentral', displayName: 'WeebCentral', baseUrl: 'https://weebcentral.com', badge: 'Classic' },
   { id: 'mangadex', displayName: 'MangaDex', baseUrl: 'https://mangadex.org', badge: 'Multilingual' },
 ]
 
 /**
- * `MangaSource.fromId`: blank is ComicK, "mh" is the Manhua alias, matching is case-insensitive and anything
- * unknown falls back to ComicK.
+ * `MangaSource.fromId`: blank is WeebCentral, "mh" is Manhua, "ds" is Demonic Scans, matching is case-insensitive.
  */
 export function mangaSourceFromId(id?: string | null): MangaSourceInfo {
   if (!id || !id.trim()) return MANGA_SOURCES[0]
-  if (id.toLowerCase() === 'mh') return MANGA_SOURCES[1]
-  return MANGA_SOURCES.find((s) => s.id === id.toLowerCase()) ?? MANGA_SOURCES[0]
+  const s = id.toLowerCase().trim()
+  if (s === 'wc' || s === 'weeb' || s === 'webtoon') return MANGA_SOURCES[0]
+  if (s === 'ds' || s === 'demonic' || s === 'demonicscans') return MANGA_SOURCES[1]
+  if (s === 'mh') return MANGA_SOURCES.find((x) => x.id === 'manhua') ?? MANGA_SOURCES[0]
+  return MANGA_SOURCES.find((x) => x.id === s) ?? MANGA_SOURCES[0]
 }
 
 /**
@@ -44,11 +47,14 @@ export const isMangaSource = (s?: string | null): s is MangaSourceId => !!s && M
 /** Like `mangaSourceFromId`, but an absent or unknown value means the site default rather than ComicK. */
 export function resolveMangaSource(s?: string | null): MangaSourceId {
   if (!s) return DEFAULT_MANGA_SOURCE
-  const id = s.toLowerCase() === 'mh' ? 'manhua' : s.toLowerCase()
+  const id = s.toLowerCase().trim()
+  if (id === 'mh') return 'manhua'
+  if (id === 'ds' || id === 'demonic' || id === 'demonicscans') return 'demonicscans'
+  if (id === 'wc' || id === 'weeb' || id === 'webtoon') return 'weebcentral'
   return isMangaSource(id) ? id : DEFAULT_MANGA_SOURCE
 }
 
-export const mangaSourceInfo = (id: MangaSourceId): MangaSourceInfo => MANGA_SOURCES.find((s) => s.id === id) ?? MANGA_SOURCES[3]
+export const mangaSourceInfo = (id: MangaSourceId): MangaSourceInfo => MANGA_SOURCES.find((s) => s.id === id) ?? MANGA_SOURCES[0]
 
 /** Query params that carry the server in a link. The default server is left out so old URLs stay valid. */
 export const sourceParams = (source: MangaSourceId): Record<string, string> => (source === DEFAULT_MANGA_SOURCE ? {} : { source })
