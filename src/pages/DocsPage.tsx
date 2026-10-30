@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Tv,
@@ -15,11 +15,25 @@ import {
   Palette,
   Cpu,
   BookOpen,
+  HelpCircle,
 } from 'lucide-react'
 import { AuroraBackground } from '../components/AuroraBackground'
 import { Logo } from '../components/Logo'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { cn } from '../lib/utils'
+import { Tour, tourDone, tourSeen, type TourStep } from '../components/Tour'
+
+const API_TOUR: TourStep[] = [
+  { target: '[data-tour="d-gen"]', title: 'Live Embed Generator', text: 'Build your player here. The link and snippet below update as you change anything.' },
+  { target: '[data-tour="d-id"]', title: 'AniList ID', text: 'Paste the AniList ID of the anime. It is the number in the anilist.co page address.' },
+  { target: '[data-tour="d-ep"]', title: 'Episode', text: 'Choose which episode the player opens on.' },
+  { target: '[data-tour="d-server"]', title: 'Server', text: 'Pick a stream server. If it is down, the player switches to another one by itself.' },
+  { target: '[data-tour="d-audio"]', title: 'Sub or Dub', text: 'Choose the audio language. Dub is skipped when the show has none.' },
+  { target: '[data-tour="d-url"]', title: 'Direct link', text: 'Copy this link to open the player on its own or share it.' },
+  { target: '[data-tour="d-iframe"]', title: 'Iframe snippet', text: 'Paste this into your site. Do not add a sandbox attribute: the player will not run inside one.' },
+  { target: '[data-tour="d-preview"]', title: 'Preview', text: 'Test the player right here before you copy anything.' },
+  { target: '[data-tour="d-params"]', title: 'All options', text: 'Every query parameter the embed accepts, with its default value.' },
+]
 
 export default function DocsPage() {
   // Live Embed Configurator state
@@ -30,6 +44,14 @@ export default function DocsPage() {
   const [embedPreview, setEmbedPreview] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [copiedIframe, setCopiedIframe] = useState(false)
+  const [tourOn, setTourOn] = useState(false)
+
+  // First visit: start the guided tour once the page has settled. "How to use" restarts it.
+  useEffect(() => {
+    if (tourSeen('api')) return
+    const t = window.setTimeout(() => setTourOn(true), 800)
+    return () => window.clearTimeout(t)
+  }, [])
 
   const DOCS_ORIGIN = 'https://zenkaii.pages.dev'
   const embedUrl = `${DOCS_ORIGIN}/embed?id=${embedId}&ep=${embedEp}&server=${embedServer}&audio=${embedAudio}`
@@ -55,14 +77,23 @@ export default function DocsPage() {
       {/* Sleek minimal header for Docs without site navbar */}
       <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-4 pt-6 sm:px-6 lg:px-8">
         <Logo size={36} to="/" />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link
             to="/"
+            aria-label="Back to Zenkai"
             className="inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/5 px-3.5 py-1.5 text-xs font-semibold text-foreground/80 transition hover:bg-foreground/10 hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />
-            <span>Back to Zenkai</span>
+            <span className="hidden whitespace-nowrap sm:inline">Back to Zenkai</span>
           </Link>
+          <button
+            type="button"
+            onClick={() => setTourOn(true)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/5 px-3.5 py-1.5 text-xs font-semibold text-foreground/80 transition hover:bg-foreground/10 hover:text-foreground"
+          >
+            <HelpCircle className="size-3.5" />
+            <span className="whitespace-nowrap">How to use</span>
+          </button>
           <ThemeToggle />
         </div>
       </header>
@@ -85,7 +116,7 @@ export default function DocsPage() {
 
         {/* 1. Embed Configurator Card */}
         <div className="rounded-2xl border border-border bg-card/90 p-5 sm:p-7 shadow-2xl backdrop-blur-xl">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5">
+          <div data-tour="d-gen" className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5">
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 <Tv className="size-5 text-rose-500" />
@@ -99,6 +130,7 @@ export default function DocsPage() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                data-tour="d-preview"
                 onClick={() => setEmbedPreview(!embedPreview)}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition',
@@ -125,7 +157,7 @@ export default function DocsPage() {
 
           {/* Form Controls */}
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
+            <div data-tour="d-id">
               <label className="block text-xs font-semibold text-muted mb-1.5">
                 AniList Media ID
               </label>
@@ -139,7 +171,7 @@ export default function DocsPage() {
               <span className="mt-1 block text-[11px] text-muted">Canonical AniList anime ID (e.g. 195604)</span>
             </div>
 
-            <div>
+            <div data-tour="d-ep">
               <label className="block text-xs font-semibold text-muted mb-1.5">
                 Episode Number
               </label>
@@ -153,7 +185,7 @@ export default function DocsPage() {
               <span className="mt-1 block text-[11px] text-muted">Episode number to stream</span>
             </div>
 
-            <div>
+            <div data-tour="d-server">
               <label className="block text-xs font-semibold text-muted mb-1.5">
                 Stream Server
               </label>
@@ -170,7 +202,7 @@ export default function DocsPage() {
               <span className="mt-1 block text-[11px] text-muted">Automatic fallback if unavailable</span>
             </div>
 
-            <div>
+            <div data-tour="d-audio">
               <label className="block text-xs font-semibold text-muted mb-1.5">
                 Audio Language
               </label>
@@ -206,7 +238,7 @@ export default function DocsPage() {
 
           {/* Generated Code Snippets */}
           <div className="mt-6 space-y-4">
-            <div>
+            <div data-tour="d-url">
               <div className="flex items-center justify-between text-xs text-muted mb-1.5">
                 <span className="font-semibold">Direct Embed URL</span>
                 <button
@@ -222,7 +254,7 @@ export default function DocsPage() {
               </div>
             </div>
 
-            <div>
+            <div data-tour="d-iframe">
               <div className="flex items-center justify-between text-xs text-muted mb-1.5">
                 <span className="font-semibold">HTML Iframe Embed Snippet</span>
                 <button
@@ -260,7 +292,7 @@ export default function DocsPage() {
         </div>
 
         {/* 2. Embed URL Query Parameters */}
-        <div className="rounded-2xl border border-border bg-card/90 p-5 sm:p-7 shadow-xl">
+        <div data-tour="d-params" className="rounded-2xl border border-border bg-card/90 p-5 sm:p-7 shadow-xl">
           <h3 className="text-lg font-bold text-foreground flex items-center gap-2 mb-4">
             <Info className="size-5 text-rose-500" />
             <span>Embed URL Query Parameters</span>
@@ -390,6 +422,15 @@ export default function DocsPage() {
           </div>
         </div>
       </div>
+      {tourOn && (
+        <Tour
+          steps={API_TOUR}
+          onDone={() => {
+            tourDone('api')
+            setTourOn(false)
+          }}
+        />
+      )}
     </main>
   )
 }

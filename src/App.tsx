@@ -10,6 +10,7 @@ import { ScrollToTop } from './components/ScrollToTop'
 import { TopLoader } from './components/TopLoader'
 import { PageLoader } from './components/PageLoader'
 import { ShieldGate } from './components/ShieldGate'
+import { ApiIntro } from './components/ApiIntro'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { Toaster } from './components/Toaster'
 import { MovieSearchModal } from './components/MovieSearchModal'
@@ -130,6 +131,7 @@ export default function App() {
       <ShortcutsHelp />
       <ShieldGate />
       <ChangelogModal />
+      {!isApi && !isEmbed && !reader && !isWatchPath(pathname) && pathname !== '/busted' && <ApiIntro />}
     </>
   )
 }
