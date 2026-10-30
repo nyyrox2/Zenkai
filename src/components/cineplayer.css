@@ -7,7 +7,7 @@
 .zp-v{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
 .zp-g{position:absolute;inset:0;z-index:5;touch-action:manipulation}
 .zp:not(.show) .zp-g{cursor:none}
-.zp-in{position:absolute;inset:0;pointer-events:none;--u:14px;--bar:calc(max(28px,var(--u)*2.4) + max(36px,var(--u)*3.2) + var(--u)*1.4)}
+.zp-in{position:absolute;inset:0;pointer-events:none;--u:clamp(7px,min(2.5cqw,4.4cqh),14px);--tap:clamp(24px,min(7cqw,13cqh),36px);--fm:clamp(9px,min(2.6cqw,4.8cqh),11px);--bar:calc(max(28px,var(--u)*2.4) + max(var(--tap,36px),var(--u)*3.2) + var(--u)*1.4)}
 
 /* layers */
 .zp-ui{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:space-between;padding:var(--st) var(--sr) 0 var(--sl)}
@@ -22,19 +22,19 @@
 .show .zp-top{transform:none}
 .zp-ti{flex:1;min-width:0}
 .zp-ti h3{margin:0;font-size:max(14px,calc(var(--u)*1.25));font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 8px rgba(0,0,0,.7)}
-.zp-ti p{margin:.2em 0 0;font-size:max(11px,calc(var(--u)*.9));font-weight:600;opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zp-ti p{margin:.2em 0 0;font-size:max(var(--fm,11px),calc(var(--u)*.9));font-weight:600;opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .zp-ac{display:flex;gap:calc(var(--u)*.7);flex:none}
 
 /* buttons */
-.zp-b{all:unset;box-sizing:border-box;position:relative;display:grid;place-items:center;flex:none;width:max(36px,var(--s,calc(var(--u)*3.2)));height:max(36px,var(--s,calc(var(--u)*3.2)));border-radius:50%;cursor:pointer;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 calc(var(--u)*.3) calc(var(--u)*1) rgba(0,0,0,.4);backdrop-filter:blur(14px) saturate(1.5);-webkit-backdrop-filter:blur(14px) saturate(1.5);transition:transform .2s cubic-bezier(.34,1.56,.64,1),background .2s,border-color .2s,opacity .2s}
+.zp-b{all:unset;box-sizing:border-box;position:relative;display:grid;place-items:center;flex:none;width:max(var(--tap,36px),var(--s,calc(var(--u)*3.2)));height:max(var(--tap,36px),var(--s,calc(var(--u)*3.2)));border-radius:50%;cursor:pointer;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 calc(var(--u)*.3) calc(var(--u)*1) rgba(0,0,0,.4);backdrop-filter:blur(14px) saturate(1.5);-webkit-backdrop-filter:blur(14px) saturate(1.5);transition:transform .2s cubic-bezier(.34,1.56,.64,1),background .2s,border-color .2s,opacity .2s}
 .zp-b:hover{background:rgba(255,255,255,.22)}
 .zp-b:active{transform:scale(.88)}
 .zp-b:disabled{opacity:.3;pointer-events:none}
 .zp-b:focus-visible,.zp-row:focus-visible,.zp-pi:focus-visible,.zp-sk:focus-visible{outline:2px solid var(--a2);outline-offset:2px}
 .zp-b svg{width:52%;height:52%;grid-area:1/1}
 .zp-b.on{background:color-mix(in srgb,var(--a) 40%,transparent);border-color:var(--a)}
-.zp-t{font-size:max(11px,calc(var(--u)*.9));font-weight:800;letter-spacing:.02em}
-.zp-b.pill{width:auto;padding:0 calc(var(--u)*1.1);gap:calc(var(--u)*.55);grid-auto-flow:column;border-radius:99px;font-size:max(12px,calc(var(--u)*.95));font-weight:800}
+.zp-t{font-size:max(var(--fm,11px),calc(var(--u)*.9));font-weight:800;letter-spacing:.02em}
+.zp-b.pill{width:auto;padding:0 calc(var(--u)*1.1);gap:calc(var(--u)*.55);grid-auto-flow:column;border-radius:99px;font-size:max(calc(var(--fm,11px) + 1px),calc(var(--u)*.95));font-weight:800}
 .zp-b.pill svg{width:max(14px,calc(var(--u)*1.3));height:max(14px,calc(var(--u)*1.3))}
 .zp-b em{font-style:normal;font-size:.85em;padding:.18em .55em;border-radius:99px;background:linear-gradient(135deg,var(--a),var(--a2))}
 
@@ -58,9 +58,9 @@
 .zp-bot{padding:0 calc(var(--u)*1.6) calc(var(--sb) + var(--u)*.6);transform:translateY(calc(var(--u)*1.2))}
 .show .zp-bot{transform:none}
 .zp-sr{display:flex;align-items:center;gap:calc(var(--u)*1)}
-.zp-tm{min-width:3.6em;font-size:max(11px,calc(var(--u)*.9));font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 1px 4px rgba(0,0,0,.7)}
+.zp-tm{min-width:3.6em;font-size:max(var(--fm,11px),calc(var(--u)*.9));font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 1px 4px rgba(0,0,0,.7)}
 .zp-tm.r{text-align:right;opacity:.75}
-.zp-cr{display:flex;align-items:center;gap:calc(var(--u)*.8)}
+.zp-cr{min-width:0;display:flex;align-items:center;gap:calc(var(--u)*.8)}
 .zp-flex{flex:1}
 
 /* seek */
@@ -74,7 +74,7 @@
 .zp-th{position:absolute;top:50%;width:calc(var(--u)*1);height:calc(var(--u)*1);min-width:10px;min-height:10px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.5);transform:translate(-50%,-50%) scale(0);transition:transform .2s cubic-bezier(.34,1.56,.64,1),left .25s linear}
 .zp-seek:hover .zp-th{transform:translate(-50%,-50%) scale(1)}
 .zp-seek.drag .zp-th{transform:translate(-50%,-50%) scale(1.3);transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
-.zp-tip{position:absolute;bottom:calc(100% - var(--u)*.2);left:clamp(calc(var(--u)*2.4),var(--x),calc(100% - var(--u)*2.4));transform:translateX(-50%);padding:.3em .7em;border-radius:.6em;font-size:max(11px,calc(var(--u)*.9));font-weight:700;font-variant-numeric:tabular-nums;background:rgba(14,14,18,.92);border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 14px rgba(0,0,0,.5);white-space:nowrap}
+.zp-tip{position:absolute;bottom:calc(100% - var(--u)*.2);left:clamp(calc(var(--u)*2.4),var(--x),calc(100% - var(--u)*2.4));transform:translateX(-50%);padding:.3em .7em;border-radius:.6em;font-size:max(var(--fm,11px),calc(var(--u)*.9));font-weight:700;font-variant-numeric:tabular-nums;background:rgba(14,14,18,.92);border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 14px rgba(0,0,0,.5);white-space:nowrap}
 @media (pointer:coarse){.zp-th{transform:translate(-50%,-50%) scale(.85)}.zp-vol{display:none!important}}
 
 /* volume */
@@ -85,7 +85,7 @@
 .zp-vol::-moz-range-thumb{width:calc(var(--u)*1.15);height:calc(var(--u)*1.15);border:0;border-radius:50%;background:#fff}
 
 /* feedback / spinner / subs / skip */
-.zp-fb{position:absolute;top:0;bottom:0;width:36%;z-index:12;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*.5);font-size:max(12px,calc(var(--u)*1));font-weight:800;text-shadow:0 1px 6px rgba(0,0,0,.6);animation:zpb .7s ease both}
+.zp-fb{position:absolute;top:0;bottom:0;width:36%;z-index:12;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*.5);font-size:max(calc(var(--fm,11px) + 1px),calc(var(--u)*1));font-weight:800;text-shadow:0 1px 6px rgba(0,0,0,.6);animation:zpb .7s ease both}
 .zp-fb svg{width:max(24px,calc(var(--u)*2.6));height:max(24px,calc(var(--u)*2.6))}
 .zp-fb.l{left:0;border-radius:0 60% 60% 0/0 50% 50% 0;background:radial-gradient(circle at 0 50%,rgba(255,255,255,.28),rgba(255,255,255,.06) 70%)}
 .zp-fb.r{right:0;border-radius:60% 0 0 60%/50% 0 0 50%;background:radial-gradient(circle at 100% 50%,rgba(255,255,255,.28),rgba(255,255,255,.06) 70%)}
@@ -93,7 +93,7 @@
 .zp-sub{position:absolute;left:calc(var(--sl) + 6%);right:calc(var(--sr) + 6%);bottom:calc(var(--sb) + var(--u)*2 + var(--sp,0%));z-index:14;display:flex;justify-content:center;transition:bottom .35s cubic-bezier(.2,.8,.2,1)}
 .show .zp-sub{bottom:calc(var(--sb) + var(--bar) + var(--sp,0%))}
 .zp-sub span{max-width:100%;text-align:center;white-space:pre-line;font-weight:700;line-height:1.35;padding:.2em .65em;border-radius:.45em;}
-.zp-sk{all:unset;box-sizing:border-box;position:absolute;z-index:30;right:calc(var(--sr) + var(--u)*1.6);bottom:calc(var(--sb) + var(--u)*1.6);display:flex;align-items:center;gap:calc(var(--u)*.7);min-height:max(30px,calc(var(--u)*2.6));padding:0 calc(var(--u)*1.1);border-radius:8px;cursor:pointer;pointer-events:auto;font-size:max(12px,calc(var(--u)*.95));font-weight:600;letter-spacing:.01em;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:zps .35s cubic-bezier(.2,.9,.3,1) both;transition:bottom .35s cubic-bezier(.2,.8,.2,1),background .2s}
+.zp-sk{all:unset;box-sizing:border-box;position:absolute;z-index:30;right:calc(var(--sr) + var(--u)*1.6);bottom:calc(var(--sb) + var(--u)*1.6);display:flex;align-items:center;gap:calc(var(--u)*.7);min-height:max(30px,calc(var(--u)*2.6));padding:0 calc(var(--u)*1.1);border-radius:8px;cursor:pointer;pointer-events:auto;font-size:max(calc(var(--fm,11px) + 1px),calc(var(--u)*.95));font-weight:600;letter-spacing:.01em;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:zps .35s cubic-bezier(.2,.9,.3,1) both;transition:bottom .35s cubic-bezier(.2,.8,.2,1),background .2s}
 .show .zp-sk{bottom:calc(var(--sb) + var(--bar) + var(--u)*.6)}
 .zp-sk:hover{background:rgba(255,255,255,.16)}
 .zp-sk svg{width:max(14px,calc(var(--u)*1.3));height:max(14px,calc(var(--u)*1.3))}
@@ -117,9 +117,9 @@
 .zp-rg{-webkit-appearance:none;appearance:none;margin:calc(var(--u)*.6) 0;width:100%;height:max(6px,calc(var(--u)*.5));border-radius:99px;cursor:pointer;outline:none;background:linear-gradient(90deg,var(--a) var(--p),rgba(255,255,255,.25) var(--p))}
 .zp-rg::-webkit-slider-thumb{-webkit-appearance:none;width:calc(var(--u)*1.6);height:calc(var(--u)*1.6);border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.6)}
 .zp-rg::-moz-range-thumb{width:calc(var(--u)*1.6);height:calc(var(--u)*1.6);border:0;border-radius:50%;background:#fff}
-.zp-sw-c{background:var(--c)!important;min-width:max(36px,calc(var(--u)*2.9))!important;padding:0!important}
+.zp-sw-c{background:var(--c)!important;min-width:max(var(--tap,36px),calc(var(--u)*2.9))!important;padding:0!important}
 .zp-sw-c.on{box-shadow:0 0 0 3px var(--a)!important}
-.zp-sec{margin:calc(var(--u)*1) 0 calc(var(--u)*.2);font-size:max(12px,calc(var(--u)*.9));font-weight:700;opacity:.6}
+.zp-sec{margin:calc(var(--u)*1) 0 calc(var(--u)*.2);font-size:max(calc(var(--fm,11px) + 1px),calc(var(--u)*.9));font-weight:700;opacity:.6}
 .zp-note{margin:0;padding:calc(var(--u)*.6) 0;opacity:.6}
 .zp-row{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:calc(var(--u)*.8);width:100%;min-height:max(40px,calc(var(--u)*3.2));padding:0 calc(var(--u)*1.1);border-radius:calc(var(--u)*1);cursor:pointer;font-weight:600;transition:background .2s}
 .zp-row>span{flex:1;min-width:0}
@@ -132,7 +132,7 @@
 .zp-tg.on{background:var(--a)}
 .zp-tg.on::after{transform:translateX(1.1em)}
 .zp-pg{display:flex;flex-wrap:wrap;gap:calc(var(--u)*.6)}
-.zp-pi{all:unset;box-sizing:border-box;display:grid;place-items:center;min-width:max(44px,calc(var(--u)*3.6));min-height:max(36px,calc(var(--u)*2.9));padding:0 calc(var(--u)*1.1);border-radius:6px;cursor:pointer;font-weight:600;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);transition:background .2s}
+.zp-pi{all:unset;box-sizing:border-box;display:grid;place-items:center;min-width:max(44px,calc(var(--u)*3.6));min-height:max(var(--tap,36px),calc(var(--u)*2.9));padding:0 calc(var(--u)*1.1);border-radius:6px;cursor:pointer;font-weight:600;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);transition:background .2s}
 .zp-pi:hover{background:rgba(255,255,255,.12)}
 .zp-pi:active{transform:scale(.97)}
 .zp-pi:disabled{opacity:.35;pointer-events:none}
@@ -163,7 +163,7 @@
 /* title card, intro / outro markers, up-next, server rows */
 .zp-card{position:absolute;z-index:13;left:calc(var(--sl) + var(--u)*1.8);bottom:30%;max-width:70%;pointer-events:none;animation:zpt 3.6s ease both;border-left:3px solid var(--a);padding-left:calc(var(--u)*.9)}
 .zp-card h3{margin:0;font-size:max(15px,calc(var(--u)*1.7));font-weight:900;letter-spacing:-.02em;text-shadow:0 2px 12px rgba(0,0,0,.8)}
-.zp-card p{margin:.25em 0 0;font-size:max(12px,calc(var(--u)*1));font-weight:700;opacity:.85}
+.zp-card p{margin:.25em 0 0;font-size:max(calc(var(--fm,11px) + 1px),calc(var(--u)*1));font-weight:700;opacity:.85}
 .zp-seg{position:absolute;top:0;bottom:0;border-radius:99px;background:#facc15;pointer-events:none;z-index:1}
 .zp-row.dis{opacity:.4;pointer-events:none}
 .zp-two{display:flex;gap:calc(var(--u)*.6)}
@@ -215,7 +215,7 @@
 .zp-sh::before{display:none}
 .zp-sh-h{border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:calc(var(--u)*.5)}
 .zp-sh-h h4{font-weight:600}
-.zp-sec{font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:max(11px,calc(var(--u)*.8))}
+.zp-sec{font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:max(var(--fm,11px),calc(var(--u)*.8))}
 .zp-row{border-radius:6px;font-weight:500}
 .zp-row.on{background:rgba(255,255,255,.08);box-shadow:inset 3px 0 0 var(--a)}
 .zp-tg{background:rgba(255,255,255,.25)}
@@ -232,11 +232,11 @@
 .zp-pop{position:absolute;z-index:26;right:calc(var(--sr) + var(--u)*1.6);bottom:calc(var(--sb) + var(--bar) + var(--u)*.2);min-width:max(170px,calc(var(--u)*11));max-width:min(280px,72%);max-height:calc(100cqh - var(--bar) - var(--sb) - var(--st) - var(--u)*1.6);overflow-y:auto;overscroll-behavior:contain;pointer-events:auto;padding:4px;border-radius:6px;background:rgba(24,24,24,.97);box-shadow:0 6px 24px rgba(0,0,0,.55);font-size:max(13px,calc(var(--u)*1));scrollbar-width:thin;animation:zpf .15s both}
 .zp-pop .zp-row{min-height:max(34px,calc(var(--u)*2.6));padding:0 calc(var(--u)*.9)}
 .zp-pop .zp-row small{font-size:.78em}
-.zp-ph{margin:0;padding:calc(var(--u)*.5) calc(var(--u)*.9);font-size:max(11px,calc(var(--u)*.8));font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.55}
+.zp-ph{margin:0;padding:calc(var(--u)*.5) calc(var(--u)*.9);font-size:max(var(--fm,11px),calc(var(--u)*.8));font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.55}
 .zp-pad{margin:0;padding:calc(var(--u)*.3) calc(var(--u)*.9) calc(var(--u)*.6)}
 .zp-sub-row{padding-left:calc(var(--u)*2)!important}
 .zp-ft{margin-top:4px;border-top:1px solid rgba(255,255,255,.1);border-radius:0!important;opacity:.8}
-.zp-hold{position:absolute;z-index:14;top:calc(var(--st) + var(--u)*1.6);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:calc(var(--u)*.5);padding:calc(var(--u)*.35) calc(var(--u)*1);border-radius:99px;background:rgba(0,0,0,.65);font-size:max(12px,calc(var(--u)*1));font-weight:600;animation:zpf .15s both}
+.zp-hold{position:absolute;z-index:14;top:calc(var(--st) + var(--u)*1.6);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:calc(var(--u)*.5);padding:calc(var(--u)*.35) calc(var(--u)*1);border-radius:99px;background:rgba(0,0,0,.65);font-size:max(calc(var(--fm,11px) + 1px),calc(var(--u)*1));font-weight:600;animation:zpf .15s both}
 .zp-hold svg{width:max(14px,calc(var(--u)*1.3));height:max(14px,calc(var(--u)*1.3))}
 .zp-cr{gap:calc(var(--u)*.3)}
 
@@ -439,7 +439,7 @@
 /* Color swatches in subtitle sheet */
 .zp-sw-c, .zp-sh .zp-sw-c, .zp-sh .zp-pi.zp-sw-c {
   background: var(--c) !important;
-  min-width: max(36px, calc(var(--u) * 2.9)) !important;
+  min-width: max(var(--tap,36px), calc(var(--u) * 2.9)) !important;
   min-height: 28px !important;
   padding: 0 !important;
   border: 1px solid rgba(255, 255, 255, 0.25) !important;
@@ -483,7 +483,7 @@
   gap: 6px;
   padding: 5px 12px;
   border-radius: 99px;
-  font-size: max(11px, calc(var(--u)*0.8));
+  font-size: max(var(--fm,11px), calc(var(--u)*0.8));
   font-weight: 600;
   pointer-events: none;
   animation: zpn 0.3s cubic-bezier(0.2, 0.9, 0.3, 1) both;
@@ -526,7 +526,7 @@
   padding: 0;
   overflow: hidden;
   border-radius: 8px;
-  font-size: max(11px, calc(var(--u)*0.85));
+  font-size: max(var(--fm,11px), calc(var(--u)*0.85));
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
