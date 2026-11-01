@@ -402,10 +402,6 @@ input, select, textarea { font-size: max(16px, 1em); } /* stops iOS zooming into
   animation: img-in 0.5s ease both;
 }
 
-/* anime-style hero loader */
-@keyframes hl-spin { 0% { transform: rotate(0) scale(0.9); } 50% { transform: rotate(540deg) scale(1.08); } 100% { transform: rotate(1080deg) scale(0.9); } }
-@keyframes hl-ring { to { transform: rotate(-360deg); } }
-@keyframes hl-streak { 0% { transform: translateX(-130%); opacity: 0; } 25% { opacity: 0.8; } 100% { transform: translateX(260%); opacity: 0; } }
-@keyframes hl-petal { 0% { transform: translate3d(0, -12vh, 0) rotate(0); opacity: 0; } 12% { opacity: 0.9; } 100% { transform: translate3d(-34vw, 112vh, 0) rotate(560deg); opacity: 0; } }
-@keyframes hl-kana { 0%, 100% { opacity: 0.45; letter-spacing: 0.32em; } 50% { opacity: 1; letter-spacing: 0.5em; } }
+/* hero loader */
+@keyframes hl-bar { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
 @media (prefers-reduced-motion: reduce) { .hl * { animation: none !important; } }

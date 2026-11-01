@@ -8,7 +8,6 @@ import { ProfileCard } from '../components/ProfileCard'
 import { ContinueRow } from '../components/ContinueRow'
 import { AnimeRow } from '../components/AnimeRow'
 import { AppPromo } from '../components/AppPromo'
-import { AuroraBackground } from '../components/AuroraBackground'
 import { ErrorState } from '../components/ErrorState'
 import { GenreMarquee } from '../components/GenreMarquee'
 import { HeroCarousel } from '../components/HeroCarousel'
@@ -47,7 +46,6 @@ export default function HomePage() {
     <main>
       {home.loading ? (
         <div className="relative h-[88svh] max-h-[900px] min-h-[580px] overflow-hidden lg:h-[92svh] lg:max-h-[860px]">
-          <AuroraBackground />
           <HeroLoader />
         </div>
       ) : err ? (
