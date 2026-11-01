@@ -412,7 +412,7 @@ export async function handle(request, env) {
     }
     return json({
       name: "Zenkai Streaming API",
-      version: "1.0.0",
+      version: "1.0.3",
       description: "Direct streaming endpoints and CinePlayer embed infrastructure",
       documentation: "/api",
       routes: {

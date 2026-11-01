@@ -2,6 +2,13 @@
 
 All notable changes to the Zenkai Web application will be documented in this file.
 
+## [1.0.3] - 2026-11-01
+
+### 🚀 New Features
+- **Zenkai Player API**: embeddable player via `/embed?id={anilistId}&ep={episode}` with server and sub/dub options, plus a live embed generator and docs at `/api`.
+- **What's New** now reads the latest GitHub release of the web repo (falls back to the built-in note offline); the footer version follows it.
+- TMDB-first artwork with skeleton + fade-in, new black & white hero loader, minimal What's New card, refined CinePlayer popup animations.
+
 ## [1.0.1] - 2026-10-19
 
 ### 🚀 New Features & Providers

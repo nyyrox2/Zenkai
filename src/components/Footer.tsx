@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { NAV_LINKS } from '../lib/constants'
 import { openShortcuts } from '../lib/keys'
-import { openChangelog, CURRENT_RELEASE } from '../lib/changelog'
+import { openChangelog, useRelease } from '../lib/changelog'
 import { sectionOf } from '../lib/sections'
 import { cn } from '../lib/utils'
 import { CommunitySection } from './CommunitySection'
@@ -16,6 +16,7 @@ const LegalLink = () => (
 )
 
 export function Footer() {
+  const { release } = useRelease()
   const section = sectionOf(useLocation().pathname)
   if (section === 'movies') return <MoviesFooter />
   if (section === 'novel' || section === 'manga') return <ReaderFooter kind={section} />
@@ -57,7 +58,7 @@ export function Footer() {
             </li>
             <li>
               <button type="button" onClick={openChangelog} className="transition-colors hover:text-accent">
-                What&apos;s new (v{CURRENT_RELEASE.version})
+                What&apos;s new (v{release.version})
               </button>
             </li>
             <li className="hidden md:list-item">

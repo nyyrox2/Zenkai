@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { CURRENT_RELEASE, hasSeenLatestRelease, markReleaseSeen, onChangelogToggle } from '../lib/changelog'
+import { hasSeenLatestRelease, markReleaseSeen, onChangelogToggle, useRelease } from '../lib/changelog'
 
 /** Minimal black & white "what's new" card, crimson only on the version label and button hover. No blur, no per-mouse state. */
 export function ChangelogModal() {
   const [open, setOpen] = useState(false)
+  const { release: r, ready } = useRelease()
 
   useEffect(() => {
-    if (hasSeenLatestRelease()) return
+    if (!ready || hasSeenLatestRelease(r.version)) return
     const t = window.setTimeout(() => setOpen(true), 750)
     return () => window.clearTimeout(t)
-  }, [])
+  }, [ready, r.version])
   useEffect(() => onChangelogToggle(setOpen), [])
 
-  const close = () => (markReleaseSeen(CURRENT_RELEASE.version), setOpen(false))
+  const close = () => (markReleaseSeen(r.version), setOpen(false))
 
   useEffect(() => {
     if (!open) return
@@ -26,7 +27,7 @@ export function ChangelogModal() {
       document.body.style.overflow = prev
       window.removeEventListener('keydown', key)
     }
-  }, [open])
+  }, [open, r.version])
 
   return (
     <AnimatePresence>
@@ -53,14 +54,14 @@ export function ChangelogModal() {
               <X className="size-5" />
             </button>
 
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">What&apos;s new · v{CURRENT_RELEASE.version}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">What&apos;s new · v{r.version}</p>
             <h2 id="changelog-title" className="mt-3 pr-6 text-xl font-bold tracking-tight">
-              {CURRENT_RELEASE.title}
+              {r.title}
             </h2>
-            <p className="mt-1.5 text-sm leading-relaxed text-white/50">{CURRENT_RELEASE.tagline}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-white/50">{r.tagline}</p>
 
             <ul className="mt-5 max-h-[44vh] divide-y divide-white/10 overflow-y-auto border-y border-white/10">
-              {CURRENT_RELEASE.highlights.map((h, i) => (
+              {r.highlights.map((h, i) => (
                 <li key={h.title} className="flex gap-4 py-3.5">
                   <span className="pt-0.5 font-mono text-xs text-white/30">{String(i + 1).padStart(2, '0')}</span>
                   <div className="min-w-0">
@@ -80,6 +81,9 @@ export function ChangelogModal() {
             >
               Continue
             </button>
+            <a href={r.githubUrl} target="_blank" rel="noreferrer" className="mt-3 block text-center text-xs text-white/40 transition-colors hover:text-white">
+              Full notes on GitHub ↗
+            </a>
           </motion.div>
         </motion.div>
       )}
