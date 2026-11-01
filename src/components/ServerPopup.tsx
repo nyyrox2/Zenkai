@@ -12,7 +12,9 @@ export interface ServerOpt {
   tags?: string[]
 }
 
-export const SPRING = { type: 'spring', stiffness: 270, damping: 30 } as const
+/** Weak device (<= 4 GB RAM or <= 4 cores): the player drops backdrop blur and uses a slightly slower, cheaper tween. */
+export const LITE = typeof navigator !== 'undefined' && (((navigator as { deviceMemory?: number }).deviceMemory ?? 8) <= 4 || (navigator.hardwareConcurrency ?? 8) <= 4)
+export const SPRING = (LITE ? { type: 'tween', duration: 0.42, ease: 'easeOut' } : { type: 'spring', stiffness: 270, damping: 30 }) as { type: 'spring'; stiffness: number; damping: number }
 /** Same-shape radius strings (8 px values) so every step interpolates instead of snapping. */
 const r = (n: number) => `${n}px ${n}px ${n}px ${n}px / ${n}px ${n}px ${n}px ${n}px`
 /** circle -> lopsided blob -> rounded rectangle; shared with CinePlayer popups */

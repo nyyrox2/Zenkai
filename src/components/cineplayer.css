@@ -243,15 +243,15 @@
 /* ── Minimal 2D UI: flat surfaces, no bevels, no gradient gloss, frosted glass translucency ── */
 .zp-sw {
   background: rgba(0, 0, 0, 0.45) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
   animation: none !important;
 }
 
 .zp-sh, .zp-toast, .zp-tip {
   background: rgba(18, 18, 24, 0.65) !important;
-  backdrop-filter: blur(24px) saturate(180%) brightness(1.1) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.1) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 10px 36px rgba(0, 0, 0, 0.5) !important;
   text-shadow: none !important;
@@ -261,8 +261,9 @@
 /* Setting popups (speed / quality / audio / servers / captions) - sleek dark frosted glass card matching ServerPopup */
 .zp-pop {
   background: rgba(11, 11, 15, 0.88) !important;
-  backdrop-filter: blur(28px) saturate(190%) brightness(1.02) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(1.02) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  will-change: transform, opacity;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 18px 44px -8px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
   text-shadow: none !important;
@@ -677,3 +678,13 @@
 @media (orientation:landscape) and (max-height:620px){.zp-sw:not(.zp-sw-dlg) .zp-sh{animation-name:zpsheetx!important}}
 @media (min-width:900px) and (min-height:621px){.zp-sw .zp-sh{animation-name:zpsheetc!important}}
 .zp-sw-dlg .zp-sh{animation-name:zpsheetc!important}
+
+/* big sheets get their own layer while they slide in */
+.zp-sw .zp-sh{will-change:transform,opacity}
+
+/* weak devices: no backdrop blur anywhere, slightly more opaque flat glass, a touch slower sheets */
+.zp-lite .zp-sw,.zp-lite .zp-sh,.zp-lite .zp-toast,.zp-lite .zp-tip,.zp-lite .zp-pop,.zp-lite .zp-b,.zp-lite .zp-sk{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.zp-lite .zp-sw{background:rgba(0,0,0,.6)!important}
+.zp-lite .zp-sh,.zp-lite .zp-toast,.zp-lite .zp-tip{background:rgba(16,16,22,.95)!important;box-shadow:0 6px 20px rgba(0,0,0,.5)!important}
+.zp-lite .zp-pop{background:rgba(11,11,15,.96)!important;box-shadow:0 8px 24px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06)!important}
+.zp-lite .zp-sw .zp-sh{animation-duration:.27s!important}

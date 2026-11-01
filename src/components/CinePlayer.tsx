@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { apiUrl, fetchStream, type EpInfo, type EpKind } from '../services/api'
 import { KIND } from './EpisodeList'
-import { blob, BLOB_T, SPRING } from './ServerPopup'
+import { blob, BLOB_T, LITE, SPRING } from './ServerPopup'
 import { LoadingGrid } from './LoadingGrid'
 import { Tour, tourDone, tourSeen, type TourStep } from './Tour'
 import { gpuSupported, startUpscale, type Anime4KMode } from '../lib/upscale'
@@ -1042,6 +1042,18 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
 
   st.current = { playing, sheet, pop, show }
 
+  // weak devices: html.zp-lite turns off every backdrop blur (see cineplayer.css)
+  useEffect(() => {
+    if (!LITE) return
+    document.documentElement.classList.add('zp-lite')
+    return () => document.documentElement.classList.remove('zp-lite')
+  }, [])
+  // timeupdate re-renders this whole component; hold it back while a popup/sheet is opening so the animation gets every frame
+  const animUntil = useRef(0)
+  useEffect(() => {
+    animUntil.current = performance.now() + 700
+  }, [pop, sheet])
+
   /* ── controls visibility ── */
   const poke = useCallback(() => {
     setShow(true)
@@ -1384,12 +1396,13 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   /* ── video events ── */
   const onTime = () => {
     const v = vid.current
-    if (!v) return
+    if (!v || performance.now() < animUntil.current) return
     setTime(v.currentTime)
     if (v.duration > 0) {
       let end = 0
       for (let i = 0; i < v.buffered.length; i++) if (v.buffered.start(i) <= v.currentTime + 0.5) end = Math.max(end, v.buffered.end(i))
-      setBuf(end / v.duration)
+      const b = end / v.duration
+      setBuf((o) => (Math.abs(o - b) < 0.002 ? o : b))
     }
   }
 
