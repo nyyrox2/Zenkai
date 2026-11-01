@@ -15,7 +15,7 @@ export interface ServerOpt {
 export const SPRING = { type: 'spring', stiffness: 270, damping: 30 } as const
 /** lopsided blob first, then settles into the rectangle; shared with CinePlayer popups */
 export const BLOB = ['50%', '38% 62% 45% 55% / 58% 42% 58% 42%', '24px']
-export const BLOB_T = { duration: 0.6, times: [0, 0.45, 1], ease: 'easeOut' } as const
+export const BLOB_T = { duration: 0.6, times: [0, 0.45, 1], ease: 'easeOut' as const }
 
 /** A circle button that morphs into the dark glass server card (circle -> rounded rectangle), then lists the servers. */
 export function ServerPopup({ servers, value, onPick }: { servers: ServerOpt[]; value: string; onPick: (id: string) => void }) {
