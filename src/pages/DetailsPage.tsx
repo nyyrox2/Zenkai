@@ -139,7 +139,8 @@ export default function DetailsPage() {
   const mal = useAsync(() => (malId ? fetchMalFull(malId).catch(() => null) : Promise.resolve(null)), [malId])
   const stats = useAsync(() => (malId ? fetchMalStats(malId).catch(() => null) : Promise.resolve(null)), [malId])
 
-  const tmdb = useTmdb(anime.data?.id, anime.data ? pickTitle(anime.data.title) : '', anime.data?.format)?.tmdb ?? null
+  const tb = useTmdb(anime.data?.id, anime.data ? pickTitle(anime.data.title) : '', anime.data?.format)
+  const tmdb = tb?.tmdb ?? null
   const eps = useEpisodes(tmdb, anime.data?.streamingEpisodes)
   const kinds = useFiller(anime.data, tab === 'episodes')
   const order = useAsync(async () => (tab === 'order' && anime.data ? fetchWatchOrder(anime.data.id) : undefined), [tab, anime.data?.id])
@@ -319,7 +320,7 @@ export default function DetailsPage() {
               className="relative mx-auto aspect-[2/3] w-44 overflow-hidden rounded-3xl border border-border bg-card-2 shadow-2xl shadow-black/30 sm:w-56 lg:w-full"
               style={{ backgroundColor: a.coverImage.color ?? undefined }}
             >
-              <img src={a.coverImage.extraLarge ?? a.coverImage.large ?? ''} alt={title} className="h-full w-full object-cover" />
+              {tb && <img src={tmdbImg(tmdb?.poster, 'w500') ?? a.coverImage.extraLarge ?? a.coverImage.large ?? ''} alt={title} className="h-full w-full object-cover" />}
               <BorderBeam size={200} duration={9} />
             </motion.div>
 

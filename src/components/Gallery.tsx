@@ -15,10 +15,10 @@ export function Gallery({ anime, tmdb }: { anime: AniMediaDetails; tmdb: { id: n
 
   const imgs = useMemo(() => {
     const all = [
+      ...(t.data ?? []),
       anime.bannerImage,
       anime.coverImage.extraLarge,
       ...anime.streamingEpisodes.map((e) => e.thumbnail),
-      ...(t.data ?? []),
       ...(m.data ?? []).map((p) => p.jpg.large_image_url ?? p.jpg.image_url),
     ].filter((u): u is string => !!u)
     return [...new Set(all)]

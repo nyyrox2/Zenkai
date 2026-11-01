@@ -14,19 +14,22 @@ import { TrailerModal } from './TrailerModal'
 
 const INTERVAL = 9000
 
-/** Backdrop: AniList banner shows instantly, the TMDB backdrop fades in over it once it has loaded. */
-function Backdrop({ item, tmdb }: { item: AniMedia; tmdb: Tmdb | null }) {
+/** Backdrop: TMDB first; the AniList banner only shows when TMDB has none (or fails to load). */
+function Backdrop({ item, tmdb, loaded }: { item: AniMedia; tmdb: Tmdb | null; loaded: boolean }) {
   const [ready, setReady] = useState(false)
+  const [bad, setBad] = useState(false)
   const base = item.bannerImage ?? item.coverImage.extraLarge ?? ''
   const hd = tmdbImg(tmdb?.backdrop, 'w1280')
   return (
     <div className="animate-kenburns absolute inset-0 will-change-transform">
-      <img src={base} alt="" fetchPriority="high" className={cn('h-full w-full object-cover object-[center_25%]', !item.bannerImage && 'scale-125 blur-2xl')} />
+      {loaded && (!hd || bad) && <img src={base} alt="" fetchPriority="high" className={cn('h-full w-full object-cover object-[center_25%]', !item.bannerImage && 'scale-125 blur-2xl')} />}
       {hd && (
         <img
           src={hd}
           alt=""
+          fetchPriority="high"
           onLoad={() => setReady(true)}
+          onError={() => setBad(true)}
           className={cn('absolute inset-0 h-full w-full object-cover object-[center_25%] transition-opacity duration-1000', ready ? 'opacity-100' : 'opacity-0')}
         />
       )}
@@ -153,7 +156,7 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
       <div aria-hidden className="absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,transparent,#000_96px,#000_calc(100%_-_80px),transparent)]">
         <AnimatePresence>
           <motion.div key={item.id} className="absolute inset-0" initial={{ opacity: 0, scale: 1.05 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.9 }}>
-            <Backdrop item={item} tmdb={tmdb} />
+            <Backdrop item={item} tmdb={tmdb} loaded={bundle !== null} />
           </motion.div>
         </AnimatePresence>
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-black/20" />

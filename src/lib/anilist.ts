@@ -283,8 +283,7 @@ async function autoPull() {
   const l = store.get()
   if (!listsOn() || (l?.lastSync && Date.now() - l.lastSync < THROTTLE)) return
   try {
-    const n = await pullAniListLists()
-    if (n) toast('Watchlist synced from AniList', 'info')
+    await pullAniListLists()
   } catch {
     /* offline: try again later */
   }

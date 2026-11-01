@@ -59,6 +59,7 @@ export interface Tmdb {
   imdbId: string | null
   logo: string | null
   backdrop: string | null
+  poster?: string | null
   backdrops: string[]
   overview: string | null
   tagline: string | null
@@ -91,7 +92,7 @@ export function fetchTmdb(anilistId: number, title: string, format?: string | nu
   const hit = tmdbMem.get(key)
   if (hit) return hit
 
-  const lsKey = `zk:tmdb:v1:${key}`
+  const lsKey = `zk:tmdb:v2:${key}`
   try {
     const raw = localStorage.getItem(lsKey)
     if (raw) {

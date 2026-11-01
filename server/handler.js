@@ -152,6 +152,7 @@ export async function tmdbFor(anilistId, title, format) {
       imdbId: d.external_ids?.imdb_id || map?.imdb || null,
       logo,
       backdrop: d.backdrop_path || backdrops[0] || null,
+      poster: d.poster_path || null,
       backdrops,
       overview: d.overview || null,
       tagline: d.tagline || null,
@@ -476,7 +477,12 @@ export async function handle(request, env) {
           audio: "multi",
           multiAudio: true,
           streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}&seg=1`,
-          subtitles: [],
+          subtitles: (r.subtitles || []).map((s) => ({
+            ...s,
+            file: s.file && !s.file.startsWith("/proxy") && !s.file.startsWith("http://localhost")
+              ? `${proxyBase}?url=${encodeURIComponent(s.file)}&referer=${encodeURIComponent(r.referer || "https://ravok.buzz/")}`
+              : s.file,
+          })),
           intro: null,
           outro: null,
         });

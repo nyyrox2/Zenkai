@@ -47,11 +47,12 @@ const decodeB64 = (raw) => {
   return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
 };
 
-const direct = (url, referer, kind) => ({
+const direct = (url, referer, kind, subtitles = []) => ({
   streamUrl: url,
   referer,
   kind: kind || (/\.m3u8(\?|$)/i.test(url) ? "hls" : "file"),
   isDirect: true,
+  subtitles,
 });
 
 /* ---------------- Player resolvers ---------------- */
@@ -103,27 +104,87 @@ async function resolveAbyss(url) {
   }
 }
 
+function extractSubtitlesFromPlayer(html, domain = "ravok.buzz") {
+  if (!html) return [];
+  const subs = [];
+
+  const pjsMatch =
+    html.match(/playerjsSubtitle\s*=\s*["']([^"']+)["']/i) ||
+    html.match(/Subtitle\s*=\s*["'](\[[^"']+\]https?[^"']+)["']/i);
+
+  if (pjsMatch && pjsMatch[1]) {
+    const raw = pjsMatch[1].trim();
+    const parts = raw.split(/,(?=\[|https?:\/\/)/);
+    for (const part of parts) {
+      const p = part.trim();
+      if (!p) continue;
+      const m = p.match(/^\[([^\]]+)\](.*)$/);
+      if (m) {
+        const label = m[1].trim();
+        let file = m[2].trim();
+        if (file.startsWith("//")) file = `https:${file}`;
+        if (file.startsWith("http")) {
+          subs.push({ label, file, kind: "captions" });
+        }
+      } else if (p.startsWith("http") || p.startsWith("//")) {
+        const file = p.startsWith("//") ? `https:${p}` : p;
+        subs.push({ label: "English", file, kind: "captions" });
+      }
+    }
+  }
+
+  for (const tm of html.matchAll(/<track[^>]+(?:src|data-src)=["']([^"']+)["'][^>]*>/gi)) {
+    const tag = tm[0];
+    let file = tm[1].trim();
+    if (file.startsWith("//")) file = `https:${file}`;
+    else if (file.startsWith("/")) file = `https://${domain}${file}`;
+    const labelMatch = tag.match(/label=["']([^"']+)["']/i);
+    const langMatch = tag.match(/srclang=["']([^"']+)["']/i);
+    const label = labelMatch?.[1] || langMatch?.[1] || "English";
+    if (file.startsWith("http") && !subs.some((s) => s.file === file)) {
+      subs.push({ label, file, kind: "captions" });
+    }
+  }
+
+  return subs;
+}
+
 /** as-cdn / ravok / AWSStream: POST getVideo returns the HLS master playlist (several audio renditions). */
 async function resolveAsCdn(domain, hash) {
   try {
-    const r = await fetch(`https://${domain}/player/index.php?data=${hash}&do=getVideo`, {
-      method: "POST",
-      headers: {
-        "User-Agent": UA,
-        Referer: `https://${domain}/video/${hash}`,
-        Origin: `https://${domain}`,
-        "X-Requested-With": "XMLHttpRequest",
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      },
-      body: new URLSearchParams({ hash, r: "https://animesalt.cx/" }).toString(),
-      signal: AbortSignal.timeout(14000),
-    });
-    if (!r.ok) return null;
+    const [pageRes, r] = await Promise.all([
+      fetch(`https://${domain}/video/${hash}`, {
+        headers: { "User-Agent": UA, Referer: "https://animesalt.cx/" },
+        signal: AbortSignal.timeout(10000),
+      }).catch(() => null),
+      fetch(`https://${domain}/player/index.php?data=${hash}&do=getVideo`, {
+        method: "POST",
+        headers: {
+          "User-Agent": UA,
+          Referer: `https://${domain}/video/${hash}`,
+          Origin: `https://${domain}`,
+          "X-Requested-With": "XMLHttpRequest",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        },
+        body: new URLSearchParams({ hash, r: "https://animesalt.cx/" }).toString(),
+        signal: AbortSignal.timeout(14000),
+      }).catch(() => null),
+    ]);
+
+    if (!r || !r.ok) return null;
     const body = (await r.text()).trim();
     if (!body.startsWith("{")) return null;
     const j = JSON.parse(body);
     const m3u8 = j.videoSource || j.securedLink || j.hls;
-    return m3u8 ? direct(m3u8, `https://${domain}/`, "hls") : null;
+    if (!m3u8) return null;
+
+    let subtitles = [];
+    if (pageRes && pageRes.ok) {
+      const pageHtml = await pageRes.text();
+      subtitles = extractSubtitlesFromPlayer(pageHtml, domain);
+    }
+
+    return direct(m3u8, `https://${domain}/`, "hls", subtitles);
   } catch {
     return null;
   }
@@ -173,10 +234,19 @@ async function resolveFromPage(pageUrl, referer, lang, depth) {
   const nested = html.match(/<iframe[^>]+src=["']([^"']+)["']/i)?.[1];
   if (usable(nested)) {
     const r = await resolvePlayer(abs(nested.trim(), pageUrl), pageUrl, lang, depth + 1);
-    if (r) return r;
+    if (r) {
+      if (!r.subtitles?.length) {
+        try {
+          const domain = new URL(pageUrl).hostname;
+          const pageSubs = extractSubtitlesFromPlayer(html, domain);
+          if (pageSubs.length) r.subtitles = pageSubs;
+        } catch {}
+      }
+      return r;
+    }
   }
 
-  const cdn = html.match(/https?:\/\/(as-cdn\d*\.top)\/video\/([a-zA-Z0-9_-]+)/i);
+  const cdn = html.match(/https?:\/\/([a-zA-Z0-9_.-]+)\/video\/([a-zA-Z0-9_-]+)/i);
   if (cdn) {
     const r = await resolveAsCdn(cdn[1], cdn[2]);
     if (r) return r;
@@ -189,7 +259,15 @@ async function resolveFromPage(pageUrl, referer, lang, depth) {
   }
 
   const file = html.match(/(?:file|source|src)\s*:\s*["'](https?:\/\/[^"']+\.(?:m3u8|mp4)[^"']*)["']/i)?.[1];
-  return file ? direct(file, pageUrl) : null;
+  if (file) {
+    let pageSubs = [];
+    try {
+      const domain = new URL(pageUrl).hostname;
+      pageSubs = extractSubtitlesFromPlayer(html, domain);
+    } catch {}
+    return direct(file, pageUrl, null, pageSubs);
+  }
+  return null;
 }
 
 /** Any player url -> direct stream (or null). Mirrors resolveIframeToServer in MultiAudioExtractor.kt. */

@@ -124,6 +124,7 @@ export async function tmdbDirect(anilistId: number, title: string, format?: stri
     imdbId: d.external_ids?.imdb_id || map?.imdb || null,
     logo,
     backdrop: d.backdrop_path || backdrops[0] || null,
+    poster: d.poster_path || null,
     backdrops,
     overview: d.overview || null,
     tagline: d.tagline || null,

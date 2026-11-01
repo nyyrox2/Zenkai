@@ -248,13 +248,29 @@
   animation: none !important;
 }
 
-.zp-pop, .zp-sh, .zp-toast, .zp-tip {
+.zp-sh, .zp-toast, .zp-tip {
   background: rgba(18, 18, 24, 0.65) !important;
   backdrop-filter: blur(24px) saturate(180%) brightness(1.1) !important;
   -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.1) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 10px 36px rgba(0, 0, 0, 0.5) !important;
   text-shadow: none !important;
+  animation: none !important;
+}
+
+/* Setting popups (speed / quality / audio / servers / captions) - sleek dark frosted glass card matching ServerPopup */
+.zp-pop {
+  background: rgba(11, 11, 15, 0.88) !important;
+  backdrop-filter: blur(28px) saturate(190%) brightness(1.02) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(1.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 18px 44px -8px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  text-shadow: none !important;
+  padding: 8px !important;
+  min-width: max(175px, calc(var(--u)*10.5));
+  max-width: min(320px, 82%);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   animation: none !important;
 }
 
@@ -271,15 +287,7 @@
   }
 }
 
-.zp-pop {
-  border-radius: 10px !important;
-  padding: 5px !important;
-  min-width: max(160px, calc(var(--u)*10));
-  max-width: min(300px, 80%);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-  animation: none !important;
-}
+
 .zp-pop::-webkit-scrollbar {
   width: 4px;
 }
@@ -296,14 +304,15 @@
 
 /* Subtitles popup width & scrollable height */
 .zp-pop.zp-pop-cc {
-  min-width: min(330px, 88vw) !important;
-  max-width: min(380px, 92vw) !important;
-  max-height: min(460px, calc(100cqh - var(--bar) - var(--sb) - var(--st) - 16px)) !important;
-  padding: 8px !important;
+  min-width: min(340px, 88vw) !important;
+  max-width: min(400px, 92vw) !important;
+  max-height: min(480px, calc(100cqh - var(--bar) - var(--sb) - var(--st) - 16px)) !important;
+  border-radius: 22px !important;
+  padding: 10px !important;
 }
 
 /* Minimal 2D rows (NO card appearance, NO bevels, NO inset 3D bar) */
-.zp-row, .zp-pop .zp-row, .zp-sh .zp-row {
+.zp-row, .zp-sh .zp-row {
   min-height: max(30px, calc(var(--u)*2.3));
   border-radius: 6px !important;
   padding: 0 8px !important;
@@ -314,13 +323,40 @@
   color: rgba(255, 255, 255, 0.85);
   transition: background 0.15s, color 0.15s;
 }
-.zp-row:hover, .zp-pop .zp-row:hover, .zp-sh .zp-row:hover {
+.zp-row:hover, .zp-sh .zp-row:hover {
   background: rgba(255, 255, 255, 0.06) !important;
   color: #fff !important;
   box-shadow: none !important;
 }
-.zp-row.on, .zp-pop .zp-row.on, .zp-sh .zp-row.on {
+.zp-row.on, .zp-sh .zp-row.on {
   background: rgba(255, 255, 255, 0.09) !important;
+  color: #fff !important;
+  font-weight: 600;
+  box-shadow: none !important;
+}
+
+.zp-pop .zp-row {
+  min-height: max(34px, calc(var(--u)*2.5));
+  border-radius: 12px !important;
+  padding: 6px 12px !important;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 8px;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: rgba(255, 255, 255, 0.85);
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.zp-pop .zp-row:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+.zp-pop .zp-row:active {
+  transform: scale(0.985);
+}
+.zp-pop .zp-row.on {
+  background: rgba(255, 255, 255, 0.12) !important;
   color: #fff !important;
   font-weight: 600;
   box-shadow: none !important;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import Hls from 'hls.js'
 import {
   AudioLines, Check, CheckCircle2, ChevronDown, FastForward, Flag, Languages, List, Loader2, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
@@ -7,6 +8,7 @@ import {
 } from 'lucide-react'
 import { apiUrl, fetchStream, type EpInfo, type EpKind } from '../services/api'
 import { KIND } from './EpisodeList'
+import { BLOB, BLOB_T, SPRING } from './ServerPopup'
 import { LoadingGrid } from './LoadingGrid'
 import { Tour, tourDone, tourSeen, type TourStep } from './Tour'
 import { gpuSupported, startUpscale, type Anime4KMode } from '../lib/upscale'
@@ -41,7 +43,8 @@ function formatTrackSubLabel(label: string, lang: string): string {
   }
   return s
 }
-const sourceReferer = (id?: string) => (id?.startsWith('flixcloud') ? 'https://flixcloud.cc/' : 'https://megaplay.buzz/')
+const sourceReferer = (id?: string) =>
+  id === 'acdn' ? 'https://ravok.buzz/' : id?.startsWith('flixcloud') ? 'https://flixcloud.cc/' : 'https://megaplay.buzz/'
 
 const SUB_SIZE = {
   tiny: 0.9,
@@ -843,14 +846,17 @@ export default function CinePlayer({
   const [held, setHeld] = useState(false)
   const hold = useRef({ timer: 0, on: false, prev: 1 })
   const [popAnchor, setPopAnchor] = useState<{ left?: number; right?: number; top?: number; bottom?: number } | null>(null)
+  const lastAnchor = useRef<{ left?: number; right?: number; top?: number; bottom?: number } | null>(null)
+  if (popAnchor) lastAnchor.current = popAnchor
+  const activeAnchor = popAnchor || lastAnchor.current
+  const popRef = useRef<HTMLDivElement>(null)
+
   const closePop = () => {
     setPopRaw(null)
-    setPopAnchor(null)
   }
   const setPop = (p: PopName, target?: HTMLElement | null) => {
     setPopRaw((c) => {
       if (c === p || !p) {
-        setPopAnchor(null)
         return null
       }
       if (target && root.current) {
@@ -875,12 +881,33 @@ export default function CinePlayer({
           anchor.right = Math.max(8, Math.min(maxRight, Math.round(rootRect.right - btnRect.right)))
         }
         setPopAnchor(anchor)
+        lastAnchor.current = anchor
       } else {
         setPopAnchor(null)
       }
       return p
     })
   }
+
+  useEffect(() => {
+    if (!pop) return
+    const onDown = (e: PointerEvent) => {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) {
+        const target = e.target as HTMLElement | null
+        if (target?.closest?.('.zp-b, .zp-btn, [data-tour]')) return
+        closePop()
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePop()
+    }
+    window.addEventListener('pointerdown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [pop])
   const [reportIssue, setReportIssue] = useState('Broken / Won\'t Play')
   const [reportDetails, setReportDetails] = useState('')
   const [reportSubmitting, setReportSubmitting] = useState(false)
@@ -1294,17 +1321,23 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
 
       // ask every other direct server for its captions too; they trickle into the menu as each answers
       const seen = new Set(all.map((t) => t.url))
-      const others = (servers ?? []).filter((x) => x.id !== serverId && x.id !== 'acdn') // ponytail: ACDN carries no caption files; add it here if that changes
+      const others = (servers ?? []).filter((x) => x.id !== serverId)
       setSrcLeft(others.length)
       for (const x of others) {
-        fetchStream({ id: animeId, ep: episode, server: x.id, audio: audioMode, title, format })
-          .then((r) => {
-            const add: Track[] = r.subtitles
-              .filter((s) => s.file && !seen.has(s.file))
-              .map((s, i) => ({ id: `${x.id}_${i}_${s.file}`, label: s.label, language: s.label, url: s.file, source: x.name, referer: sourceReferer(x.id) }))
-            add.forEach((t) => seen.add(t.url))
-            if (!dead && add.length) setTracks((p) => [...p, ...add])
-          })
+        const fetchSubs = async () => {
+          let r = await fetchStream({ id: animeId, ep: episode, server: x.id, audio: audioMode, title, format })
+          if ((!r.subtitles || !r.subtitles.length) && audioMode !== 'sub' && x.id !== 'acdn') {
+            try {
+              r = await fetchStream({ id: animeId, ep: episode, server: x.id, audio: 'sub', title, format })
+            } catch {}
+          }
+          const add: Track[] = (r.subtitles || [])
+            .filter((s) => s.file && !seen.has(s.file))
+            .map((s, i) => ({ id: `${x.id}_${i}_${s.file}`, label: s.label, language: s.label, url: s.file, source: x.name, referer: sourceReferer(x.id) }))
+          add.forEach((t) => seen.add(t.url))
+          if (!dead && add.length) setTracks((p) => [...p, ...add])
+        }
+        fetchSubs()
           .catch(() => {
             /* that server has nothing for this episode */
           })
@@ -1789,6 +1822,9 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   const seg = (s: Seg) => (s && dur > 0 && s.end > s.start ? { left: `${(s.start / dur) * 100}%`, width: `${((s.end - s.start) / dur) * 100}%` } : null)
   const si = seg(intro)
   const so = seg(outro)
+  const isPopTop = activeAnchor?.top !== undefined
+  const isPopLeft = activeAnchor?.left !== undefined
+  const popTransformOrigin = `${isPopTop ? 'top' : 'bottom'} ${isPopLeft ? 'left' : 'right'}`
 
   return (
     <div
@@ -2073,289 +2109,366 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         </div>
 
 
-        {pop && (
-          <div
-            className={cx('zp-pop', pop === 'cc' && 'zp-pop-cc')}
-            role="menu"
-            aria-label={pop}
-            style={
-              popAnchor
-                ? {
-                    top: popAnchor.top !== undefined ? `${popAnchor.top}px` : 'auto',
-                    bottom: popAnchor.bottom !== undefined ? `${popAnchor.bottom}px` : 'auto',
-                    left: popAnchor.left !== undefined ? `${popAnchor.left}px` : 'auto',
-                    right: popAnchor.right !== undefined ? `${popAnchor.right}px` : 'auto',
-                  }
-                : undefined
-            }
-          >
-            {pop === 'spd' && (
-              <>
-                <p className="zp-ph">Speed</p>
-                {SPEEDS.map((x) => (
-                  <button key={x} className={cx('zp-row', speed === x && 'on')} onClick={() => (setRate(x), closePop())}>
-                    <span>{x === 1 ? 'Normal' : `${x}×`}</span>
-                    {speed === x && <Check className="size-3.5 shrink-0" />}
-                  </button>
-                ))}
-              </>
-            )}
-            {pop === 'q' && (
-              <>
-                <p className="zp-ph">Quality</p>
-                <button className={cx('zp-row', lvl === -1 && 'on')} onClick={() => (setQuality(-1), closePop())}>
-                  <span>Auto</span>
-                  {lvl === -1 && <Check className="size-3.5 shrink-0" />}
-                </button>
-                {levels.map((l) => (
-                  <button key={l.i} className={cx('zp-row', lvl === l.i && 'on')} onClick={() => (setQuality(l.i), closePop())}>
-                    <span>{l.label}</span>
-                    {lvl === l.i && <Check className="size-3.5 shrink-0" />}
-                  </button>
-                ))}
-              </>
-            )}
-            {pop === 'aud' && (
-              <>
-                <p className="zp-ph">Audio</p>
-                {audioTracks.map((t) => (
-                  <button key={t.i} className={cx('zp-row', t.i === audioIdx && 'on')} onClick={() => (setAudioTrack(t), closePop())}>
-                    <span>{t.label}</span>
-                    {t.i === audioIdx && <Check className="size-3.5 shrink-0" />}
-                  </button>
-                ))}
-              </>
-            )}
-            {pop === 'srv' && servers && (
-              <>
-                <p className="zp-ph">Servers</p>
-                {onAudio && (
-                  <div className="zp-two zp-pad">
-                    {(['sub', 'dub'] as const).map((m) => {
-                      const avail = m === 'sub' ? hasSub : hasDub
-                      return (
+        <AnimatePresence mode="wait">
+          {pop && (
+            <motion.div
+              ref={popRef}
+              key={pop}
+              className={cx('zp-pop', pop === 'cc' && 'zp-pop-cc')}
+              role="menu"
+              aria-label={pop}
+              initial={{ opacity: 0, scale: 0.3, borderRadius: '50%' }}
+              animate={{ opacity: 1, scale: 1, borderRadius: BLOB }}
+              exit={{ opacity: 0, scale: 0.6, borderRadius: '50%', transition: { duration: 0.14 } }}
+              transition={{ ...SPRING, borderRadius: BLOB_T }}
+              style={{
+                transformOrigin: popTransformOrigin,
+                ...(activeAnchor
+                  ? {
+                      top: activeAnchor.top !== undefined ? `${activeAnchor.top}px` : 'auto',
+                      bottom: activeAnchor.bottom !== undefined ? `${activeAnchor.bottom}px` : 'auto',
+                      left: activeAnchor.left !== undefined ? `${activeAnchor.left}px` : 'auto',
+                      right: activeAnchor.right !== undefined ? `${activeAnchor.right}px` : 'auto',
+                    }
+                  : undefined),
+              }}
+            >
+              {pop === 'spd' && (
+                <>
+                  <p className="zp-ph">Speed</p>
+                  <div className="flex flex-col gap-0.5">
+                    {SPEEDS.map((x, i) => (
+                      <motion.button
+                        key={x}
+                        type="button"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.03 + i * 0.02, duration: 0.18 }}
+                        className={cx('zp-row', speed === x && 'on')}
+                        onClick={() => (setRate(x), closePop())}
+                      >
+                        <span>{x === 1 ? 'Normal' : `${x}×`}</span>
+                        {speed === x && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
+                      </motion.button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {pop === 'q' && (
+                <>
+                  <p className="zp-ph">Quality</p>
+                  <div className="flex flex-col gap-0.5">
+                    <motion.button
+                      type="button"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.03, duration: 0.18 }}
+                      className={cx('zp-row', lvl === -1 && 'on')}
+                      onClick={() => (setQuality(-1), closePop())}
+                    >
+                      <span>Auto</span>
+                      {lvl === -1 && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
+                    </motion.button>
+                    {levels.map((l, i) => (
+                      <motion.button
+                        key={l.i}
+                        type="button"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.05 + i * 0.02, duration: 0.18 }}
+                        className={cx('zp-row', lvl === l.i && 'on')}
+                        onClick={() => (setQuality(l.i), closePop())}
+                      >
+                        <span>{l.label}</span>
+                        {lvl === l.i && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
+                      </motion.button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {pop === 'aud' && (
+                <>
+                  <p className="zp-ph">Audio</p>
+                  <div className="flex flex-col gap-0.5">
+                    {audioTracks.map((t, i) => (
+                      <motion.button
+                        key={t.i}
+                        type="button"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.03 + i * 0.02, duration: 0.18 }}
+                        className={cx('zp-row', t.i === audioIdx && 'on')}
+                        onClick={() => (setAudioTrack(t), closePop())}
+                      >
+                        <span>{t.label}</span>
+                        {t.i === audioIdx && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
+                      </motion.button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {pop === 'srv' && servers && (
+                <>
+                  <p className="zp-ph">Servers</p>
+                  {onAudio && (
+                    <div className="zp-two zp-pad">
+                      {(['sub', 'dub'] as const).map((m) => {
+                        const avail = m === 'sub' ? hasSub : hasDub
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            className={cx('zp-pi', audioMode === m && 'on', !avail && 'opacity-60')}
+                            onClick={() => {
+                              if (audioMode !== m) {
+                                flash('load', `Switching to ${m.toUpperCase()}…`)
+                                onAudio(m)
+                              }
+                            }}
+                          >
+                            <span>{m.toUpperCase()}</span>
+                            {!avail && <span className="ml-1 text-[9px] opacity-70">(N/A)</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-0.5">
+                    {servers.map((x, i) => (
+                      <motion.button
+                        key={x.id}
+                        type="button"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.04 + i * 0.025, duration: 0.18 }}
+                        className={cx('zp-row', x.id === serverId && 'on')}
+                        onClick={() => (x.id !== serverId && flash('load', `Switching to ${x.name}…`), onServer?.(x.id), closePop())}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span>{x.name}</span>
+                          {x.tags && x.tags.length > 0 && (
+                            <span className="flex items-center gap-1 text-[10px] text-white/50">
+                              {x.tags.map((t) => (
+                                <span key={t} className="rounded border border-white/15 px-1 text-[9px] font-bold uppercase leading-4 text-neutral-300">{t}</span>
+                              ))}
+                            </span>
+                          )}
+                        </span>
+                        {x.id === serverId && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
+                      </motion.button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {pop === 'cc' && (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between border-b border-white/10 px-2 py-1 pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Languages className="size-3.5 text-white/70" />
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-white/80">Subtitles</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closePop()
+                        setSheet('subs')
+                      }}
+                      title="Customize subtitle styling & sync"
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-white/60 hover:text-white hover:bg-white/5 transition"
+                    >
+                      <Settings className="size-3" />
+                      <span>Settings</span>
+                    </button>
+                  </div>
+
+                  {langs.length > 4 && (
+                    <div className="relative my-1 px-1">
+                      <Search className="pointer-events-none absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-white/40" />
+                      <input
+                        type="text"
+                        value={subSearch}
+                        onChange={(e) => setSubSearch(e.target.value)}
+                        placeholder="Filter languages…"
+                        aria-label="Filter languages"
+                        className="h-8 w-full rounded-xl border border-white/10 bg-white/5 pl-8 pr-7 text-xs text-white placeholder:text-white/40 outline-none transition focus:border-white/30"
+                      />
+                      {subSearch && (
                         <button
-                          key={m}
-                          className={cx('zp-pi', audioMode === m && 'on', !avail && 'opacity-60')}
-                          onClick={() => {
-                            if (audioMode !== m) {
-                              flash('load', `Switching to ${m.toUpperCase()}…`)
-                              onAudio(m)
-                            }
-                          }}
+                          type="button"
+                          onClick={() => setSubSearch('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-white/40 hover:text-white"
+                          aria-label="Clear filter"
                         >
-                          <span>{m.toUpperCase()}</span>
-                          {!avail && <span className="ml-1 text-[9px] opacity-70">(N/A)</span>}
+                          <X className="size-3" />
                         </button>
+                      )}
+                    </div>
+                  )}
+
+                  <motion.button
+                    type="button"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.02, duration: 0.15 }}
+                    onClick={() => {
+                      setCaps(false)
+                      closePop()
+                    }}
+                    className={cx(
+                      'flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-medium transition',
+                      !caps
+                        ? 'bg-white/10 text-white font-semibold'
+                        : 'text-white/70 hover:bg-white/5 hover:text-white'
+                    )}
+                  >
+                    <span>Off</span>
+                    {!caps && <Check className="size-3.5 text-accent text-[var(--a,#dc143c)] shrink-0" />}
+                  </motion.button>
+
+                  {loadingSubs && (
+                    <div className="flex items-center gap-2 px-3 py-2 text-xs text-white/50">
+                      <Loader2 className="size-3.5 animate-spin text-[var(--a,#dc143c)]" />
+                      <span>Searching for subtitles…</span>
+                    </div>
+                  )}
+                  {!loadingSubs && tracks.length === 0 && srcLeft === 0 && (
+                    <p className="px-3 py-2 text-xs text-white/50">No subtitles found.</p>
+                  )}
+                  {subErr && <p className="px-3 py-1.5 text-xs text-amber-400">{subErr}</p>}
+
+                  <div className="flex flex-col gap-0.5">
+                    {filteredLangs.map(([name, list], i) => {
+                      const isSingle = list.length === 1
+                      const isLangActive = caps && list.some((t) => t.id === trackId)
+                      const isExpanded = grp === name
+
+                      if (isSingle) {
+                        const t = list[0]
+                        const isSelected = caps && t.id === trackId
+                        const subLabel = formatTrackSubLabel(t.label, name)
+                        const displayName = subLabel !== 'Default' ? `${name} (${subLabel})` : name
+
+                        return (
+                          <motion.button
+                            key={name}
+                            type="button"
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.03 + Math.min(i, 8) * 0.02, duration: 0.15 }}
+                            onClick={() => {
+                              void pick(t)
+                              closePop()
+                            }}
+                            className={cx(
+                              'group flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left transition',
+                              isSelected
+                                ? 'bg-white/10 text-white font-semibold'
+                                : 'text-white/80 hover:bg-white/5 hover:text-white'
+                            )}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <span className="truncate text-xs">{displayName}</span>
+                              {t.source && <span className="block text-[10px] text-white/40">{t.source}</span>}
+                            </div>
+                            {isSelected && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
+                          </motion.button>
+                        )
+                      }
+
+                      return (
+                        <motion.div
+                          key={name}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.03 + Math.min(i, 8) * 0.02, duration: 0.15 }}
+                          className="flex flex-col"
+                        >
+                          <button
+                            type="button"
+                            aria-expanded={isExpanded}
+                            onClick={() => setGrp(isExpanded ? null : name)}
+                            className={cx(
+                              'group flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left transition',
+                              isLangActive
+                                ? 'text-white font-semibold bg-white/5'
+                                : 'text-white/80 hover:bg-white/5 hover:text-white'
+                            )}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="truncate text-xs">{name}</span>
+                              <span className="text-[10px] text-white/40">({list.length})</span>
+                              {isLangActive && (
+                                <span className="size-1.5 rounded-full bg-[var(--a,#dc143c)] shrink-0" />
+                              )}
+                            </div>
+                            <ChevronDown
+                              className={cx(
+                                'size-3.5 text-white/40 transition-transform duration-200 shrink-0',
+                                isExpanded && 'rotate-180 text-white'
+                              )}
+                            />
+                          </button>
+
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden my-0.5 ml-3.5 flex flex-col gap-0.5 border-l border-white/10 pl-2"
+                              >
+                                {list.map((t) => {
+                                  const isSelected = caps && t.id === trackId
+                                  const subLabel = formatTrackSubLabel(t.label, name)
+                                  return (
+                                    <button
+                                      key={t.id}
+                                      type="button"
+                                      onClick={() => {
+                                        void pick(t)
+                                        closePop()
+                                      }}
+                                      className={cx(
+                                        'group flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left transition',
+                                        isSelected
+                                          ? 'text-white font-semibold bg-white/10'
+                                          : 'text-white/70 hover:bg-white/5 hover:text-white'
+                                      )}
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="truncate text-xs">{subLabel}</span>
+                                          {isSelected && <span className="size-1 rounded-full bg-[var(--a,#dc143c)] shrink-0" />}
+                                        </div>
+                                        {t.source && (
+                                          <span className="block text-[10px] text-white/40">
+                                            {t.source}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {isSelected && <Check className="size-3 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
+                                    </button>
+                                  )
+                                })}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
                       )
                     })}
                   </div>
-                )}
-                {servers.map((x) => (
-                  <button key={x.id} className={cx('zp-row', x.id === serverId && 'on')} onClick={() => (x.id !== serverId && flash('load', `Switching to ${x.name}…`), onServer?.(x.id), closePop())}>
-                    <span className="flex items-center gap-2">
-                      <span>{x.name}</span>
-                      {x.tags && x.tags.length > 0 && (
-                        <span className="flex items-center gap-1 text-[10px] text-white/50">
-                          {x.tags.map((t) => (
-                            <span key={t} className="rounded bg-white/10 px-1 py-0.5">{t}</span>
-                          ))}
-                        </span>
-                      )}
-                    </span>
-                    {x.id === serverId && <Check className="size-3.5 shrink-0" />}
-                  </button>
-                ))}
-              </>
-            )}
-            {pop === 'cc' && (
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between border-b border-white/10 px-2 py-1 pb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Languages className="size-3.5 text-white/70" />
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-white/80">Subtitles</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closePop()
-                      setSheet('subs')
-                    }}
-                    title="Customize subtitle styling & sync"
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-white/50 hover:text-white transition"
-                  >
-                    <Settings className="size-3" />
-                    <span>Settings</span>
-                  </button>
-                </div>
 
-                {langs.length > 4 && (
-                  <div className="relative my-1 px-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-3 -translate-y-1/2 text-white/40" />
-                    <input
-                      type="text"
-                      value={subSearch}
-                      onChange={(e) => setSubSearch(e.target.value)}
-                      placeholder="Filter languages…"
-                      aria-label="Filter languages"
-                      className="h-7 w-full rounded-md border border-white/10 bg-white/5 pl-7 pr-6 text-xs text-white placeholder:text-white/40 outline-none transition focus:border-white/30"
-                    />
-                    {subSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setSubSearch('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-white/40 hover:text-white"
-                        aria-label="Clear filter"
-                      >
-                        <X className="size-2.5" />
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCaps(false)
-                    closePop()
-                  }}
-                  className={cx(
-                    'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs font-medium transition',
-                    !caps
-                      ? 'bg-white/10 text-white font-semibold'
-                      : 'text-white/70 hover:bg-white/5 hover:text-white'
+                  {srcLeft > 0 && (
+                    <p className="px-3 py-1 text-[10px] text-white/40">
+                      Checking {srcLeft} more source{srcLeft > 1 ? 's' : ''}…
+                    </p>
                   )}
-                >
-                  <span>Off</span>
-                  {!caps && <Check className="size-3.5 text-white shrink-0" />}
-                </button>
-
-                {loadingSubs && (
-                  <div className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-white/50">
-                    <Loader2 className="size-3 animate-spin text-[var(--a,#dc143c)]" />
-                    <span>Searching for subtitles…</span>
-                  </div>
-                )}
-                {!loadingSubs && tracks.length === 0 && srcLeft === 0 && (
-                  <p className="px-2.5 py-1.5 text-xs text-white/50">No subtitles found.</p>
-                )}
-                {subErr && <p className="px-2.5 py-1 text-xs text-amber-400">{subErr}</p>}
-
-                <div className="flex flex-col gap-0.5">
-                  {filteredLangs.map(([name, list]) => {
-                    const isSingle = list.length === 1
-                    const isLangActive = caps && list.some((t) => t.id === trackId)
-                    const isExpanded = grp === name
-
-                    if (isSingle) {
-                      const t = list[0]
-                      const isSelected = caps && t.id === trackId
-                      const subLabel = formatTrackSubLabel(t.label, name)
-                      const displayName = subLabel !== 'Default' ? `${name} (${subLabel})` : name
-
-                      return (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => {
-                            void pick(t)
-                            closePop()
-                          }}
-                          className={cx(
-                            'group flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left transition',
-                            isSelected
-                              ? 'bg-white/10 text-white font-semibold'
-                              : 'text-white/80 hover:bg-white/5 hover:text-white'
-                          )}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <span className="truncate text-xs">{displayName}</span>
-                            {t.source && <span className="block text-[10px] text-white/40">{t.source}</span>}
-                          </div>
-                          {isSelected && <Check className="size-3.5 shrink-0 text-white" />}
-                        </button>
-                      )
-                    }
-
-                    return (
-                      <div key={name} className="flex flex-col">
-                        <button
-                          type="button"
-                          aria-expanded={isExpanded}
-                          onClick={() => setGrp(isExpanded ? null : name)}
-                          className={cx(
-                            'group flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left transition',
-                            isLangActive
-                              ? 'text-white font-semibold bg-white/5'
-                              : 'text-white/80 hover:bg-white/5 hover:text-white'
-                          )}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="truncate text-xs">{name}</span>
-                            <span className="text-[10px] text-white/40">({list.length})</span>
-                            {isLangActive && (
-                              <span className="size-1.5 rounded-full bg-[var(--a,#dc143c)] shrink-0" />
-                            )}
-                          </div>
-                          <ChevronDown
-                            className={cx(
-                              'size-3.5 text-white/40 transition-transform duration-200 shrink-0',
-                              isExpanded && 'rotate-180 text-white'
-                            )}
-                          />
-                        </button>
-
-                        {isExpanded && (
-                          <div className="my-0.5 ml-3.5 flex flex-col gap-0.5 border-l border-white/10 pl-2">
-                            {list.map((t) => {
-                              const isSelected = caps && t.id === trackId
-                              const subLabel = formatTrackSubLabel(t.label, name)
-                              return (
-                                <button
-                                  key={t.id}
-                                  type="button"
-                                  onClick={() => {
-                                    void pick(t)
-                                    closePop()
-                                  }}
-                                  className={cx(
-                                    'group flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left transition',
-                                    isSelected
-                                      ? 'text-white font-semibold bg-white/10'
-                                      : 'text-white/70 hover:bg-white/5 hover:text-white'
-                                  )}
-                                >
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="truncate text-xs">{subLabel}</span>
-                                      {isSelected && <span className="size-1 rounded-full bg-[var(--a,#dc143c)] shrink-0" />}
-                                    </div>
-                                    {t.source && (
-                                      <span className="block text-[10px] text-white/40">
-                                        {t.source}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {isSelected && <Check className="size-3 shrink-0 text-white" />}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
                 </div>
-
-                {srcLeft > 0 && (
-                  <p className="px-2.5 py-1 text-[10px] text-white/40">
-                    Checking {srcLeft} more source{srcLeft > 1 ? 's' : ''}…
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {err && (
           <div className="zp-er">
