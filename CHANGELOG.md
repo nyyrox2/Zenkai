@@ -4,10 +4,51 @@ All notable changes to the Zenkai Web application will be documented in this fil
 
 ## [1.0.3] - 2026-11-01
 
-### 🚀 New Features
-- **Zenkai Player API**: embeddable player via `/embed?id={anilistId}&ep={episode}` with server and sub/dub options, plus a live embed generator and docs at `/api`.
-- **What's New** now reads the latest GitHub release of the web repo (falls back to the built-in note offline); the footer version follows it.
-- TMDB-first artwork with skeleton + fade-in, new black & white hero loader, minimal What's New card, refined CinePlayer popup animations.
+### 🔌 Zenkai Player API
+
+- **Embeddable Player**:
+  - Put any anime episode on your own site with one iframe: `/embed?id={anilistId}&ep={episode}`. No keys, no setup.
+  - Choose the server with `server=` and the audio with `audio=sub|dub`.
+  - `/api/servers?id={anilistId}&ep={episode}` lists the servers available for an episode.
+  - The API info endpoint now reports version 1.0.3.
+- **Live Embed Generator & Docs**:
+  - Build, preview and copy your snippet on the `/api` page, with every option documented.
+
+### 🖼️ TMDB-First Artwork & Loading
+
+- **TMDB First, AniList As Fallback**:
+  - Hero banners, the details poster and the gallery now use TMDB artwork first and only fall back to AniList when TMDB has nothing.
+  - TMDB posters are now returned and cached (cache upgraded so existing visitors pick them up).
+- **Skeleton Then Fade-In**:
+  - Posters, banners, episode thumbnails, gallery tiles, schedule, book covers and movie pages show a shimmer skeleton until the image is fully loaded, then fade in.
+- **Faster Hero**:
+  - The hero shows the TMDB title-logo PNG when one exists and plain text only when it does not.
+  - TMDB data for the first four hero slides is prefetched as soon as the list arrives.
+- **New Black & White Loader**:
+  - A scrambling ZENKAI wordmark with a hairline sweep and the live loading timer replaces the old skeleton on the home page.
+
+### 🎬 CinePlayer Popups
+
+- **Morphing Small Popups**:
+  - Speed, quality, captions, audio and server popups now open with the same circle, lopsided blob, rectangle morph as the server popup on the player page.
+  - Fixed the captions popup snapping straight to a rectangle.
+- **Minimal Big Sheets**:
+  - Settings, Caption settings, Episodes and Report open with a quick, plain slide and fade instead.
+
+### 📰 What's New From GitHub
+
+- **Always In Sync**:
+  - The What's New popup and the footer version now read the latest GitHub release automatically, so publishing a release updates both.
+  - Works offline with a built-in fallback note.
+- **Lighter, Minimal Design**:
+  - New black and white card with crimson accents only. Removed the heavy blur, meteors and per-mouse-move spotlight that caused lag.
+
+### 🧹 Cleanup
+
+- **Quieter Sync**:
+  - Removed the "Watchlist synced from AniList" toast. Syncing still happens in the background.
+- **Version 1.0.3**:
+  - Version bumped across `package.json`, the lockfile and the API info endpoint.
 
 ## [1.0.1] - 2026-10-19
 

@@ -31,7 +31,7 @@ export const CURRENT_RELEASE: ReleaseData = {
 }
 
 /* ---------- latest GitHub release -> ReleaseData ---------- */
-interface GhRelease {
+export interface GhRelease {
   tag_name: string
   name: string | null
   body: string | null
@@ -43,16 +43,25 @@ const CACHE = 'zenkai_release_cache'
 const TTL = 10 * 60 * 1000
 const clean = (t: string) => t.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_`]/g, '').trim()
 
-/** Release body format: first plain line = tagline, "## Heading" = badge, "- **Title** — text" = one highlight. */
-function parseRelease(r: GhRelease): ReleaseData {
+const trim = (t: string, n = 130) => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t)
+const noEmoji = (t: string) => t.replace(/^[^\p{L}\p{N}]+/u, '')
+
+/** Reads either release-body style:
+ *  - changelog style: each "### Section" becomes one highlight (title = section, text = its first real bullet)
+ *  - short style: first plain line = tagline, "## Heading" = badge, "- **Title** — text" = one highlight */
+export function parseRelease(r: GhRelease): ReleaseData {
+  const lines = (r.body ?? '').split(/\r?\n/).map((l) => l.trim())
+  const sections = lines.some((l) => /^###\s/.test(l))
   let tagline = ''
   let badge = 'NEW'
   const highlights: ChangelogItem[] = []
-  for (const raw of (r.body ?? '').split(/\r?\n/)) {
-    const line = raw.trim()
+  for (const line of lines) {
     const h = line.match(/^#{1,6}\s+(.*)/)
     const li = line.match(/^[-*+]\s+(.*)/)
-    if (h) badge = clean(h[1]).toUpperCase()
+    if (sections) {
+      if (/^###\s/.test(line)) highlights.push({ badge: '', title: noEmoji(clean(line.replace(/^#+\s*/, ''))), description: '' })
+      else if (li && highlights.length && !highlights[highlights.length - 1].description && !/:\**$/.test(li[1])) highlights[highlights.length - 1].description = trim(clean(li[1]))
+    } else if (h) badge = clean(h[1]).toUpperCase()
     else if (li) {
       const b = li[1].match(/^\*\*(.+?)\*\*\s*[—–:-]*\s*(.*)$/)
       const [t, ...d] = b ? [b[1], b[2]] : clean(li[1]).split(/\s[—–-]\s|:\s/)
@@ -62,7 +71,7 @@ function parseRelease(r: GhRelease): ReleaseData {
   return {
     version: r.tag_name.replace(/^v/i, ''),
     releaseDate: r.published_at ? new Date(r.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '',
-    title: r.name || r.tag_name,
+    title: (r.name || r.tag_name).replace(/^.*?v?\d+(\.\d+)+\s*[-–—:]\s*/i, ''),
     tagline,
     githubUrl: r.html_url,
     highlights: highlights.slice(0, 8),

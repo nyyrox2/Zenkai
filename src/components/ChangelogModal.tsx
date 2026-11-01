@@ -58,7 +58,7 @@ export function ChangelogModal() {
             <h2 id="changelog-title" className="mt-3 pr-6 text-xl font-bold tracking-tight">
               {r.title}
             </h2>
-            <p className="mt-1.5 text-sm leading-relaxed text-white/50">{r.tagline}</p>
+            {r.tagline && <p className="mt-1.5 text-sm leading-relaxed text-white/50">{r.tagline}</p>}
 
             <ul className="mt-5 max-h-[44vh] divide-y divide-white/10 overflow-y-auto border-y border-white/10">
               {r.highlights.map((h, i) => (
@@ -66,9 +66,10 @@ export function ChangelogModal() {
                   <span className="pt-0.5 font-mono text-xs text-white/30">{String(i + 1).padStart(2, '0')}</span>
                   <div className="min-w-0">
                     <h3 className="text-sm font-semibold">
-                      {h.title} <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{h.badge}</span>
+                      {h.title}
+                      {h.badge && <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{h.badge}</span>}
                     </h3>
-                    <p className="mt-1 text-xs leading-relaxed text-white/50">{h.description}</p>
+                    {h.description && <p className="mt-1 text-xs leading-relaxed text-white/50">{h.description}</p>}
                   </div>
                 </li>
               ))}
