@@ -1,4 +1,5 @@
 import { Img } from './Img'
+import { HeroLoader } from './HeroLoader'
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bookmark, BookmarkCheck, ChevronLeft, ChevronRight, Film, Info, Play, Star } from 'lucide-react'
@@ -23,7 +24,7 @@ function Backdrop({ item, tmdb, loaded }: { item: AniMedia; tmdb: Tmdb | null; l
   const hd = tmdbImg(tmdb?.backdrop, 'w1280')
   return (
     <div className="animate-kenburns absolute inset-0 will-change-transform">
-      {!loaded || (hd && !bad && !ready) ? <span aria-hidden className="skeleton absolute inset-0" /> : null}
+      {!loaded || (hd && !bad && !ready) ? <HeroLoader /> : null}
       {loaded && (!hd || bad) && <Img src={base} alt="" fetchPriority="high" className={cn('h-full w-full object-cover object-[center_25%]', !item.bannerImage && 'scale-125 blur-2xl')} />}
       {hd && (
         <img
@@ -40,24 +41,28 @@ function Backdrop({ item, tmdb, loaded }: { item: AniMedia; tmdb: Tmdb | null; l
 }
 
 /** Title: TMDB transparent logo when there is one (centred on phones, left on desktop), blur-in text otherwise. */
-function Heading({ title, logo }: { title: string; logo: string | null }) {
+function Heading({ title, logo, loaded }: { title: string; logo: string | null; loaded: boolean }) {
   const [ok, setOk] = useState(false)
+  const [bad, setBad] = useState(false)
   const src = tmdbImg(logo, 'w500')
+  useEffect(() => (setOk(false), setBad(false)), [src])
+  // nothing until TMDB has answered; the PNG logo when there is one; the text only when there is no logo (or it fails)
+  const text = loaded && (!src || bad)
   return (
     <div className="relative flex min-h-[4.5rem] w-full items-end justify-center lg:justify-start">
-      {src && (
+      {loaded && src && !bad && (
         <img
           src={src}
           alt={title}
           onLoad={() => setOk(true)}
-          onError={() => setOk(false)}
+          onError={() => setBad(true)}
           className={cn(
             'max-h-24 w-auto max-w-[78%] object-contain object-center drop-shadow-[0_6px_28px_rgba(0,0,0,0.7)] transition-all duration-700 sm:max-h-32 lg:max-h-36 lg:max-w-[60%] lg:object-left',
             ok ? 'relative opacity-100' : 'pointer-events-none absolute opacity-0',
           )}
         />
       )}
-      {!ok && (
+      {text && (
         <BlurText
           text={title}
           className="font-display text-4xl font-black leading-[1.02] tracking-tight text-white drop-shadow-lg [text-wrap:balance] text-center lg:text-left"
@@ -111,6 +116,11 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
     setPaused(v)
     if (!v) setEpoch((e) => e + 1)
   }, [])
+
+  // warm the first slides' TMDB data as soon as the list arrives
+  useEffect(() => {
+    items.slice(0, 4).forEach((n) => void fetchTmdb(n.id, pickTitle(n.title), n.format))
+  }, [items])
 
   // warm the next slide's artwork
   useEffect(() => {
@@ -176,7 +186,7 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
       <div className="absolute inset-x-0 bottom-0 mx-auto flex w-full max-w-7xl flex-col px-5 pb-7 sm:px-8 lg:pb-9">
         <AnimatePresence mode="wait">
           <motion.div key={item.id} className="flex min-w-0 flex-col items-center gap-3.5 text-center lg:items-start lg:text-left" exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
-            <Heading title={title} logo={tmdb?.logo ?? null} />
+            <Heading title={title} logo={tmdb?.logo ?? null} loaded={bundle !== null} />
 
             <Rise i={1} className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[13px] font-medium text-white/75 lg:justify-start">
               <span className="inline-flex items-center gap-1.5">

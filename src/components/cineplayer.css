@@ -669,9 +669,11 @@
 .zp-sw:not(.zp-sw-dlg) .zp-sh.zp-sh-wide{width:min(100%,560px)!important}
 @media (orientation:landscape) and (max-height:620px){.zp-sw:not(.zp-sw-dlg) .zp-sh,.zp-sw:not(.zp-sw-dlg) .zp-sh.zp-sh-wide{width:min(440px,70vw)!important}}
 
-/* sheets / dialogs (settings, captions, episodes, report): same circle -> blob -> rectangle morph as the popups; the end radius is the sheet's own */
-@keyframes zpblob{0%{opacity:0;transform:scale(.3);border-radius:120px 120px 120px 120px/120px 120px 120px 120px}45%{opacity:1;transform:scale(.9);border-radius:46px 18px 40px 24px/26px 44px 20px 40px}100%{transform:none}}
-.zp-sw .zp-sh{animation:zpblob .6s cubic-bezier(.2,.9,.3,1) both!important;transform-origin:50% 100%}
-@media (orientation:landscape) and (max-height:620px){.zp-sw:not(.zp-sw-dlg) .zp-sh{transform-origin:100% 50%}}
-@media (min-width:900px) and (min-height:621px){.zp-sw .zp-sh{transform-origin:50% 50%}}
-.zp-sw-dlg .zp-sh{transform-origin:50% 50%}
+/* big sheets / dialogs (settings, captions, episodes, report): plain minimal open animation; the blob morph is only for the small popups */
+@keyframes zpsheet{from{opacity:0;transform:translateY(14px)}}
+@keyframes zpsheetx{from{opacity:0;transform:translateX(22px)}}
+@keyframes zpsheetc{from{opacity:0;transform:scale(.97)}}
+.zp-sw .zp-sh{animation:zpsheet .2s ease-out both!important}
+@media (orientation:landscape) and (max-height:620px){.zp-sw:not(.zp-sw-dlg) .zp-sh{animation-name:zpsheetx!important}}
+@media (min-width:900px) and (min-height:621px){.zp-sw .zp-sh{animation-name:zpsheetc!important}}
+.zp-sw-dlg .zp-sh{animation-name:zpsheetc!important}

@@ -12,7 +12,7 @@ import { AuroraBackground } from '../components/AuroraBackground'
 import { ErrorState } from '../components/ErrorState'
 import { GenreMarquee } from '../components/GenreMarquee'
 import { HeroCarousel } from '../components/HeroCarousel'
-import { Skeleton } from '../components/Skeleton'
+import { HeroLoader } from '../components/HeroLoader'
 
 export default function HomePage() {
   const home = useAsync(fetchHome, [])
@@ -48,15 +48,7 @@ export default function HomePage() {
       {home.loading ? (
         <div className="relative h-[88svh] max-h-[900px] min-h-[580px] overflow-hidden lg:h-[92svh] lg:max-h-[860px]">
           <AuroraBackground />
-          <div className="absolute inset-x-0 bottom-0 mx-auto flex w-full max-w-7xl flex-col items-center gap-4 px-5 pb-12 sm:px-8 lg:items-start">
-            <Skeleton className="h-16 w-64 max-w-[70%]" />
-            <Skeleton className="h-4 w-56" />
-            <Skeleton className="h-10 w-full max-w-md" />
-            <div className="flex gap-2.5">
-              <Skeleton className="h-14 w-40 rounded-full" />
-              <Skeleton className="h-14 w-36 rounded-full" />
-            </div>
-          </div>
+          <HeroLoader />
         </div>
       ) : err ? (
         <div className="grid min-h-[70svh] place-items-center px-4 pt-24">
