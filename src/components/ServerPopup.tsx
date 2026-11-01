@@ -13,8 +13,10 @@ export interface ServerOpt {
 }
 
 export const SPRING = { type: 'spring', stiffness: 270, damping: 30 } as const
-/** lopsided blob first, then settles into the rectangle; shared with CinePlayer popups */
-export const BLOB = ['50%', '38% 62% 45% 55% / 58% 42% 58% 42%', '24px']
+/** Same-shape radius strings (8 px values) so every step interpolates instead of snapping. */
+const r = (n: number) => `${n}px ${n}px ${n}px ${n}px / ${n}px ${n}px ${n}px ${n}px`
+/** circle -> lopsided blob -> rounded rectangle; shared with CinePlayer popups */
+export const blob = (from: number) => [r(from), '46px 18px 40px 24px / 26px 44px 20px 40px', r(24)]
 export const BLOB_T = { duration: 0.6, times: [0, 0.45, 1], ease: 'easeOut' as const }
 
 /** A circle button that morphs into the dark glass server card (circle -> rounded rectangle), then lists the servers. */
@@ -45,8 +47,8 @@ export function ServerPopup({ servers, value, onPick }: { servers: ServerOpt[]; 
 
       <motion.div
         initial={false}
-        animate={{ width: open ? 288 : 44, height: open ? 'auto' : 44, borderRadius: open ? BLOB : 22 }}
-        transition={{ ...SPRING, borderRadius: open ? BLOB_T : SPRING }}
+        animate={{ width: open ? 288 : 44, height: open ? 'auto' : 44, borderRadius: open ? blob(22) : r(22) }}
+        transition={{ ...SPRING, borderRadius: open ? BLOB_T : { duration: 0.3 } }}
         style={{ minHeight: 44, maxWidth: 'calc(100vw - 1.5rem)' }}
         className="absolute left-0 top-0 z-40 overflow-hidden border border-white/10 bg-neutral-900/90 shadow-xl shadow-black/40 backdrop-blur-md"
       >

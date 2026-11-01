@@ -1,3 +1,4 @@
+import { Img } from '../components/Img'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Play, Star } from 'lucide-react'
@@ -36,7 +37,7 @@ function Entry({ e, now }: { e: AniAiringEntry; now: number }) {
   return (
     <li className="group relative flex gap-4 rounded-2xl border border-border bg-card/60 p-3 transition hover:border-accent/50 hover:bg-card sm:p-4">
       <Link to={`/anime/${m.id}`} className="relative aspect-[2/3] w-16 shrink-0 overflow-hidden rounded-xl bg-card-2 sm:w-20" style={{ backgroundColor: m.coverImage.color ?? undefined }}>
-        <img src={m.coverImage.large ?? ''} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <Img src={m.coverImage.large ?? ''} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
       </Link>
       <div className="flex min-w-0 flex-1 flex-col justify-between">
         <div>

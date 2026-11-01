@@ -1,3 +1,4 @@
+import { Img } from './Img'
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { fetchMalPictures } from '../services/jikan'
@@ -47,8 +48,8 @@ export function Gallery({ anime, tmdb }: { anime: AniMediaDetails; tmdb: { id: n
     <>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {imgs.map((u) => (
-          <button key={u} onClick={() => setOpen(u)} aria-label="View image" className="overflow-hidden rounded-xl bg-card-2 transition hover:ring-2 hover:ring-accent">
-            <img src={u} alt="" loading="lazy" className="aspect-video w-full object-cover" onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')} />
+          <button key={u} onClick={() => setOpen(u)} aria-label="View image" className="relative overflow-hidden rounded-xl bg-card-2 transition hover:ring-2 hover:ring-accent">
+            <Img src={u} alt="" loading="lazy" className="aspect-video w-full object-cover" onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')} />
           </button>
         ))}
         {loading && Array.from({ length: 4 }, (_, i) => <div key={`s${i}`} className="aspect-video animate-pulse rounded-xl bg-card-2" />)}

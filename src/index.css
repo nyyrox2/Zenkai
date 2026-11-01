@@ -392,3 +392,12 @@ html {
 html[data-tv] { font-size: calc(var(--root-fs) * 1.125); }
 body { min-width: 320px; }
 input, select, textarea { font-size: max(16px, 1em); } /* stops iOS zooming into fields */
+
+@keyframes img-in {
+  from {
+    opacity: 0;
+  }
+}
+.img-in {
+  animation: img-in 0.5s ease both;
+}

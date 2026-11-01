@@ -1,3 +1,4 @@
+import { Img } from './Img'
 import { Link } from 'react-router-dom'
 import { Play, X } from 'lucide-react'
 import { removeHistory, useHistory, type HistoryItem } from '../lib/library'
@@ -29,7 +30,7 @@ function Card({ h }: { h: HistoryItem }) {
           style={{ backgroundColor: h.color ?? undefined }}
           className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border bg-card-2 shadow-lg shadow-black/10 group-focus-visible:ring-2 group-focus-visible:ring-accent"
         >
-          <img src={h.image} alt={h.title} loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          <Img src={h.image} alt={h.title} loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
           <div className="absolute inset-0 grid place-items-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
             <span className="grid size-12 place-items-center rounded-full bg-accent text-accent-fg shadow-xl">
               <Play className="size-5 fill-current" />

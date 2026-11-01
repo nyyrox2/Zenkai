@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { apiUrl, fetchStream, type EpInfo, type EpKind } from '../services/api'
 import { KIND } from './EpisodeList'
-import { BLOB, BLOB_T, SPRING } from './ServerPopup'
+import { blob, BLOB_T, SPRING } from './ServerPopup'
 import { LoadingGrid } from './LoadingGrid'
 import { Tour, tourDone, tourSeen, type TourStep } from './Tour'
 import { gpuSupported, startUpscale, type Anime4KMode } from '../lib/upscale'
@@ -2117,9 +2117,9 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               className={cx('zp-pop', pop === 'cc' && 'zp-pop-cc')}
               role="menu"
               aria-label={pop}
-              initial={{ opacity: 0, scale: 0.3, borderRadius: '50%' }}
-              animate={{ opacity: 1, scale: 1, borderRadius: BLOB }}
-              exit={{ opacity: 0, scale: 0.6, borderRadius: '50%', transition: { duration: 0.14 } }}
+              initial={{ opacity: 0, scale: 0.3, borderRadius: blob(120)[0] }}
+              animate={{ opacity: 1, scale: 1, borderRadius: blob(120) }}
+              exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.14 } }}
               transition={{ ...SPRING, borderRadius: BLOB_T }}
               style={{
                 transformOrigin: popTransformOrigin,

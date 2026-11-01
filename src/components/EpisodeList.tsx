@@ -1,3 +1,4 @@
+import { Img } from './Img'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpDown, AudioLines, LayoutGrid, List, Play, Search } from 'lucide-react'
@@ -140,7 +141,7 @@ export function EpisodeList({
             const body = (
               <>
                 <div className={cn('relative shrink-0 overflow-hidden rounded-2xl bg-card-2', card ? 'aspect-video w-full' : 'aspect-video w-36 sm:w-52')}>
-                  {img && <img src={img} alt="" loading="lazy" decoding="async" className={cn('h-full w-full object-cover transition duration-500', aired && 'group-hover:scale-105', !e?.image && 'opacity-60 blur-[1px]')} />}
+                  {img && <Img src={img} alt="" loading="lazy" decoding="async" className={cn('h-full w-full object-cover transition duration-500', aired && 'group-hover:scale-105', !e?.image && 'opacity-60 blur-[1px]')} />}
                   <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                   {kind && <span className={cn('absolute left-2 top-2 rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase backdrop-blur', KIND[kind].cls, 'bg-black/70')}>{KIND[kind].label}</span>}
                   {card ? (

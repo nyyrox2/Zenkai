@@ -1,3 +1,4 @@
+import { Img } from '../components/Img'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMarkDetails, useSmartBack } from '../lib/backToDetails'
@@ -57,7 +58,7 @@ export default function MovieDetailsPage() {
         <div className="relative mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-16 pt-32 sm:px-6 sm:pt-40 md:flex-row md:items-end">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mx-auto w-44 shrink-0 sm:w-56 md:mx-0 md:w-64">
             {m?.poster ? (
-              <img src={img(m.poster, 'w500') ?? ''} alt={m.title} className="aspect-[2/3] w-full rounded-2xl border border-white/20 object-cover shadow-2xl shadow-black/60" />
+              <div className="relative overflow-hidden rounded-2xl border border-white/20 shadow-2xl shadow-black/60"><Img src={img(m.poster, 'w500') ?? ''} alt={m.title} className="aspect-[2/3] w-full object-cover" /></div>
             ) : (
               <Skeleton className="aspect-[2/3] w-full rounded-2xl" />
             )}
@@ -143,8 +144,8 @@ export default function MovieDetailsPage() {
             <div className="no-scrollbar flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6">
               {m.cast.map((c) => (
                 <div key={c.id} className="w-28 shrink-0 text-center sm:w-32">
-                  <div className="aspect-square overflow-hidden rounded-full border border-border bg-card-2">
-                    {c.photo ? <img src={img(c.photo, 'w185') ?? ''} alt={c.name} loading="lazy" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center font-display text-2xl font-black text-muted">{c.name[0]}</div>}
+                  <div className="relative aspect-square overflow-hidden rounded-full border border-border bg-card-2">
+                    {c.photo ? <Img src={img(c.photo, 'w185') ?? ''} alt={c.name} loading="lazy" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center font-display text-2xl font-black text-muted">{c.name[0]}</div>}
                   </div>
                   <p className="mt-2 line-clamp-2 text-sm font-medium leading-tight">{c.name}</p>
                   <p className="line-clamp-1 text-xs text-muted">{c.character}</p>
@@ -183,7 +184,7 @@ function Episodes({ id, seasons, season, onSeason }: { id: number; seasons: { n:
                 <SpotlightCard className="h-full p-2.5 transition group-hover:border-accent group-focus-visible:ring-2 group-focus-visible:ring-accent">
                   <div className="flex gap-3">
                   <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-xl bg-card-2 sm:w-36">
-                    {e.still && <img src={img(e.still, 'w342') ?? ''} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
+                    {e.still && <Img src={img(e.still, 'w342') ?? ''} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />}
                     <span className="absolute inset-0 grid place-items-center bg-black/30 opacity-0 transition group-hover:opacity-100">
                       <Play className="size-6 fill-white text-white" />
                     </span>

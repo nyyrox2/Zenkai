@@ -1,9 +1,10 @@
-import { memo, useRef, useState } from 'react'
+import { memo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import type { CardItem } from '../types/anime'
 import { cn, formatLabel, toScore10 } from '../lib/utils'
 import { ListButton } from './ListButton'
+import { Img } from './Img'
 
 /**
  * Poster card. Cheap by design: plain CSS animation/hover, a pointer-driven 3D tilt that only runs for a mouse
@@ -23,7 +24,6 @@ export const AnimeCard = memo(function AnimeCard({
 }) {
   const tilt = useRef<HTMLDivElement>(null)
   const raf = useRef(0)
-  const [loaded, setLoaded] = useState(false)
 
   function onMove(e: React.PointerEvent<HTMLAnchorElement>) {
     if (e.pointerType !== 'mouse') return
@@ -55,7 +55,7 @@ export const AnimeCard = memo(function AnimeCard({
           style={{ backgroundColor: item.color ?? undefined }}
           className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border bg-card-2 shadow-lg shadow-black/10 transition-[transform,box-shadow] duration-200 ease-out group-hover:shadow-2xl group-hover:shadow-accent/20 group-focus-visible:ring-2 group-focus-visible:ring-accent"
         >
-          <img
+          <Img
             src={item.image}
             srcSet={item.image2x ? `${item.image} 230w, ${item.image2x} 460w` : undefined}
             sizes={fluid ? '(min-width:1280px) 16vw, (min-width:640px) 30vw, 46vw' : '(min-width:1024px) 196px, (min-width:640px) 178px, 148px'}
@@ -63,11 +63,7 @@ export const AnimeCard = memo(function AnimeCard({
             loading="lazy"
             decoding="async"
             draggable={false}
-            onLoad={() => setLoaded(true)}
-            className={cn(
-              'h-full w-full object-cover transition-[opacity,transform] duration-500 group-hover:scale-105',
-              loaded ? 'opacity-100' : 'opacity-0',
-            )}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
 
           {item.score ? (

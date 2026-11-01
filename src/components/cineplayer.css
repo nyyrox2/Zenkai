@@ -307,7 +307,6 @@
   min-width: min(340px, 88vw) !important;
   max-width: min(400px, 92vw) !important;
   max-height: min(480px, calc(100cqh - var(--bar) - var(--sb) - var(--st) - 16px)) !important;
-  border-radius: 22px !important;
   padding: 10px !important;
 }
 
@@ -379,21 +378,21 @@
 .zp-sh {
   font-size: 13px;
   width: min(100%, 430px);
-  border-radius: 14px 14px 0 0 !important;
+  border-radius: 14px 14px 0 0;
   border-bottom: 0 !important;
   animation: none !important;
 }
 @media (orientation: landscape) and (max-height: 620px) {
   .zp-sh {
     width: min(390px, 70vw);
-    border-radius: 14px 0 0 14px !important;
+    border-radius: 14px 0 0 14px;
     border: 0 !important;
     border-left: 1px solid rgba(255, 255, 255, 0.12) !important;
   }
 }
 @media (min-width: 900px) and (min-height: 621px) {
   .zp-sh {
-    border-radius: 14px !important;
+    border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.12) !important;
     width: min(100%, 450px);
     max-height: 78dvh;
@@ -606,7 +605,7 @@
 
 /* Caption dialog */
 .zp-sw-dlg{align-items:center!important;justify-content:center!important;padding:12px!important}
-.zp-sw-dlg .zp-sh{width:min(100%,460px)!important;height:min(620px,88dvh)!important;max-height:88dvh!important;border-radius:18px!important;padding:0!important;border:1px solid rgba(255,255,255,.14)!important;animation:none!important}
+.zp-sw-dlg .zp-sh{width:min(100%,460px)!important;height:min(620px,88dvh)!important;max-height:88dvh!important;border-radius:18px;padding:0!important;border:1px solid rgba(255,255,255,.14)!important;animation:none!important}
 .zp-sw-dlg .zp-sh-b{padding:0 14px 14px!important;gap:8px}
 .zp-sw-dlg .zp-prev{margin:0 -14px;padding:8px 14px 0;background:#0b0b10;border-bottom:1px solid rgba(255,255,255,.08)}
 .zp-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
@@ -669,3 +668,10 @@
 .zp-sw:not(.zp-sw-dlg) .zp-sh{width:min(100%,480px)}
 .zp-sw:not(.zp-sw-dlg) .zp-sh.zp-sh-wide{width:min(100%,560px)!important}
 @media (orientation:landscape) and (max-height:620px){.zp-sw:not(.zp-sw-dlg) .zp-sh,.zp-sw:not(.zp-sw-dlg) .zp-sh.zp-sh-wide{width:min(440px,70vw)!important}}
+
+/* sheets / dialogs (settings, captions, episodes, report): same circle -> blob -> rectangle morph as the popups; the end radius is the sheet's own */
+@keyframes zpblob{0%{opacity:0;transform:scale(.3);border-radius:120px 120px 120px 120px/120px 120px 120px 120px}45%{opacity:1;transform:scale(.9);border-radius:46px 18px 40px 24px/26px 44px 20px 40px}100%{transform:none}}
+.zp-sw .zp-sh{animation:zpblob .6s cubic-bezier(.2,.9,.3,1) both!important;transform-origin:50% 100%}
+@media (orientation:landscape) and (max-height:620px){.zp-sw:not(.zp-sw-dlg) .zp-sh{transform-origin:100% 50%}}
+@media (min-width:900px) and (min-height:621px){.zp-sw .zp-sh{transform-origin:50% 50%}}
+.zp-sw-dlg .zp-sh{transform-origin:50% 50%}

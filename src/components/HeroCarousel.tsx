@@ -1,3 +1,4 @@
+import { Img } from './Img'
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bookmark, BookmarkCheck, ChevronLeft, ChevronRight, Film, Info, Play, Star } from 'lucide-react'
@@ -22,7 +23,8 @@ function Backdrop({ item, tmdb, loaded }: { item: AniMedia; tmdb: Tmdb | null; l
   const hd = tmdbImg(tmdb?.backdrop, 'w1280')
   return (
     <div className="animate-kenburns absolute inset-0 will-change-transform">
-      {loaded && (!hd || bad) && <img src={base} alt="" fetchPriority="high" className={cn('h-full w-full object-cover object-[center_25%]', !item.bannerImage && 'scale-125 blur-2xl')} />}
+      {!loaded || (hd && !bad && !ready) ? <span aria-hidden className="skeleton absolute inset-0" /> : null}
+      {loaded && (!hd || bad) && <Img src={base} alt="" fetchPriority="high" className={cn('h-full w-full object-cover object-[center_25%]', !item.bannerImage && 'scale-125 blur-2xl')} />}
       {hd && (
         <img
           src={hd}

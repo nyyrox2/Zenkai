@@ -1,3 +1,4 @@
+import { Img } from '../components/Img'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { shareLink } from '../lib/share'
@@ -320,7 +321,7 @@ export default function DetailsPage() {
               className="relative mx-auto aspect-[2/3] w-44 overflow-hidden rounded-3xl border border-border bg-card-2 shadow-2xl shadow-black/30 sm:w-56 lg:w-full"
               style={{ backgroundColor: a.coverImage.color ?? undefined }}
             >
-              {tb && <img src={tmdbImg(tmdb?.poster, 'w500') ?? a.coverImage.extraLarge ?? a.coverImage.large ?? ''} alt={title} className="h-full w-full object-cover" />}
+              {tb ? <Img src={tmdbImg(tmdb?.poster, 'w500') ?? a.coverImage.extraLarge ?? a.coverImage.large ?? ''} alt={title} className="h-full w-full object-cover" /> : <span aria-hidden className="skeleton absolute inset-0" />}
               <BorderBeam size={200} duration={9} />
             </motion.div>
 

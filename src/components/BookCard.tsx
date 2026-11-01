@@ -1,3 +1,4 @@
+import { Img } from './Img'
 import { memo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Star } from 'lucide-react'
@@ -62,7 +63,7 @@ export const BookCard = memo(function BookCard({
           className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border bg-card-2 shadow-lg shadow-black/10 transition-[transform,box-shadow] duration-200 ease-out group-hover:shadow-2xl group-hover:shadow-accent/20 group-focus-visible:ring-2 group-focus-visible:ring-accent"
         >
           {showImg ? (
-            <img
+            <Img
               src={item.image}
               alt={item.title}
               loading="lazy"
