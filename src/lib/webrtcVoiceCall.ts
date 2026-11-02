@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { requestMicrophoneStream } from './microphone'
+import { playConnected, playHangup, playMicOff, playMicOn, startRinging, stopRinging } from './sounds'
 
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [
@@ -55,6 +56,14 @@ export class DirectVoiceCall {
     this.partner = options.partner
     this.isCaller = options.isCaller
     this.status = options.isCaller ? 'calling' : 'incoming'
+    this.syncRinging()
+  }
+
+  /** Ringtone while a call comes in, soft ringback while we are calling, silence otherwise. */
+  private syncRinging() {
+    if (this.status === 'incoming') startRinging('incoming')
+    else if (this.status === 'calling' && this.isCaller) startRinging('outgoing')
+    else stopRinging()
   }
 
   public setCallbacks(cbs: {
@@ -299,6 +308,7 @@ export class DirectVoiceCall {
       try {
         this.isMuted = false // acquireMicrophone enables the new track based on this flag
         await this.acquireMicrophone()
+        playMicOn()
         return false
       } catch {
         this.isMuted = true
@@ -316,6 +326,7 @@ export class DirectVoiceCall {
     }
     for (const track of this.localStream.getTracks()) track.stop()
     this.localStream = null
+    playMicOff()
     return this.isMuted
   }
 
@@ -356,7 +367,11 @@ export class DirectVoiceCall {
     if (newStatus === 'connected' && !this.connectedAt) {
       this.connectedAt = Date.now()
     }
+    const prev = this.status
     this.status = newStatus
+    this.syncRinging()
+    if (newStatus === 'connected' && prev !== 'connected') playConnected()
+    else if (newStatus === 'ended' && prev !== 'ended') playHangup()
     this.onStatusChange?.(newStatus)
   }
 

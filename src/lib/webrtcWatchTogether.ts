@@ -1,3 +1,4 @@
+import { playJoin, playLeave, playMicOff, playMicOn } from './sounds'
 import { supabase } from './supabase'
 import { requestMicrophoneStream } from './microphone'
 
@@ -104,6 +105,9 @@ export class WatchTogetherRoom {
   private onLocalMicChangeCallback?: (active: boolean) => void
 
   private isDestroyed = false
+  /** false while the initial presence burst is processed, so people already in the room don't each chime */
+  private announceJoins = false
+  private chimed: Set<string> = new Set()
 
   constructor(options: {
     roomId: string
@@ -157,6 +161,7 @@ export class WatchTogetherRoom {
           activePeerIds.add(key)
           const p = (presences as any[])[0]
           if (p && key !== this.peerId) {
+            this.noteArrival(key)
             const existing = this.peers.get(key)
             this.peers.set(key, {
               peerId: key,
@@ -183,6 +188,7 @@ export class WatchTogetherRoom {
             this.peerConnections.delete(id)
             this.dataChannels.delete(id)
             this.peers.delete(id)
+            if (this.chimed.delete(id)) playLeave()
             const audioEl = this.remoteAudioElements.get(id)
             if (audioEl) {
               audioEl.pause()
@@ -201,6 +207,8 @@ export class WatchTogetherRoom {
         if (this.isDestroyed || key === this.peerId) return
         const p = (newPresences as any[])[0]
         if (p) {
+          // the first burst after connecting lists people already there: stay quiet for those
+          this.noteArrival(key)
           this.peers.set(key, {
             peerId: key,
             userId: p.userId,
@@ -223,6 +231,7 @@ export class WatchTogetherRoom {
         // The old session of a peer that already rejoined (same id) leaves late: it is still in the room
         const still = this.channel?.presenceState()?.[key]
         if (still && still.length > 0) return
+        if (this.chimed.delete(key)) playLeave()
         const pc = this.peerConnections.get(key)
         if (pc) {
           pc.close()
@@ -285,8 +294,16 @@ export class WatchTogetherRoom {
           joinedAt: Date.now(),
         })
         this.onConnectionStatusChangeCallback?.('connected')
+        window.setTimeout(() => { this.announceJoins = true }, 2000)
       }
     })
+  }
+
+  /** Chime once per newly arrived peer; people already in the room when we connect arrive silently. */
+  private noteArrival(key: string) {
+    if (this.chimed.has(key)) return
+    this.chimed.add(key)
+    if (this.announceJoins) playJoin()
   }
 
   /** Host always offers to guests; between two guests the lower id offers. */
@@ -810,6 +827,8 @@ export class WatchTogetherRoom {
       }
     }
 
+    if (this.isMicActive) playMicOn()
+    else playMicOff()
     this.onLocalMicChangeCallback?.(this.isMicActive)
     this.peerVoiceStates.set(this.peerId, this.isMicActive)
     this.broadcastP2P({
