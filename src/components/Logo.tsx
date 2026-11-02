@@ -3,10 +3,22 @@ import { Link } from 'react-router-dom'
 import { LOGO_URL } from '../lib/constants'
 import { cn } from '../lib/utils'
 
-export function Logo({ size = 36, showText = true, className, to = '/home' }: { size?: number; showText?: boolean; className?: string; to?: string }) {
+export function Logo({
+  size = 36,
+  showText = true,
+  className,
+  textClassName,
+  to = '/home',
+}: {
+  size?: number
+  showText?: boolean
+  className?: string
+  textClassName?: string
+  to?: string
+}) {
   const [failed, setFailed] = useState(false)
   return (
-    <Link to={to} aria-label="Zenkai home" className={cn('group inline-flex items-center gap-2.5', className)}>
+    <Link to={to} aria-label="Zenkai home" className={cn('group inline-flex shrink-0 items-center gap-2.5', className)}>
       {failed ? (
         <span
           className="grid place-items-center rounded-xl bg-foreground font-display text-lg font-black text-background"
@@ -25,7 +37,11 @@ export function Logo({ size = 36, showText = true, className, to = '/home' }: { 
           style={{ width: size, height: size }}
         />
       )}
-      {showText && <span className="font-display text-xl font-extrabold tracking-tight">Zenkai</span>}
+      {showText && (
+        <span className={cn('font-display text-xl font-extrabold tracking-tight', textClassName)}>
+          Zenkai
+        </span>
+      )}
     </Link>
   )
 }

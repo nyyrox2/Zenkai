@@ -9,6 +9,55 @@ export interface DirectMessage {
   created_at: string
 }
 
+export interface CallLogPayload {
+  isCall: boolean
+  status?: 'started' | 'ended' | 'missed' | 'declined'
+  duration?: number
+  timestamp?: number
+}
+
+export function parseCallMessage(content: string): CallLogPayload {
+  if (!content) return { isCall: false }
+  const match = content.match(/^\[CALL:(started|ended|missed|declined)(?::(\d+))?\]$/)
+  if (match) {
+    const status = match[1] as 'started' | 'ended' | 'missed' | 'declined'
+    const num = match[2] ? Number(match[2]) : undefined
+    return {
+      isCall: true,
+      status,
+      duration: status === 'ended' ? num : undefined,
+      timestamp: status === 'started' ? num : undefined,
+    }
+  }
+  return { isCall: false }
+}
+
+export function formatCallDuration(seconds?: number): string {
+  if (!seconds || seconds <= 0) return '0s'
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  if (m === 0) return `${s}s`
+  return `${m}m ${s < 10 ? '0' : ''}${s}s`
+}
+
+export function formatCallSummary(content: string): string {
+  const parsed = parseCallMessage(content)
+  if (!parsed.isCall) return content
+  if (parsed.status === 'started') {
+    return '📞 Outgoing audio call'
+  }
+  if (parsed.status === 'ended') {
+    return `📞 Audio call (${formatCallDuration(parsed.duration)})`
+  }
+  if (parsed.status === 'missed') {
+    return '📞 Missed audio call'
+  }
+  if (parsed.status === 'declined') {
+    return '📞 Declined call'
+  }
+  return '📞 Audio call'
+}
+
 export interface ConversationSummary {
   partnerId: string
   partnerUsername: string
@@ -138,7 +187,7 @@ export async function fetchConversations(myUserId: string): Promise<Conversation
         partnerDisplayName: displayName,
         partnerAvatar: p?.avatar_url || null,
         partnerFrame: p?.frame || null,
-        lastMessage: info.lastMsg.content,
+        lastMessage: formatCallSummary(info.lastMsg.content),
         lastMessageAt: info.lastMsg.created_at,
         unreadCount: info.unread,
       })

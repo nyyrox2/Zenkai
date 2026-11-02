@@ -4,21 +4,27 @@ import {
   ArrowLeft,
   Check,
   CheckCheck,
-  Globe,
   Loader2,
   MessageSquare,
   Search,
   Send,
   UserX,
   X,
+  Phone,
+  PhoneCall,
+  PhoneOff,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useVoiceCall } from '../context/VoiceCallContext'
 import { Avatar } from '../components/Avatar'
+import { Logo } from '../components/Logo'
 import {
   fetchConversations,
   fetchMessagesWith,
   findUserByHandle,
   sendDirectMessage,
+  parseCallMessage,
+  formatCallDuration,
   type ConversationSummary,
   type DirectMessage,
   type PartnerProfile,
@@ -26,6 +32,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/toast'
 import { cn } from '../lib/utils'
+import { requestMicrophoneStream } from '../lib/microphone'
 
 function timeLabel(dateString: string) {
   const d = new Date(dateString)
@@ -62,6 +69,7 @@ export default function MessagesPage() {
   const { partnerHandle } = useParams<{ partnerHandle?: string }>()
   const navigate = useNavigate()
   const { user, signInWithGoogle } = useAuth()
+  const { startCall } = useVoiceCall()
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [loadingConvs, setLoadingConvs] = useState(true)
@@ -240,24 +248,36 @@ export default function MessagesPage() {
   // Not logged in view
   if (!user) {
     return (
-      <main className="mx-auto max-w-4xl px-4 pb-28 pt-24 sm:px-6">
-        <div className="rounded-3xl border border-border bg-card/70 p-8 text-center sm:p-14 shadow-2xl backdrop-blur-md">
-          <div className="mx-auto grid size-16 place-items-center rounded-3xl bg-accent/15 text-accent">
-            <MessageSquare className="size-8" />
-          </div>
-          <h1 className="mt-4 font-display text-2xl font-bold sm:text-3xl">Direct Messages & Inbox</h1>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            Sign in with your Google account to chat one-on-one with other otakus, share recommendations, and receive direct message notifications.
-          </p>
-          <div className="mt-6 flex justify-center">
-            <button
-              type="button"
-              onClick={() => void signInWithGoogle()}
-              className="inline-flex h-12 items-center gap-2.5 rounded-full bg-foreground px-6 text-sm font-bold text-background transition hover:opacity-90 active:scale-95 shadow-lg shadow-black/20"
-            >
-              <GoogleIcon className="size-5" />
-              <span>Continue with Google</span>
-            </button>
+      <main className="fixed inset-0 z-20 flex flex-col overflow-hidden bg-background h-[100dvh] w-full">
+        <header className="flex h-14 items-center justify-between border-b border-border bg-card/60 px-4 sm:px-6 shrink-0">
+          <Link
+            to="/home"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-muted hover:text-foreground transition active:scale-95"
+          >
+            <ArrowLeft className="size-4" />
+            <span>Back to Zenkai</span>
+          </Link>
+          <Logo size={32} textClassName="hidden sm:inline" />
+        </header>
+        <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="rounded-3xl border border-border bg-card/70 p-8 text-center sm:p-14 shadow-2xl backdrop-blur-md max-w-lg w-full">
+            <div className="mx-auto grid size-16 place-items-center rounded-3xl bg-accent/15 text-accent">
+              <MessageSquare className="size-8" />
+            </div>
+            <h1 className="mt-4 font-display text-2xl font-bold sm:text-3xl">Direct Messages & Inbox</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+              Sign in with your Google account to chat one-on-one with other otakus, share recommendations, and receive direct message notifications.
+            </p>
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => void signInWithGoogle()}
+                className="inline-flex h-12 items-center gap-2.5 rounded-full bg-foreground px-6 text-sm font-bold text-background transition hover:opacity-90 active:scale-95 shadow-lg shadow-black/20"
+              >
+                <GoogleIcon className="size-5" />
+                <span>Continue with Google</span>
+              </button>
+            </div>
           </div>
         </div>
       </main>
@@ -275,8 +295,8 @@ export default function MessagesPage() {
   })
 
   return (
-    <main className="fixed inset-0 top-14 z-20 flex flex-col overflow-hidden bg-background md:static md:mx-auto md:max-w-6xl md:px-4 md:pt-20 md:pb-6 md:h-[calc(100dvh-5rem)]">
-      <div className="relative flex-1 min-h-0 w-full overflow-hidden border-border bg-card/90 shadow-2xl backdrop-blur-md md:rounded-3xl md:border md:grid md:grid-cols-[21rem_minmax(0,1fr)] flex">
+    <main className="fixed inset-0 z-20 flex flex-col overflow-hidden bg-background h-[100dvh] w-full">
+      <div className="relative flex-1 min-h-0 w-full overflow-hidden border-border bg-card/90 flex md:grid md:grid-cols-[22rem_minmax(0,1fr)]">
         {/* ================= LEFT PANE: Inbox & Conversations List ================= */}
         <aside
           className={cn(
@@ -285,11 +305,20 @@ export default function MessagesPage() {
           )}
         >
           {/* Header */}
-          <div className="p-4 border-b border-border shrink-0">
+          <div className="p-3.5 sm:p-4 border-b border-border shrink-0 bg-card/50">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h1 className="font-display text-lg font-bold">Messages</h1>
-                <span className="rounded-full bg-card px-2 py-0.5 text-xs font-semibold text-muted border border-border">
+              <div className="flex items-center gap-2.5">
+                <Link
+                  to="/home"
+                  aria-label="Back to Zenkai home"
+                  title="Back to Zenkai home"
+                  className="grid size-8 place-items-center rounded-full border border-border bg-card text-muted hover:text-foreground hover:border-accent transition active:scale-95 shrink-0"
+                >
+                  <ArrowLeft className="size-4" />
+                </Link>
+                <Logo size={28} textClassName="hidden sm:inline" />
+                <h1 className="font-display text-base font-bold text-foreground">Messages</h1>
+                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold text-accent border border-accent/20">
                   {conversations.length}
                 </span>
               </div>
@@ -438,38 +467,65 @@ export default function MessagesPage() {
                     <ArrowLeft className="size-4" />
                   </button>
 
-                  <Avatar
-                    size={38}
-                    name={activePartner.displayName}
-                    src={activePartner.avatarUrl}
-                    frame={activePartner.frame}
-                    animateFrame
-                  />
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <h2 className="truncate font-display text-xs sm:text-sm font-bold">
-                        {activePartner.displayName}
-                      </h2>
-                      <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
-                        @{activePartner.username}
-                      </span>
-                    </div>
-                    <p className="text-[10px] sm:text-[11px] text-muted flex items-center gap-1">
-                      <span className="size-1.5 rounded-full bg-emerald-400" />
-                      <span>Direct Message</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="shrink-0">
                   <Link
                     to={`/u/${activePartner.username}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-accent hover:text-accent active:scale-95 shadow-sm"
+                    title={`View @${activePartner.username}'s profile`}
+                    className="group flex items-center gap-2.5 sm:gap-3 min-w-0 hover:opacity-85 transition"
                   >
-                    <Globe className="size-3.5" />
-                    <span className="hidden sm:inline">View Profile</span>
+                    <Avatar
+                      size={38}
+                      name={activePartner.displayName}
+                      src={activePartner.avatarUrl}
+                      frame={activePartner.frame}
+                      animateFrame
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <h2 className="truncate font-display text-xs sm:text-sm font-bold group-hover:text-accent transition-colors">
+                          {activePartner.displayName}
+                        </h2>
+                        <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
+                          @{activePartner.username}
+                        </span>
+                      </div>
+                      <p className="text-[10px] sm:text-[11px] text-muted flex items-center gap-1">
+                        <span className="size-1.5 rounded-full bg-emerald-400" />
+                        <span>Direct Message</span>
+                      </p>
+                    </div>
                   </Link>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!activePartner) return
+                      let stream: MediaStream | undefined
+                      try {
+                        stream = await requestMicrophoneStream()
+                      } catch (err: any) {
+                        const msg = err?.message || ''
+                        if (msg.includes('HTTPS')) {
+                          toast(msg, 'error')
+                          return
+                        }
+                      }
+                      await startCall({
+                        id: activePartner.id,
+                        username: activePartner.username,
+                        displayName: activePartner.displayName,
+                        avatar: activePartner.avatarUrl,
+                      }, stream)
+                      navigate('/call')
+                    }}
+                    title={`Voice call @${activePartner.username}`}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3.5 py-1.5 text-xs font-bold text-emerald-400 transition hover:bg-emerald-500 hover:text-white active:scale-95 shadow-sm"
+                  >
+                    <Phone className="size-3.5" />
+                    <span>Call</span>
+                  </button>
                 </div>
               </header>
 
@@ -519,40 +575,122 @@ export default function MessagesPage() {
                           </div>
                         )}
 
-                        <div
-                          className={cn(
-                            'flex w-full',
-                            isMe ? 'justify-end' : 'justify-start'
-                          )}
-                        >
-                          <div
-                            className={cn(
-                              'relative max-w-[85%] sm:max-w-[70%] rounded-2xl px-3.5 py-2 text-xs sm:text-sm leading-relaxed shadow-sm',
-                              isMe
-                                ? 'bg-accent text-accent-fg rounded-br-sm shadow-accent/15'
-                                : 'border border-border bg-card-2 text-foreground rounded-bl-sm'
-                            )}
-                          >
-                            <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                        {(() => {
+                          const callData = parseCallMessage(m.content)
+                          if (callData.isCall) {
+                            const isStarted = callData.status === 'started'
+                            const isEnded = callData.status === 'ended'
+                            const isDeclined = callData.status === 'declined'
+                            const isPositive = isEnded || isStarted
+
+                            return (
+                              <div className="my-2.5 flex w-full justify-center">
+                                <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-card/90 px-3.5 py-2.5 shadow-md backdrop-blur-md max-w-sm w-full">
+                                  <div
+                                    className={cn(
+                                      'grid size-10 place-items-center rounded-xl shrink-0',
+                                      isPositive
+                                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                        : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                                    )}
+                                  >
+                                    {isPositive ? (
+                                      <PhoneCall className="size-5" />
+                                    ) : (
+                                      <PhoneOff className="size-5" />
+                                    )}
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs font-bold text-foreground">
+                                      {isStarted
+                                        ? (isMe ? 'Outgoing Audio Call' : 'Incoming Audio Call')
+                                        : isEnded
+                                        ? 'Audio Call'
+                                        : isDeclined
+                                        ? (isMe ? 'Call Declined' : 'Declined Audio Call')
+                                        : (isMe ? 'Unanswered Call' : 'Missed Audio Call')}
+                                    </h4>
+                                    <p className="text-[10px] sm:text-[11px] text-muted truncate">
+                                      {isStarted
+                                        ? `Started · ${timeLabel(m.created_at)}`
+                                        : isEnded && callData.duration
+                                        ? `Call ended • ${formatCallDuration(callData.duration)} · ${timeLabel(m.created_at)}`
+                                        : isDeclined
+                                        ? `Call declined · ${timeLabel(m.created_at)}`
+                                        : `No answer · ${timeLabel(m.created_at)}`}
+                                    </p>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!activePartner) return
+                                      let stream: MediaStream | undefined
+                                      try {
+                                        stream = await requestMicrophoneStream()
+                                      } catch (err: any) {
+                                        const msg = err?.message || ''
+                                        if (msg.includes('HTTPS')) {
+                                          toast(msg, 'error')
+                                          return
+                                        }
+                                      }
+                                      await startCall({
+                                        id: activePartner.id,
+                                        username: activePartner.username,
+                                        displayName: activePartner.displayName,
+                                        avatar: activePartner.avatarUrl,
+                                      }, stream)
+                                      navigate('/call')
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-bold text-accent-fg hover:brightness-110 active:scale-95 transition shrink-0 shadow-sm"
+                                  >
+                                    <Phone className="size-3" />
+                                    <span>Call back</span>
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          }
+
+                          return (
                             <div
                               className={cn(
-                                'mt-1 flex items-center justify-end gap-1 text-[9px] sm:text-[10px]',
-                                isMe ? 'text-accent-fg/80' : 'text-muted'
+                                'flex w-full',
+                                isMe ? 'justify-end' : 'justify-start'
                               )}
                             >
-                              <span>{timeLabel(m.created_at)}</span>
-                              {isMe && (
-                                isTemp ? (
-                                  <Loader2 className="size-2.5 animate-spin" />
-                                ) : m.read ? (
-                                  <CheckCheck className="size-3 text-emerald-300" />
-                                ) : (
-                                  <Check className="size-3" />
-                                )
-                              )}
+                              <div
+                                className={cn(
+                                  'relative max-w-[85%] sm:max-w-[70%] rounded-2xl px-3.5 py-2 text-xs sm:text-sm leading-relaxed shadow-sm',
+                                  isMe
+                                    ? 'bg-accent text-accent-fg rounded-br-sm shadow-accent/15'
+                                    : 'border border-border bg-card-2 text-foreground rounded-bl-sm'
+                                )}
+                              >
+                                <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                                <div
+                                  className={cn(
+                                    'mt-1 flex items-center justify-end gap-1 text-[9px] sm:text-[10px]',
+                                    isMe ? 'text-accent-fg/80' : 'text-muted'
+                                  )}
+                                >
+                                  <span>{timeLabel(m.created_at)}</span>
+                                  {isMe && (
+                                    isTemp ? (
+                                      <Loader2 className="size-2.5 animate-spin" />
+                                    ) : m.read ? (
+                                      <CheckCheck className="size-3 text-emerald-300" />
+                                    ) : (
+                                      <Check className="size-3" />
+                                    )
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
+                          )
+                        })()}
                       </div>
                     )
                   })
