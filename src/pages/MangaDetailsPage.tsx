@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowUpDown, BookOpen, RefreshCw, Search, Share2, Star } fro
 import { useAsync } from '../hooks/useAsync'
 import { useReading } from '../lib/reading'
 import { cn } from '../lib/utils'
-import { mangaShareUrl, shareLink } from '../lib/share'
+import { mangaShareUrl, shareMedia } from '../lib/share'
 import { MANGA_SOURCES, mangaHref, mangaSourceInfo, readingKey, resolveMangaSource, sourceParams, type MangaSourceId } from '../lib/mangaModels'
 import { bestMatch, fetchMangaChapters, fetchMangaMeta, resolveWorkerId, searchManga, type MangaChapterRef } from '../services/manga'
 import { ErrorState } from '../components/ErrorState'
@@ -171,7 +171,7 @@ function Details({ id }: { id: string }) {
                     Latest · Ch. {latest.number}
                   </ShimmerButton>
                 )}
-                <ShimmerButton variant="ghost" onClick={() => shareLink(mangaShareUrl(wid, title, cover, sourceParams(source)), `${title} — Zenkai`)} icon={<Share2 className="size-4" />}>
+                <ShimmerButton variant="ghost" onClick={() => shareMedia({ url: mangaShareUrl(wid, title, cover, sourceParams(source)), title, image: cover, poster: cover, label: 'Read free on Zenkai', subtitle: 'Manga' })} icon={<Share2 className="size-4" />}>
                   Share
                 </ShimmerButton>
                 <ShimmerButton variant="ghost" to="/manga">

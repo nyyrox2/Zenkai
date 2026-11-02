@@ -1,7 +1,7 @@
 import { Img } from '../components/Img'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { shareLink } from '../lib/share'
+import { shareMedia } from '../lib/share'
 import { useMarkDetails, useSmartBack } from '../lib/backToDetails'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, CalendarDays, Crown, ExternalLink, Heart, Play, Share2, ShieldAlert, ShieldCheck, TrendingUp, Users } from 'lucide-react'
@@ -337,7 +337,7 @@ export default function DetailsPage() {
               )}
               <ShimmerButton
                 variant="ghost"
-                onClick={() => shareLink(`${window.location.origin}/anime/${a.id}`, `${title} — Zenkai`)}
+                onClick={() => shareMedia({ url: `${window.location.origin}/anime/${a.id}`, title, image: a.bannerImage ?? a.coverImage.extraLarge, poster: a.coverImage.extraLarge, label: 'Watch free on Zenkai', subtitle: [a.format ? formatLabel(a.format) : '', a.seasonYear ?? ''].filter(Boolean).join(' · ') })}
                 icon={<Share2 className="size-4" />}
               >
                 Share

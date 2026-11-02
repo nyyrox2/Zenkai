@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import { Avatar } from './Avatar'
 import type { PublicUserData } from '../lib/profile'
-import { toast } from '../lib/toast'
 
 const spring = { type: 'spring', stiffness: 260, damping: 22 } as const
 
@@ -29,15 +28,16 @@ export function PublicProfileCard({
   const { profile, username, watchlistCount = 0, historyCount = 0, readingCount = 0 } = data
 
   const handleCopyLink = async () => {
-    try {
-      const url = `${window.location.origin}/u/${username}`
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      toast(`Copied @${username}'s profile link!`)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      toast('Failed to copy link', 'error')
-    }
+    const url = `${window.location.origin}/u/${username}`
+    const name = profile.name || username
+    const { shareCard } = await import('../lib/shareCard')
+    await shareCard(
+      { kind: 'profile', eyebrow: 'Join me on Zenkai', title: name, subtitle: `@${username}`, image: profile.banner, avatar: profile.avatar, initial: name },
+      url,
+      `${name} (@${username}) is inviting you to Zenkai — watch anime & movies together`,
+    )
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -70,7 +70,7 @@ export function PublicProfileCard({
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-3.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/80 active:scale-95"
           >
             {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
-            <span>{copied ? 'Link Copied!' : 'Share Profile'}</span>
+            <span>{copied ? 'Shared!' : 'Share Profile'}</span>
           </button>
         </div>
       </div>

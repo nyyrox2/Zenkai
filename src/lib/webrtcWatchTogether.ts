@@ -169,8 +169,8 @@ export class WatchTogetherRoom {
               latencyMs: existing?.latencyMs,
             })
 
-            // Mesh peer connection: if connection does not exist yet and this.peerId < key (or host)
-            if (!this.peerConnections.has(key) && (this.peerId < key || this.isHost)) {
+            // Mesh peer connection: exactly one side offers (host first, otherwise the lower id), so rejoining never collides
+            if (this.needsConnection(key) && this.shouldInitiate(key)) {
               void this.initiatePeerConnection(key)
             }
           }
@@ -212,14 +212,17 @@ export class WatchTogetherRoom {
           })
           this.notifyPeersChanged()
 
-          // Connect mesh peer connection
-          if (this.peerId < key || this.isHost) {
+          // A rejoining peer reuses its id: drop the stale connection and offer a fresh one
+          if (this.shouldInitiate(key)) {
             void this.initiatePeerConnection(key)
           }
         }
       })
       .on('presence', { event: 'leave' }, ({ key }) => {
         if (this.isDestroyed || key === this.peerId) return
+        // The old session of a peer that already rejoined (same id) leaves late: it is still in the room
+        const still = this.channel?.presenceState()?.[key]
+        if (still && still.length > 0) return
         const pc = this.peerConnections.get(key)
         if (pc) {
           pc.close()
@@ -286,9 +289,38 @@ export class WatchTogetherRoom {
     })
   }
 
+  /** Host always offers to guests; between two guests the lower id offers. */
+  private shouldInitiate(key: string): boolean {
+    if (this.isHost) return true
+    if (this.peers.get(key)?.isHost) return false
+    return this.peerId < key
+  }
+
+  private needsConnection(key: string): boolean {
+    const pc = this.peerConnections.get(key)
+    return !pc || pc.connectionState === 'closed' || pc.connectionState === 'failed'
+  }
+
+  private dropConnection(key: string) {
+    const old = this.peerConnections.get(key)
+    if (old) {
+      old.onconnectionstatechange = null
+      old.onicecandidate = null
+      old.ontrack = null
+      try {
+        old.close()
+      } catch {
+        /* already closed */
+      }
+      this.peerConnections.delete(key)
+    }
+    this.dataChannels.delete(key)
+  }
+
   /** Host/Initiator creates WebRTC connection & DataChannel to target peer */
   private async initiatePeerConnection(targetPeerId: string) {
     try {
+      this.dropConnection(targetPeerId)
       const pc = new RTCPeerConnection(RTC_CONFIG)
       this.peerConnections.set(targetPeerId, pc)
 
@@ -331,6 +363,8 @@ export class WatchTogetherRoom {
   /** Remote peer receives SDP Offer, creates Answer */
   private async handleRemoteOffer(fromPeerId: string, sdp: RTCSessionDescriptionInit) {
     try {
+      // A new offer means the peer (re)started its side: never reuse the old connection
+      this.dropConnection(fromPeerId)
       let pc = this.peerConnections.get(fromPeerId)
       if (!pc) {
         pc = new RTCPeerConnection(RTC_CONFIG)
@@ -448,6 +482,14 @@ export class WatchTogetherRoom {
         if (peer) {
           peer.p2pConnected = false
           this.notifyPeersChanged()
+        }
+        // Broadcast fallback keeps sync alive meanwhile; the offering side retries the direct link
+        if (state === 'failed' && !this.isDestroyed && this.shouldInitiate(targetPeerId)) {
+          window.setTimeout(() => {
+            if (!this.isDestroyed && this.peers.has(targetPeerId) && pc === this.peerConnections.get(targetPeerId)) {
+              void this.initiatePeerConnection(targetPeerId)
+            }
+          }, 2000)
         }
       }
     }

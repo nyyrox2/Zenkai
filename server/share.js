@@ -158,7 +158,7 @@ const KINDS = {
   manga: { ogType: "book", suffix: "Read Free on Zenkai", fallback: (t) => `Read ${t} online free on Zenkai.` },
 };
 
-export async function shareCard({ request, env, kind, id, type }) {
+export async function shareCard({ request, env, kind, id, type, party = false }) {
   const ua = request.headers.get("user-agent") || "";
   const reqUrl = new URL(request.url);
   const asset = await env.ASSETS.fetch(new URL("/", request.url));
@@ -180,8 +180,16 @@ export async function shareCard({ request, env, kind, id, type }) {
   const cfg = KINDS[isMovie ? type : kind];
   const url = request.url;
   const name = c.plainTitle || c.title;
-  const title = `${c.title} — ${cfg.suffix}`;
-  const desc = c.desc || cfg.fallback(name);
+  let title = `${c.title} — ${cfg.suffix}`;
+  let desc = c.desc || cfg.fallback(name);
+  // Watch-party invite: /watch/:id?room=zk-xxxxxx&host=Name&ep=6
+  const room = (reqUrl.searchParams.get("room") || "").toLowerCase();
+  if (party && /^zk-[a-z0-9]{3,12}$/.test(room)) {
+    const host = clip(plain(reqUrl.searchParams.get("host") || ""), 40);
+    const ep = /^\d{1,4}$/.test(reqUrl.searchParams.get("ep") || "") ? reqUrl.searchParams.get("ep") : "";
+    title = `${host || "A friend"} is inviting you to watch ${name} together`;
+    desc = `Join the Zenkai watch party${ep ? ` · Episode ${ep}` : ""} · Code ${room.toUpperCase()} — everyone stays in sync. Tap to join.`;
+  }
   const set = (value) => ({ element: (e) => e.setAttribute("content", value) });
   const rw = new HTMLRewriter()
     .on("title", { element: (e) => e.setInnerContent(title) })

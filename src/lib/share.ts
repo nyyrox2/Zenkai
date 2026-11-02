@@ -20,3 +20,20 @@ export const movieShareUrl = (type: 'movie' | 'tv', id: number, title: string) =
 /** Manga link. Manga ids belong to the reading server, so the title/cover/server travel in the URL for the preview card. */
 export const mangaShareUrl = (id: string, title: string, cover: string, source: Record<string, string>) =>
   `${window.location.origin}/manga/${encodeURIComponent(id)}?${new URLSearchParams({ title, cover: /^https:\/\//.test(cover) ? cover : '', ...source })}`
+
+/**
+ * Watch-party invite link. Host name and title ride along so the preview card
+ * ("<name> is inviting you to watch <title>") works for crawlers without any database lookup.
+ */
+export const partyShareUrl = (animeId: number, ep: number, room: string, host: string, title: string) =>
+  `${window.location.origin}/watch/${animeId}?${new URLSearchParams({ ep: String(ep), room, host: host.slice(0, 40), t: title.slice(0, 120) })}`
+
+/** Anime / movie / manga share: native sheet with the generated card image + link. */
+export async function shareMedia(o: { url: string; title: string; image?: string | null; poster?: string | null; label: string; subtitle?: string }) {
+  const { shareCard } = await import('./shareCard')
+  await shareCard(
+    { kind: 'media', eyebrow: o.label, title: o.title, subtitle: o.subtitle, image: o.image, avatar: o.poster ?? o.image },
+    o.url,
+    `${o.title} — ${o.label} on Zenkai`,
+  )
+}

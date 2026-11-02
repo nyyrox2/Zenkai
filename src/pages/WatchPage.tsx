@@ -58,6 +58,7 @@ import { SERVERS, DIRECT, serverById, type EmbedCtx } from '../lib/servers'
 import { episodeCounts } from '../lib/episodes'
 import { lastEpisode, saveEpisode } from '../lib/progress'
 import { toast } from '../lib/toast'
+import { partyShareUrl } from '../lib/share'
 import { finishEpisode, getHistory, getPrefs, savePrefs, touchHistory } from '../lib/library'
 import { mediaToCard } from '../lib/mappers'
 import { ListButton } from '../components/ListButton'
@@ -288,10 +289,12 @@ export default function WatchPage() {
         const v = videoElRef.current
         if (v) {
           const expected = payload.currentTime + (Date.now() - payload.timestamp) / 1000
-          if (Math.abs(v.currentTime - expected) > 1.4) {
+          const stateOff = Boolean(payload.paused) !== v.paused && !v.seeking
+          if (Math.abs(v.currentTime - expected) > 1.4 || stateOff) {
+            // also covers a guest who just (re)joined: pick up the host's position and play/pause state
             setExternalControl({
               action: payload.paused ? 'pause' : 'play',
-              time: expected,
+              time: payload.paused ? payload.currentTime : expected,
               token: Date.now(),
             })
           }
@@ -338,23 +341,40 @@ export default function WatchPage() {
     toast(isHost ? `Watch Party started! Code: ${roomId}` : `Joined Watch Party ${roomId}!`, 'success')
   }, [room, id, ep, title, server.id, userProfile, go, navigate])
 
+  /** Coming back from a member's profile: reopen the party panel (the room itself is rejoined from the URL). */
+  const reopenAfterProfile = (roomId: string) => {
+    try {
+      if (sessionStorage.getItem('zk:party-return') === roomId) {
+        sessionStorage.removeItem('zk:party-return')
+        setWatchModalOpen(true)
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }
+
   // Auto-connect and restore host status from Supabase if room param is present in URL
   const urlRoom = sp.get('room')
+  const joiningRoom = useRef<string | null>(null)
   useEffect(() => {
-    if (urlRoom && !room && title) {
+    if (urlRoom && !room && title && joiningRoom.current !== urlRoom) {
+      joiningRoom.current = urlRoom // render churn must not open the same room twice (duplicate presence = ghost members)
       void (async () => {
         const record = await getWatchRoom(urlRoom)
         const myHostId = getMyHostIdentifier(user?.id)
         if (record) {
           const amHost = record.host_id === myHostId
           if (record.anime_id !== id) {
+            joiningRoom.current = null
             navigate(`/watch/${record.anime_id}?room=${urlRoom}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`, { replace: true })
             return
           }
           connectToRoom(urlRoom, amHost)
+          reopenAfterProfile(urlRoom)
         } else {
           // If room record was deleted or expired (>30m inactive), join as standard peer
           connectToRoom(urlRoom, false)
+          reopenAfterProfile(urlRoom)
         }
       })()
     }
@@ -400,6 +420,7 @@ export default function WatchPage() {
       audio,
     })
 
+    joiningRoom.current = newId
     connectToRoom(newId, true)
     setSp((prev) => {
       const n = new URLSearchParams(prev)
@@ -419,6 +440,7 @@ export default function WatchPage() {
       return
     }
 
+    joiningRoom.current = cleanCode
     connectToRoom(cleanCode, amHost)
     setSp((prev) => {
       const n = new URLSearchParams(prev)
@@ -428,6 +450,7 @@ export default function WatchPage() {
   }
 
   const handleLeaveRoom = () => {
+    joiningRoom.current = null
     if (room) {
       if (room.isHost) {
         void deleteWatchRoom(room.roomId)
@@ -472,7 +495,7 @@ export default function WatchPage() {
 
   const handleCopyInvite = async () => {
     if (!room) return
-    const url = `${window.location.origin}${window.location.pathname}?ep=${ep}&room=${room.roomId}`
+    const url = partyShareUrl(id, ep, room.roomId, userProfile.displayName, title)
     try {
       await navigator.clipboard.writeText(url)
       setCopiedInvite(true)
@@ -1565,8 +1588,6 @@ export default function WatchPage() {
         onClose={() => setWatchModalOpen(false)}
         room={room}
         peers={peers}
-        chatMessages={chatMessages}
-        onSendChat={(t) => room?.sendChat(t, { displayName: userProfile.displayName, avatar: userProfile.avatar })}
         onSendReaction={(em) => {
           if (!room) return
           const r = room.sendReaction(em, userProfile.displayName, userProfile.avatar)
@@ -1577,6 +1598,8 @@ export default function WatchPage() {
         onLeaveRoom={handleLeaveRoom}
         onForceSync={handleForceSync}
         animeTitle={title}
+        animeId={id}
+        image={a ? (a.bannerImage ?? a.coverImage.extraLarge) : null}
         episode={ep}
         isHost={room ? room.isHost : false}
         connectionStatus={connectionStatus}
