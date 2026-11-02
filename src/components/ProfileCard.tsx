@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { ChevronRight, ExternalLink, MessagesSquare, Sparkles } from 'lucide-react'
 import { DISCORD_URL } from '../lib/app'
 import { DiscordIcon } from './BrandIcons'
-import { BorderBeam } from './BorderBeam'
 
 /** Discord Community Banner displayed on HomePage instead of the setup profile placeholder. */
 export function ProfileCard() {
@@ -14,7 +13,6 @@ export function ProfileCard() {
         rel="noopener noreferrer"
         className="group relative flex items-center justify-between gap-4 overflow-hidden rounded-3xl border border-[#5865F2]/30 bg-gradient-to-r from-[#5865F2]/15 via-card/85 to-card/65 p-4 pr-5 transition duration-300 hover:border-[#5865F2]/60 hover:shadow-xl hover:shadow-[#5865F2]/10 active:scale-[0.99] sm:p-5"
       >
-        <BorderBeam size={180} duration={8} color="#5865F2" />
         <div className="flex items-center gap-4 min-w-0">
           <div className="grid size-12 sm:size-14 shrink-0 place-items-center rounded-2xl bg-[#5865F2] text-white shadow-lg shadow-[#5865F2]/30 transition-transform duration-300 group-hover:scale-105 group-hover:-rotate-3">
             <DiscordIcon className="size-6 sm:size-7" />

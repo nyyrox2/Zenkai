@@ -4,7 +4,6 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { submitCaptcha, useShield } from '../lib/shield'
 import { cn } from '../lib/utils'
-import { BorderBeam } from './BorderBeam'
 import { DotPattern } from './DotPattern'
 import { ShinyText } from './ShinyText'
 
@@ -17,7 +16,6 @@ function Card({ icon, title, tone = 'accent', children }: { icon: ReactNode; tit
       transition={{ type: 'spring', stiffness: 320, damping: 26 }}
       className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card p-8 text-center shadow-2xl shadow-black/40"
     >
-      <BorderBeam />
       <div className="relative mx-auto mb-5 grid size-[4.5rem] place-items-center">
         <motion.span
           aria-hidden

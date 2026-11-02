@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
 import { ChevronLeft, ChevronRight, Loader2, Lock, TriangleAlert } from 'lucide-react'
-import { BorderBeam } from '../components/BorderBeam'
 import { ErrorState } from '../components/ErrorState'
 import { ServerMenu } from '../components/ServerMenu'
 import { Skeleton } from '../components/Skeleton'
@@ -101,7 +100,6 @@ export default function MovieWatchPage() {
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
             <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-xl shadow-black/50">
               <Lock className="size-8 animate-pulse" />
-              <BorderBeam size={80} duration={4} />
             </div>
             <h3 className="font-display text-lg font-bold text-foreground">Media Playback Locked</h3>
             <p className="mt-1.5 max-w-sm text-xs text-muted leading-relaxed">
@@ -146,7 +144,6 @@ export default function MovieWatchPage() {
                 </div>
               </div>
             )}
-            <BorderBeam size={220} duration={10} />
           </>
         )}
       </div>

@@ -188,15 +188,6 @@ section[id] {
   animation: drift 18s ease-in-out infinite;
 }
 
-@keyframes border-beam {
-  to {
-    offset-distance: 100%;
-  }
-}
-.animate-border-beam {
-  animation: border-beam var(--duration, 8s) linear infinite;
-}
-
 @keyframes sweep {
   0% {
     transform: translateX(-150%) skewX(-20deg);
@@ -255,18 +246,6 @@ section[id] {
 .animate-card-in {
   animation: card-in 0.45s ease-out both;
 }
-
-/* React Bits "Star Border" */
-@keyframes star-bottom {
-  0% { transform: translate(0%, 0%); opacity: 1; }
-  100% { transform: translate(-100%, 0%); opacity: 0; }
-}
-@keyframes star-top {
-  0% { transform: translate(0%, 0%); opacity: 1; }
-  100% { transform: translate(100%, 0%); opacity: 0; }
-}
-.animate-star-bottom { animation: star-bottom linear infinite alternate; }
-.animate-star-top { animation: star-top linear infinite alternate; }
 
 /* React Bits "Gradient Text" */
 @keyframes gradient-pan {

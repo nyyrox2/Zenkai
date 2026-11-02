@@ -8,7 +8,6 @@ import { cn } from '../lib/utils'
 import { mangaShareUrl, shareLink } from '../lib/share'
 import { MANGA_SOURCES, mangaHref, mangaSourceInfo, readingKey, resolveMangaSource, sourceParams, type MangaSourceId } from '../lib/mangaModels'
 import { bestMatch, fetchMangaChapters, fetchMangaMeta, resolveWorkerId, searchManga, type MangaChapterRef } from '../services/manga'
-import { BorderBeam } from '../components/BorderBeam'
 import { ErrorState } from '../components/ErrorState'
 import { Reveal } from '../components/Reveal'
 import { ShimmerButton } from '../components/ShimmerButton'
@@ -116,7 +115,6 @@ function Details({ id }: { id: string }) {
               ) : (
                 <div className="grid size-full place-items-center p-4 text-center font-display text-lg font-bold text-muted">{title}</div>
               )}
-              <BorderBeam size={200} duration={9} />
             </div>
 
             <div className="min-w-0 flex-1 text-center md:text-left">

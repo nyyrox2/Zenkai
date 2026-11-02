@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Moon, Sun } from 'lucide-react'
+import { AccountPanel, AuthPanel } from '../components/CloudSyncCard'
+import { useAuth } from '../context/AuthContext'
 import { AniListCard } from '../components/AniListCard'
 import { ProfileCustomizer, ProfileHero, type SectionKey } from '../components/ProfileCustomizer'
 import { CustomSelect } from '../components/CustomSelect'
@@ -64,6 +66,7 @@ const langName = (c: string) => new Intl.DisplayNames(['en'], { type: 'language'
 
 export default function ProfilePage() {
   const me = useProfile()
+  const { user, loading } = useAuth()
   const { theme, setTheme } = useTheme()
   const [open, setOpen] = useState<Set<SectionKey>>(() => new Set(['avatar']))
 
@@ -101,13 +104,20 @@ export default function ProfilePage() {
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 pb-28 pt-24 sm:px-6">
-      <ProfileHero me={me} onEdit={edit} />
-      <ProfileCustomizer me={me} open={open} setOpen={setOpen} />
-      <AniListCard me={me} />
+      {loading ? null : user ? (
+        <>
+          <ProfileHero me={me} onEdit={edit} />
+          <ProfileCustomizer me={me} open={open} setOpen={setOpen} />
+          <AccountPanel />
+          <AniListCard me={me} />
+        </>
+      ) : (
+        <AuthPanel />
+      )}
 
       {/* Preferences */}
-      <section className={card} aria-label="Preferences">
-        <h2 className={cn(h2, 'mb-4')}>Preferences</h2>
+      <section id="settings" className={cn(card, 'scroll-mt-24')} aria-label="Settings">
+        <h2 className={cn(h2, 'mb-4')}>Settings</h2>
         <Row title="Theme">
           <div className="inline-flex gap-1 rounded-full border border-border bg-card/60 p-1">
             {(['dark', 'light'] as const).map((t) => (

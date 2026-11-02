@@ -24,7 +24,6 @@ import type { AniMediaDetails, CardItem, JikanStats } from '../types/anime'
 import { AnimeCard } from '../components/AnimeCard'
 import { BookCard, type BookCardItem } from '../components/BookCard'
 import { AnimeRow } from '../components/AnimeRow'
-import { BorderBeam } from '../components/BorderBeam'
 import { CharacterCard } from '../components/CharacterCard'
 import { Countdown } from '../components/Countdown'
 import { DotPattern } from '../components/DotPattern'
@@ -322,12 +321,11 @@ export default function DetailsPage() {
               style={{ backgroundColor: a.coverImage.color ?? undefined }}
             >
               {tb ? <Img src={tmdbImg(tmdb?.poster, 'w500') ?? a.coverImage.extraLarge ?? a.coverImage.large ?? ''} alt={title} className="h-full w-full object-cover" /> : <span aria-hidden className="skeleton absolute inset-0" />}
-              <BorderBeam size={200} duration={9} />
             </motion.div>
 
             <div className="mt-5 flex flex-wrap justify-center gap-3 lg:flex-col lg:items-stretch">
               {watchable && (
-                <StarBorder to={watchHref} color={a.coverImage.color ?? '#ff6b81'} className="block w-full max-w-xs self-center lg:max-w-none">
+                <StarBorder to={watchHref} className="block w-full max-w-xs self-center lg:max-w-none">
                   <Play className="size-4 fill-current" /> {resume > 0 ? `Continue · Ep ${Math.min(resume, counts.available)}` : 'Watch now'}
                 </StarBorder>
               )}

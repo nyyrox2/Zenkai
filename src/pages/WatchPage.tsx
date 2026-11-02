@@ -28,7 +28,6 @@ import { LOGO_URL } from '../lib/constants'
 import { Tour, tourDone, tourSeen, type TourStep } from '../components/Tour'
 import { ServerPopup, type ServerOpt } from '../components/ServerPopup'
 import { useShieldVerified, getToken } from '../lib/shield'
-import { BorderBeam } from '../components/BorderBeam'
 import { StreamProblem } from '../components/StreamProblem'
 
 
@@ -272,7 +271,6 @@ export default function WatchPage() {
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
                 <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-xl shadow-black/50">
                   <Lock className="size-8 animate-pulse" />
-                  <BorderBeam size={80} duration={4} />
                 </div>
                 <h3 className="font-display text-lg font-bold text-foreground">Media Playback Locked</h3>
                 <p className="mt-1.5 max-w-sm text-xs text-muted leading-relaxed">

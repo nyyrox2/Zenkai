@@ -21,6 +21,8 @@ import { initAniListSync } from './lib/anilist'
 import { useApplyTvMode } from './lib/keys'
 import { useSpatialNav } from './lib/spatial'
 import { isDetailsPath, isReaderPath, isWatchPath, sectionOf } from './lib/sections'
+import { useAuth } from './context/AuthContext'
+import { checkDailySync } from './lib/sync'
 import LandingPage from './pages/LandingPage'
 
 // Only the opening page is eager; everything else is split out; hls.js only ships with the player page.
@@ -65,6 +67,10 @@ export default function App() {
   useApplyTvMode()
   useSpatialNav()
   useEffect(() => initAniListSync(), [])
+  const { user } = useAuth()
+  useEffect(() => {
+    if (user?.id) void checkDailySync(user.id)
+  }, [user?.id])
 
   // Each section has its own colour identity (see index.css).
   useEffect(() => {

@@ -8,6 +8,7 @@ import { ImageCropper, type CropKind } from './ImageCropper'
 import { SpotlightCard } from './SpotlightCard'
 import { FRAMES, FRAME_GROUPS, frameById, frameGroup, frameUrl } from '../lib/frames'
 import { saveProfile, type Profile } from '../lib/profile'
+import { useAuth } from '../context/AuthContext'
 import { toast } from '../lib/toast'
 import { cn } from '../lib/utils'
 
@@ -20,6 +21,7 @@ const pill = 'inline-flex h-10 items-center gap-2 rounded-full border border-bor
 /* ------------------------------------------------------------------ hero */
 
 export function ProfileHero({ me, onEdit }: { me: Profile; onEdit: (k: SectionKey) => void }) {
+  const { user } = useAuth()
   const frame = frameById(me.frame)
   return (
     <motion.section initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.05 }} className="relative overflow-hidden rounded-3xl border border-border bg-card/60" aria-label="Profile preview">
@@ -46,7 +48,7 @@ export function ProfileHero({ me, onEdit }: { me: Profile; onEdit: (k: SectionKe
             {me.name || 'Guest'}
           </motion.h1>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }} className="mt-0.5 text-sm">
-            <span className="text-muted">Saved on this device only. No account needed.</span>
+            <span className="text-muted">{user ? `Profile on device · Cloud sync active (${user.email})` : 'Saved on this device only. Cloud sync optional.'}</span>
           </motion.p>
           <AnimatePresence mode="popLayout">
             {frame && (

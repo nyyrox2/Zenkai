@@ -2,7 +2,6 @@ import { useRef, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
-import { BorderBeam } from './BorderBeam'
 
 /**
  * Big "pick your world" card: 3D tilt that follows the pointer (React Bits "Tilted Card") with a cursor
@@ -29,7 +28,6 @@ export function ChoiceCard({
 }) {
   const tilt = useRef<HTMLDivElement>(null)
   const glow = useRef<HTMLDivElement>(null)
-  const beam = useRef<HTMLDivElement>(null)
   const raf = useRef(0)
 
   function onMove(e: React.PointerEvent<HTMLAnchorElement>) {
@@ -44,14 +42,12 @@ export function ChoiceCard({
         glow.current.style.opacity = '1'
         glow.current.style.background = `radial-gradient(420px circle at ${px * 100}% ${py * 100}%, var(--glow), transparent 65%)`
       }
-      if (beam.current) beam.current.style.opacity = '1'
     })
   }
   function onLeave() {
     cancelAnimationFrame(raf.current)
     if (tilt.current) tilt.current.style.transform = ''
     if (glow.current) glow.current.style.opacity = '0'
-    if (beam.current) beam.current.style.opacity = '0'
   }
 
   return (
@@ -67,9 +63,6 @@ export function ChoiceCard({
           className="relative h-full overflow-hidden rounded-[2rem] border border-border bg-card/70 p-6 backdrop-blur-md transition-[transform,box-shadow] duration-200 ease-out group-hover:shadow-2xl group-hover:shadow-accent/20 group-focus-visible:ring-2 group-focus-visible:ring-accent sm:p-8"
         >
           <div ref={glow} aria-hidden className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300" />
-          <div ref={beam} aria-hidden className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300">
-            <BorderBeam size={220} duration={7} delay={index * 2} />
-          </div>
 
           {/* giant kanji watermark */}
           <span

@@ -6,7 +6,6 @@ import { useAsync } from '../hooks/useAsync'
 import { useReading } from '../lib/reading'
 import { cn } from '../lib/utils'
 import { chapterUnit, fetchNovelChapters, fetchNovelDetail, isNovelSource, NOVEL_SOURCES, type NovelChapterRef, type NovelSource } from '../services/novel'
-import { BorderBeam } from '../components/BorderBeam'
 import { ErrorState } from '../components/ErrorState'
 import { Reveal } from '../components/Reveal'
 import { ShimmerButton } from '../components/ShimmerButton'
@@ -86,7 +85,6 @@ function Details({ source, slug }: { source: NovelSource; slug: string }) {
               ) : (
                 <div className="grid size-full place-items-center p-4 text-center font-display text-lg font-bold text-muted">{d.title}</div>
               )}
-              <BorderBeam size={200} duration={9} />
             </div>
 
             <div className="min-w-0 flex-1 text-center md:text-left">
