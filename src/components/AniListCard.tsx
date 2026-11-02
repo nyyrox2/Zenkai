@@ -23,7 +23,7 @@ export function AniListCard({ me }: { me: Profile }) {
     if (ran.current || !link?.sync || !getAniListToken()) return
     ran.current = true
     pullAniListProfile(me)
-      .then((c) => c.length && toast(`Synced ${list(c)} from AniList`))
+      .then(() => {})
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -43,8 +43,7 @@ export function AniListCard({ me }: { me: Profile }) {
   const syncLists = async () => {
     setBusy(true)
     try {
-      const n = await pullAniListLists()
-      toast(`Synced ${n} titles from AniList`)
+      await pullAniListLists()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Sync failed', 'error')
     } finally {

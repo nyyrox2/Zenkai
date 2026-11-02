@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type { HistoryItem, ListItem } from './library'
 import type { ReadingItem } from './reading'
+import { getProfile, saveProfile, syncProfileToCloud, type Profile } from './profile'
 
 export const LAST_SYNC_KEY = 'zk:cloud:last_sync'
 const ONE_DAY_MS = 24 * 60 * 60 * 1000 // 24 hours (once a day)
@@ -50,7 +51,7 @@ export function formatLastSync(t: number | null): string {
 }
 
 /**
- * PUSH local watch history & continue watching to Supabase.
+ * PUSH local watch history, watchlist, reading & profile to Supabase.
  * Updates local cache timestamp and only makes 1 request.
  */
 export async function pushWatchHistory(userId: string): Promise<{ success: boolean; count: number; error?: string }> {
@@ -60,13 +61,17 @@ export async function pushWatchHistory(userId: string): Promise<{ success: boole
     const history = readStorage<HistoryItem[]>('zk:history', [])
     const watchlist = readStorage<ListItem[]>('zk:list', [])
     const reading = readStorage<ReadingItem[]>('zk:reading:v1', [])
+    const profile = getProfile()
 
     const { error } = await supabase.from('user_sync').upsert(
-      { user_id: userId, history, watchlist, reading, updated_at: new Date().toISOString() },
+      { user_id: userId, history, watchlist, reading, profile, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
     )
 
     if (error) throw error
+
+    // Also sync to public.profiles table
+    void syncProfileToCloud(userId, undefined, profile)
 
     const now = Date.now()
     localStorage.setItem(LAST_SYNC_KEY, String(now))
@@ -89,12 +94,25 @@ export async function pullWatchHistory(userId: string): Promise<{ success: boole
 
     const { data, error } = await supabase
       .from('user_sync')
-      .select('history, watchlist, reading, updated_at')
+      .select('history, watchlist, reading, profile, updated_at')
       .eq('user_id', userId)
       .maybeSingle()
 
     if (error) throw error
     if (!data) return { success: true, count: 0 } // first sync from this account: nothing to merge yet
+
+    // Merge profile if returned
+    if (data.profile && typeof data.profile === 'object') {
+      const p = data.profile as Profile
+      const local = getProfile()
+      saveProfile({
+        name: local.name || p.name || '',
+        avatar: local.avatar || p.avatar || null,
+        banner: local.banner || p.banner || null,
+        frame: local.frame || p.frame || null,
+        bio: (local.bio !== undefined && local.bio !== '') ? local.bio : (p.bio || ''),
+      })
+    }
 
     const remoteHistory = Array.isArray(data.history) ? (data.history as HistoryItem[]) : []
     const remoteList = Array.isArray(data.watchlist) ? (data.watchlist as ListItem[]) : []
@@ -166,10 +184,11 @@ export async function pullWatchHistory(userId: string): Promise<{ success: boole
     const now = Date.now()
     localStorage.setItem(LAST_SYNC_KEY, String(now))
 
-    // Notify all cells (zk:history, zk:list, zk:reading:v1) across the app to reload
+    // Notify all cells (zk:history, zk:list, zk:reading:v1, zk:profile) across the app to reload
     window.dispatchEvent(new StorageEvent('storage', { key: 'zk:history' }))
     window.dispatchEvent(new StorageEvent('storage', { key: 'zk:list' }))
     window.dispatchEvent(new StorageEvent('storage', { key: 'zk:reading:v1' }))
+    window.dispatchEvent(new StorageEvent('storage', { key: 'zk:profile' }))
     window.dispatchEvent(new CustomEvent('zk:sync', { detail: { type: 'pull', time: now } }))
 
     return { success: true, count: mergedHistory.length }

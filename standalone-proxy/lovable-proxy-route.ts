@@ -1,36 +1,20 @@
 /**
- * Zenkai Universal Streaming Proxy for Lovable (TanStack Start / Full-Stack Node / Edge)
- * Target route: /api/public/proxy
+ * Zenkai Universal Streaming Proxy for Lovable (TanStack Start / Full-Stack Edge)
+ * Target route: /api/public/proxy (also supports /proxy and /api/proxy)
  * 
- * - Allowed origin: https://zenkaii.pages.dev (and local development)
- * - Supported Providers: MegaPlay, FlixCloud, ACDN, AnimeSalt, Vidstreaming, RapidCloud, RabbitStream, etc.
- * - Rewrites HLS m3u8 playlists and AES-128 encryption keys back through this proxy
- * - Streams video chunks (.ts, .m4s) directly with Range request support
+ * - Full CORS support for https://zenkaii.pages.dev, *.pages.dev, custom domains, and localhost
+ * - Proxies all HLS playlists (.m3u8), video segments (.ts, .m4s), and AES-128 encryption keys (.key)
+ * - Spoofs appropriate Referer headers for all anime CDNs (MegaPlay, FlixCloud, AnimeSalt, ACDN, etc.)
+ * - Full HTTP Range request and 206 Partial Content streaming support
  */
 
 import { createFileRoute } from '@tanstack/react-router';
 
-// Allowed origins - locked to zenkaii.pages.dev + dev environments
-const ALLOWED_ORIGIN_PATTERNS = [
-  'https://zenkaii.pages.dev',
-  /^https:\/\/[a-z0-9-]+\.pages\.dev$/,
-  /^http:\/\/localhost(:\d+)?$/,
-  /^http:\/\/127\.0\.0\.1(:\d+)?$/,
-];
-
 function getCorsHeaders(request: Request): Headers {
-  const origin = request.headers.get('Origin') || '';
-  let allowedOrigin = 'https://zenkaii.pages.dev';
-
-  for (const pattern of ALLOWED_ORIGIN_PATTERNS) {
-    if (typeof pattern === 'string' ? pattern === origin : pattern.test(origin)) {
-      allowedOrigin = origin;
-      break;
-    }
-  }
-
+  const origin = request.headers.get('Origin') || '*';
   const h = new Headers();
-  h.set('Access-Control-Allow-Origin', allowedOrigin);
+  // Allow all web origins for media playback
+  h.set('Access-Control-Allow-Origin', origin === 'null' ? '*' : origin);
   h.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
   h.set('Access-Control-Allow-Headers', 'Content-Type, Range, Authorization, X-Requested-With, Origin, Accept');
   h.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Content-Type, Accept-Ranges');
@@ -49,77 +33,6 @@ const FORBIDDEN_HOSTS = new Set([
   'instance-data',
 ]);
 
-const ALLOWED_STREAM_DOMAINS = [
-  'megaplay.buzz',
-  'nexabloom.top',
-  'stellarfrontier.world',
-  'phantomharbor.top',
-  'shadowharbor.top',
-  'hiddenvertex.top',
-  'emeralddrift.top',
-  'eclipseharbor.space',
-  'broforgotsave.online',
-  'imgnex.top',
-  'akirax.top',
-  'shiora.top',
-  'krussdomi.com',
-  'advancedairesearchlab.top',
-  'animeapps.top',
-  'nukitashi.top',
-  'playeng.animeapps.top',
-  'novelfire.net',
-  'novelfull.com',
-  'anikototv.to',
-  'animegg.org',
-  'anineko.to',
-  'anizone.to',
-  'aniwave.to',
-  'animesalt.cx',
-  'animesalt.ac',
-  'animesalt.ro',
-  'animesalt.cc',
-  'ravok.buzz',
-  'acdn.top',
-  'abyssplayer.com',
-  'playhydrax.com',
-  'flixcloud.cc',
-  'enc-dec.app',
-  'reanime.to',
-  'atomic4cdn.com',
-  'rundowncdn.com',
-  'rundowncdn.top',
-  'vividcdn.com',
-  'vividcdn.top',
-  'fallencdn.com',
-  'fallencdn.top',
-  'akamaized.net',
-  'cloudflare.com',
-  'workers.dev',
-  'opensubtitles.org',
-  'opensubtitles-v3.strem.io',
-  'strem.io',
-  'tmdb.org',
-  'themoviedb.org',
-  'image.tmdb.org',
-  'megacloud.tv',
-  'rapid-cloud.ru',
-  'rapid-cloud.co',
-  'vidstreaming.io',
-  'rabbitstream.net',
-  'streamtape.com',
-  'mp4upload.com',
-  'streamwish.to',
-  'streamwish.com',
-  'filemoon.sx',
-  'vidplay.online',
-  'mycloud.to',
-  'mcloud.to',
-  'vizcloud.info',
-  'vizcloud.digital',
-  'vizcloud.co',
-  'dokicloud.one',
-];
-
 function isAllowedTarget(parsed: URL): { valid: boolean; error?: string } {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return { valid: false, error: 'Only HTTP and HTTPS protocols permitted' };
@@ -136,18 +49,6 @@ function isAllowedTarget(parsed: URL): { valid: boolean; error?: string } {
 
   if (hostname.endsWith('.internal') || hostname.endsWith('.local') || hostname.endsWith('.lan')) {
     return { valid: false, error: 'Internal network targets prohibited' };
-  }
-
-  const isMediaPattern =
-    /\.(m3u8|ts|m4s|m3u|mp4|vtt|srt|key|bin|jpg|jpeg|png|webp|avif|gif)(\?.*)?$/i.test(parsed.pathname) ||
-    /cdn|stream|video|m3u8|hls|media|chunk|segment|seg-|sub|caption|fetch|anime|harbor|drift|frontier|vertex|space/i.test(hostname) ||
-    /stream|anime|subtitles/i.test(parsed.pathname) ||
-    /^as-cdn\d*\.top$/i.test(hostname);
-
-  const inDomainList = ALLOWED_STREAM_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
-
-  if (!inDomainList && !isMediaPattern) {
-    return { valid: false, error: `Domain not whitelisted for proxying: ${hostname}` };
   }
 
   return { valid: true };
@@ -221,25 +122,24 @@ export async function handleProxyRequest(request: Request): Promise<Response> {
     parsedTarget.pathname.includes('parse-flixcloud') ||
     (parsedTarget.searchParams.get('url') || '').includes('.m3u8');
 
-  // HLS Playlist rewriting
+  // HLS Playlist rewriting: ensures sub-playlists, video segments, and AES keys all route through this proxy
   if (up.ok && isPlaylist) {
     const text = await up.text();
     if (/^\s*</.test(text)) {
       return new Response(text, { status: up.status, headers: outHeaders });
     }
 
-    const direct = reqUrl.searchParams.get('seg') === '1';
     const proxyBase = `${reqUrl.origin}${reqUrl.pathname}`;
     const base = parsedTarget.hostname.includes('enc-dec.app') && parsedTarget.searchParams.get('url')
       ? new URL(parsedTarget.searchParams.get('url')!)
       : parsedTarget;
 
-    const wrap = (u: string, keep: boolean) => {
+    const wrap = (u: string) => {
       try {
         const abs = new URL(u, base);
         if (!abs.search && base.search && !u.includes('?')) abs.search = base.search;
-        if (direct && keep && !/rundowncdn|flixcloud|vividcdn|fallencdn/.test(abs.hostname)) return abs.href;
-        return `${proxyBase}?url=${encodeURIComponent(abs.href)}&referer=${encodeURIComponent(referer)}${direct ? '&seg=1' : ''}`;
+        // Always route segments, playlists, and keys through the proxy to prevent CORS blocks
+        return `${proxyBase}?url=${encodeURIComponent(abs.href)}&referer=${encodeURIComponent(referer)}`;
       } catch {
         return u;
       }
@@ -253,11 +153,10 @@ export async function handleProxyRequest(request: Request): Promise<Response> {
         if (!s) return l;
         if (s.startsWith('#')) {
           variant = s.startsWith('#EXT-X-STREAM-INF');
-          return s.replace(/URI=["']([^"']+)["']/g, (_, u) => `URI="${wrap(u, s.startsWith('#EXT-X-MAP'))}"`);
+          return s.replace(/URI=["']([^"']+)["']/g, (_, u) => `URI="${wrap(u)}"`);
         }
-        const plist = variant || /\.m3u8?(\?|$)/i.test(s) || s.includes('parse-flixcloud');
         variant = false;
-        return wrap(s, !plist);
+        return wrap(s);
       })
       .join('\n');
 
@@ -286,7 +185,7 @@ export function handleOptionsRequest(request: Request): Response {
   });
 }
 
-// 1. TanStack Start Route definition (default in Lovable TanStack template)
+// 1. TanStack Start Route definition
 export const Route = createFileRoute('/api/public/proxy')({
   server: {
     handlers: {
@@ -297,7 +196,7 @@ export const Route = createFileRoute('/api/public/proxy')({
   },
 });
 
-// 2. Direct HTTP handler exports (for Nitro / Node / Edge functions)
+// 2. Direct HTTP handler exports
 export const GET = ({ request }: { request: Request }) => handleProxyRequest(request);
 export const HEAD = ({ request }: { request: Request }) => handleProxyRequest(request);
 export const OPTIONS = ({ request }: { request: Request }) => handleOptionsRequest(request);

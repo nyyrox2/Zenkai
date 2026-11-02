@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { applyRemote, cell, getPrefs, syncHooks, type ListStatus, type Meta, type RemoteEntry, type SyncPatch } from './library'
 import { saveProfile, type Profile } from './profile'
-import { toast } from './toast'
 import { pickTitle } from './utils'
 import type { AniCardMedia } from '../types/anime'
 
@@ -206,7 +205,7 @@ const enqueue = (it: QItem) => {
 
 let flushing = false
 /** Send queued changes to AniList. Network / rate-limit failures keep the queue for the next try; anything AniList rejects is dropped. */
-export async function flushAniList(announce = false) {
+export async function flushAniList(_announce = false) {
   const token = getAniListToken()
   if (!token || flushing || !listsOn()) return
   flushing = true
@@ -228,7 +227,6 @@ export async function flushAniList(announce = false) {
             status: (it.status && TO_AL[it.status]) || 'CURRENT',
             progress: it.progress !== undefined ? Math.round(Number(it.progress)) : undefined,
           })
-          if (announce && it.label && it.progress) toast(`Synced to AniList · ${it.label}`, 'info')
         }
       } catch (e) {
         if (e instanceof ALError && e.kind === 'api') {

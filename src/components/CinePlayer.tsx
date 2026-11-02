@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Hls from 'hls.js'
 import {
   AudioLines, Check, CheckCircle2, ChevronDown, FastForward, Flag, Languages, List, Loader2, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
-  Search, Server, Settings, SkipBack, SkipForward, TriangleAlert, Upload, Volume1, Volume2, VolumeX, X,
+  Search, Server, Settings, SkipBack, SkipForward, TriangleAlert, Upload, Users, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { apiUrl, fetchStream, type EpInfo, type EpKind } from '../services/api'
 import { KIND } from './EpisodeList'
@@ -327,6 +327,18 @@ export interface CinePlayerProps {
   fallbackImg?: string | null
   defaultRuntime?: number | null
   kinds?: Map<number, EpKind>
+  onVideoRef?: (el: HTMLVideoElement | null) => void
+  onPlayerAction?: (action: { type: 'play' | 'pause' | 'seek'; time: number }) => void
+  externalControl?: {
+    action: 'play' | 'pause' | 'seek'
+    time: number
+    token: number
+  } | null
+  onWatchTogetherClick?: () => void
+  watchPartyActive?: boolean
+  watchPartyPeersCount?: number
+  /** When watching together in a room as a guest (non-host), timestamp and episode changes are host-controlled */
+  isPartyGuest?: boolean
 }
 
 const PLAYER_TOUR: TourStep[] = [
@@ -753,9 +765,41 @@ export default function CinePlayer({
   autoNext = true, onAutoNext, autoSkip = false, onAutoSkip,
   nextEpisode, episodeKind, skipFiller = false, onSkipFiller, switching = false,
   episodesInfo, fallbackImg, defaultRuntime, kinds,
+  onVideoRef, onPlayerAction, externalControl, onWatchTogetherClick, watchPartyActive, watchPartyPeersCount,
+  isPartyGuest = false,
 }: CinePlayerProps) {
   const vid = useRef<HTMLVideoElement>(null)
   const root = useRef<HTMLDivElement>(null)
+  const isExternalAction = useRef(false)
+
+  useEffect(() => {
+    onVideoRef?.(vid.current)
+    return () => onVideoRef?.(null)
+  }, [onVideoRef])
+
+  useEffect(() => {
+    if (!externalControl || !vid.current) return
+    isExternalAction.current = true
+    const v = vid.current
+    if (externalControl.action === 'seek') {
+      v.currentTime = externalControl.time
+      setTime(externalControl.time)
+    } else if (externalControl.action === 'play') {
+      if (Math.abs(v.currentTime - externalControl.time) > 1.2) {
+        v.currentTime = externalControl.time
+      }
+      void v.play().catch(() => {})
+    } else if (externalControl.action === 'pause') {
+      if (Math.abs(v.currentTime - externalControl.time) > 1.2) {
+        v.currentTime = externalControl.time
+      }
+      v.pause()
+    }
+    const t = setTimeout(() => {
+      isExternalAction.current = false
+    }, 180)
+    return () => clearTimeout(t)
+  }, [externalControl])
   const hls = useRef<Hls | null>(null)
 
   // Anti-Debug, Anti-DevTools & Anti-Scraping Protection (Scoped exclusively to CinePlayer)
@@ -1231,8 +1275,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   /** Fetch + parse a caption file; true when it produced cues. Stream captions need the player's referer, so try the proxy first, then the raw url. */
   const loadTrack = async (url: string | undefined, my: number, referer?: string): Promise<boolean> => {
     if (!url) return false
-    const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname))
-    const streamProxy = !isDev ? (import.meta.env.VITE_STREAM_PROXY_URL as string | undefined)?.trim() : undefined
+    const streamProxy = (import.meta.env.VITE_STREAM_PROXY_URL as string | undefined)?.trim()
     const proxyBase = streamProxy ? (streamProxy.includes('/proxy') ? streamProxy : `${streamProxy.replace(/\/+$/, '')}/api/public/proxy`) : apiUrl('/proxy')
     const candidates: string[] = []
     if (url.startsWith('/proxy') || url.startsWith('/api/proxy') || url.includes('/proxy?')) {
@@ -1492,6 +1535,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   }
 
   const seek = (d: number, quiet = false) => {
+    if (isPartyGuest) {
+      toast('Playback timestamp is controlled by the party host', 'info')
+      return
+    }
     const v = vid.current
     if (!v) return
     const t = clamp(v.currentTime + d, 0, v.duration || 0)
@@ -1679,14 +1726,23 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       else if (key === 'MediaPlayPause') h = a.togglePlay
       else if (key === 'MediaPlay') h = () => !st.current.playing && a.togglePlay()
       else if (key === 'MediaPause' || key === 'MediaStop') h = () => st.current.playing && a.togglePlay()
-      else if (key === 'MediaTrackNext' || k === 'n') h = () => kk.hasNext && kk.next?.()
-      else if (key === 'MediaTrackPrevious' || k === 'p') h = () => kk.hasPrev && kk.prev?.()
-      else if (key === 'MediaFastForward') h = () => kk.seek(30)
-      else if (key === 'MediaRewind') h = () => kk.seek(-30)
-      else if (k === 'arrowleft') h = () => kk.seek(-step)
-      else if (k === 'arrowright') h = () => kk.seek(step)
-      else if (k === 'j') h = () => kk.seek(-pfRef.current.seek)
-      else if (k === 'l') h = () => kk.seek(pfRef.current.seek)
+      else if (key === 'MediaTrackNext' || k === 'n') {
+        if (isPartyGuest) { toast('Only the party host can change episodes', 'info'); return }
+        h = () => kk.hasNext && kk.next?.()
+      }
+      else if (key === 'MediaTrackPrevious' || k === 'p') {
+        if (isPartyGuest) { toast('Only the party host can change episodes', 'info'); return }
+        h = () => kk.hasPrev && kk.prev?.()
+      }
+      else if (key === 'MediaFastForward' || key === 'MediaRewind' || k === 'arrowleft' || k === 'arrowright' || k === 'j' || k === 'l') {
+        if (isPartyGuest) { toast('Playback timestamp is controlled by party host', 'info'); return }
+        if (key === 'MediaFastForward') h = () => kk.seek(30)
+        else if (key === 'MediaRewind') h = () => kk.seek(-30)
+        else if (k === 'arrowleft') h = () => kk.seek(-step)
+        else if (k === 'arrowright') h = () => kk.seek(step)
+        else if (k === 'j') h = () => kk.seek(-pfRef.current.seek)
+        else if (k === 'l') h = () => kk.seek(pfRef.current.seek)
+      }
       else if (tv && (k === 'arrowup' || k === 'arrowdown')) {
         // TV: Up / Down bring up the controls and put focus on Play (the remote has its own volume keys)
         h = () => root.current?.querySelector<HTMLElement>('.zp-hero')?.focus()
@@ -1805,18 +1861,23 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   }
   const sDown = (e: RPointerEvent<HTMLDivElement>) => {
     if (!dur) return
+    if (isPartyGuest) {
+      toast('Playback scrub is controlled by the party host', 'info')
+      return
+    }
     e.currentTarget.setPointerCapture(e.pointerId)
     setScrub(frac(e) * dur)
     pvSeek(frac(e) * dur)
   }
   const sMove = (e: RPointerEvent<HTMLDivElement>) => {
+    if (isPartyGuest) return
     const f = frac(e)
     setHover(f)
     pvSeek(f * dur)
     if (scrub !== null) setScrub(f * dur)
   }
   const sUp = (e: RPointerEvent<HTMLDivElement>) => {
-    if (scrub === null) return
+    if (isPartyGuest || scrub === null) return
     const t = frac(e) * dur
     if (vid.current) vid.current.currentTime = t
     setTime(t)
@@ -1857,9 +1918,22 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         onPlay={() => {
           setPlaying(true)
           if (!loadingSubs) setNote((n) => (n?.k === 'load' ? null : n))
+          if (!isExternalAction.current && vid.current) {
+            onPlayerAction?.({ type: 'play', time: vid.current.currentTime })
+          }
           onPlay?.()
         }}
-        onPause={() => setPlaying(false)}
+        onPause={() => {
+          setPlaying(false)
+          if (!isExternalAction.current && vid.current) {
+            onPlayerAction?.({ type: 'pause', time: vid.current.currentTime })
+          }
+        }}
+        onSeeked={() => {
+          if (!isExternalAction.current && vid.current) {
+            onPlayerAction?.({ type: 'seek', time: vid.current.currentTime })
+          }
+        }}
         onWaiting={() => setBusy(true)}
         onCanPlay={() => {
           setBusy(false)
@@ -1976,10 +2050,16 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               )}
               {onAudio && audioTracks.length < 2 && (
                 <button
-                  className="zp-b pill"
+                  className={cx('zp-b pill', isPartyGuest && 'opacity-50 cursor-not-allowed')}
                   data-tour="p-audio"
-                  onClick={() => onAudio(audioMode === 'sub' ? 'dub' : 'sub')}
-                  title="Switch audio"
+                  onClick={() => {
+                    if (isPartyGuest) {
+                      toast('Audio mode is controlled by party host', 'info')
+                      return
+                    }
+                    onAudio(audioMode === 'sub' ? 'dub' : 'sub')
+                  }}
+                  title={isPartyGuest ? 'Audio mode is controlled by party host' : 'Switch audio'}
                   aria-label="Switch audio"
                 >
                   <Music />
@@ -2011,10 +2091,22 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           </div>
 
           <div className="zp-mid">
-            <button className="zp-b zp-pn" disabled={!hasPrevEpisode} onClick={() => onPrevEpisode?.()} aria-label="Previous episode" title="Previous episode">
+            <button
+              className={cx('zp-b zp-pn', isPartyGuest && 'opacity-40 cursor-not-allowed')}
+              disabled={isPartyGuest || !hasPrevEpisode}
+              onClick={() => onPrevEpisode?.()}
+              aria-label="Previous episode"
+              title={isPartyGuest ? 'Episode changes controlled by party host' : 'Previous episode'}
+            >
               <SkipBack />
             </button>
-            <button className="zp-b zp-sd" onClick={() => seek(-pf.seek)} aria-label={`Back ${pf.seek} seconds`} title={`Back ${pf.seek}s [J]`}>
+            <button
+              className={cx('zp-b zp-sd', isPartyGuest && 'opacity-40 cursor-not-allowed')}
+              disabled={isPartyGuest}
+              onClick={() => seek(-pf.seek)}
+              aria-label={`Back ${pf.seek} seconds`}
+              title={isPartyGuest ? 'Timestamp controlled by party host' : `Back ${pf.seek}s [J]`}
+            >
               <RotateCcw />
               <span className="zp-n">{pf.seek}</span>
             </button>
@@ -2022,11 +2114,23 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               <Play className={cx('zp-ic pl', playing && 'off')} fill="currentColor" />
               <Pause className={cx('zp-ic', !playing && 'off')} fill="currentColor" />
             </button>
-            <button className="zp-b zp-sd" onClick={() => seek(pf.seek)} aria-label={`Forward ${pf.seek} seconds`} title={`Forward ${pf.seek}s [L]`}>
+            <button
+              className={cx('zp-b zp-sd', isPartyGuest && 'opacity-40 cursor-not-allowed')}
+              disabled={isPartyGuest}
+              onClick={() => seek(pf.seek)}
+              aria-label={`Forward ${pf.seek} seconds`}
+              title={isPartyGuest ? 'Timestamp controlled by party host' : `Forward ${pf.seek}s [L]`}
+            >
               <RotateCw />
               <span className="zp-n">{pf.seek}</span>
             </button>
-            <button className="zp-b zp-pn" disabled={!hasNextEpisode} onClick={() => onNextEpisode?.()} aria-label="Next episode" title="Next episode">
+            <button
+              className={cx('zp-b zp-pn', isPartyGuest && 'opacity-40 cursor-not-allowed')}
+              disabled={isPartyGuest || !hasNextEpisode}
+              onClick={() => onNextEpisode?.()}
+              aria-label="Next episode"
+              title={isPartyGuest ? 'Episode changes controlled by party host' : 'Next episode'}
+            >
               <SkipForward />
             </button>
           </div>
@@ -2037,9 +2141,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               <div
                 ref={bar}
                 data-tour="p-seek"
-                className={cx('zp-seek', scrub !== null && 'drag')}
+                className={cx('zp-seek', scrub !== null && 'drag', isPartyGuest && 'cursor-not-allowed opacity-85')}
                 role="slider"
                 aria-label="Seek"
+                title={isPartyGuest ? 'Playback timestamp is controlled by party host' : undefined}
                 aria-valuemin={0}
                 aria-valuemax={Math.round(dur)}
                 aria-valuenow={Math.round(shown)}
@@ -2106,6 +2211,22 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               <button className={cx('zp-b', (pop === 'cc' || (caps && tracks.length > 0)) && 'on')} data-tour="p-cc" onClick={(e) => setPop('cc', e.currentTarget)} aria-label="Subtitles" title="Subtitles [C]">
                 <span className="zp-t">CC</span>
               </button>
+              {onWatchTogetherClick && (
+                <button
+                  type="button"
+                  className={cx('zp-b relative', watchPartyActive && 'text-accent')}
+                  onClick={onWatchTogetherClick}
+                  aria-label="Watch Together"
+                  title={watchPartyActive ? `Watch Together (${watchPartyPeersCount || 1} peers)` : 'Start Watch Together'}
+                >
+                  <Users />
+                  {watchPartyActive && (
+                    <span className="absolute -top-1 -right-1 flex size-3.5 items-center justify-center rounded-full bg-accent text-[8px] font-bold text-accent-fg animate-pulse">
+                      {watchPartyPeersCount || 1}
+                    </span>
+                  )}
+                </button>
+              )}
               <button className="zp-b" data-tour="p-set" onClick={() => (closePop(), setSheet('set'))} aria-label="Settings" title="Settings">
                 <Settings />
               </button>
@@ -2233,6 +2354,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                             type="button"
                             className={cx('zp-pi', audioMode === m && 'on', !avail && 'opacity-60')}
                             onClick={() => {
+                              if (isPartyGuest) {
+                                toast('Audio mode is controlled by party host', 'info')
+                                return
+                              }
                               if (audioMode !== m) {
                                 flash('load', `Switching to ${m.toUpperCase()}…`)
                                 onAudio(m)
@@ -2254,8 +2379,16 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                         initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.04 + i * 0.025, duration: 0.18 }}
-                        className={cx('zp-row', x.id === serverId && 'on')}
-                        onClick={() => (x.id !== serverId && flash('load', `Switching to ${x.name}…`), onServer?.(x.id), closePop())}
+                        className={cx('zp-row', x.id === serverId && 'on', isPartyGuest && 'opacity-60 cursor-not-allowed')}
+                        onClick={() => {
+                          if (isPartyGuest) {
+                            toast('Server is controlled by party host', 'info')
+                            return
+                          }
+                          if (x.id !== serverId) flash('load', `Switching to ${x.name}…`)
+                          onServer?.(x.id)
+                          closePop()
+                        }}
                       >
                         <span className="flex items-center gap-2">
                           <span>{x.name}</span>
@@ -2888,6 +3021,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
             defaultRuntime={defaultRuntime}
             kinds={kinds}
             onPick={(n) => {
+              if (isPartyGuest) {
+                toast('Only the party host can change episodes', 'info')
+                return
+              }
               onSelectEpisode(n)
               setSheet(null)
             }}

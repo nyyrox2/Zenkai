@@ -369,15 +369,6 @@ const slugVariants = (t) => {
 };
 
 function getProxyBase(request, env) {
-  // Never use external proxy when running on dev/local server
-  if (env?.IS_DEV) return "/proxy";
-  try {
-    const host = new URL(request.url).hostname.toLowerCase();
-    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1" || host.endsWith(".local")) {
-      return "/proxy";
-    }
-  } catch {}
-
   let p = env?.STREAM_PROXY_URL || env?.VITE_STREAM_PROXY_URL || globalThis.process?.env?.STREAM_PROXY_URL || globalThis.process?.env?.VITE_STREAM_PROXY_URL || "";
   p = p.trim().replace(/\/+$/, "");
   if (!p) return "/proxy";
@@ -412,7 +403,7 @@ export async function handle(request, env) {
     }
     return json({
       name: "Zenkai Streaming API",
-      version: "1.0.3",
+      version: "1.0.4",
       description: "Direct streaming endpoints and CinePlayer embed infrastructure",
       documentation: "/api",
       routes: {
@@ -808,3 +799,4 @@ export async function handle(request, env) {
 
   return null;
 }
+

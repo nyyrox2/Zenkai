@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Moon, Sun } from 'lucide-react'
+import { ChevronRight, Moon, Sun } from 'lucide-react'
 import { AccountPanel, AuthPanel } from '../components/CloudSyncCard'
 import { useAuth } from '../context/AuthContext'
 import { AniListCard } from '../components/AniListCard'
-import { ProfileCustomizer, ProfileHero, type SectionKey } from '../components/ProfileCustomizer'
+import { ProfileEditor, ProfileHero, type SectionKey } from '../components/ProfileCustomizer'
 import { CustomSelect } from '../components/CustomSelect'
 import { DISCORD_URL, REPO_URL, TELEGRAM_URL } from '../lib/app'
 import { getPrefs, savePrefs, type Audio } from '../lib/library'
@@ -68,7 +68,10 @@ export default function ProfilePage() {
   const me = useProfile()
   const { user, loading } = useAuth()
   const { theme, setTheme } = useTheme()
-  const [open, setOpen] = useState<Set<SectionKey>>(() => new Set(['avatar']))
+
+  const [editing, setEditing] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
+  const [editTab, setEditTab] = useState<SectionKey>('identity')
 
   const [prefs, setPrefs] = useState(getPrefs)
   const [autoNext, setAutoNext] = useFlag('zk:autonext', true)
@@ -79,18 +82,20 @@ export default function ProfilePage() {
   const [maxQ, setMaxQ] = useStored('zp-q')
 
   useEffect(() => {
-    document.title = 'Profile — Zenkai'
+    document.title = editing ? 'Edit Profile — Zenkai' : 'Profile — Zenkai'
     document.documentElement.dataset.zkMono = ''
     if (location.hash === '#legal') window.setTimeout(() => document.getElementById('legal')?.scrollIntoView({ behavior: 'smooth' }), 150)
     return () => {
       delete document.documentElement.dataset.zkMono
     }
-  }, [])
+  }, [editing])
 
-  const edit = (k: SectionKey) => {
-    setOpen((o) => new Set(o).add(k))
-    window.setTimeout(() => document.getElementById(`pc-${k}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  const startEdit = (tab?: SectionKey) => {
+    if (tab) setEditTab(tab)
+    setEditing(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
   const setPref = (p: { server?: string; audio?: Audio }) => {
     savePrefs(p)
     setPrefs(getPrefs())
@@ -104,93 +109,108 @@ export default function ProfilePage() {
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 pb-28 pt-24 sm:px-6">
-      {loading ? null : user ? (
-        <>
-          <ProfileHero me={me} onEdit={edit} />
-          <ProfileCustomizer me={me} open={open} setOpen={setOpen} />
-          <AccountPanel />
-          <AniListCard me={me} />
-        </>
+      {editing ? (
+        <ProfileEditor me={me} initialTab={editTab} onClose={() => setEditing(false)} />
       ) : (
-        <AuthPanel />
+        <>
+          {loading ? null : user ? (
+            <>
+              <ProfileHero me={me} onEdit={startEdit} />
+              <AccountPanel />
+            </>
+          ) : showAuth ? (
+            <AuthPanel />
+          ) : (
+            <button type="button" onClick={() => setShowAuth(true)} className={cn(card, 'flex w-full items-center justify-between gap-3 text-left transition hover:border-accent active:scale-[0.99]')}>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">Sign in to sync</span>
+                <span className="block text-xs text-muted">Optional. Back up history and resume on any device.</span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted" />
+            </button>
+          )}
+
+          {/* AniList Sync Card */}
+          <AniListCard me={me} />
+
+          {/* Preferences */}
+          <section id="settings" className={cn(card, 'scroll-mt-24')} aria-label="Settings">
+            <h2 className={cn(h2, 'mb-4')}>Settings</h2>
+            <Row title="Theme">
+              <div className="inline-flex gap-1 rounded-full border border-border bg-card/60 p-1">
+                {(['dark', 'light'] as const).map((t) => (
+                  <button key={t} type="button" onClick={() => (setTheme(t), t !== theme && toast(`${t === 'dark' ? 'Dark' : 'Light'} theme on`))} aria-pressed={theme === t} className={cn('inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold capitalize transition', theme === t ? 'bg-foreground text-background' : 'text-muted')}>
+                    {t === 'dark' ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </Row>
+            <Row title="Default audio" hint="Sub or dub, for servers that offer both">
+              <div className="inline-flex gap-1 rounded-full border border-border bg-card/60 p-1">
+                {(['sub', 'dub'] as const).map((a) => (
+                  <button key={a} type="button" onClick={() => setPref({ audio: a })} aria-pressed={(prefs.audio ?? 'sub') === a} className={cn('h-8 rounded-full px-3.5 text-sm font-semibold uppercase transition', (prefs.audio ?? 'sub') === a ? 'bg-foreground text-background' : 'text-muted')}>
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </Row>
+            <Row title="Preferred audio language" hint="For multi-audio streams">
+              <CustomSelect label="Preferred audio language" value={lang} onChange={(v) => (setLang(v), toast(v ? `Audio language: ${langName(v)}` : 'Audio language: Auto'))} placeholder="Auto" options={[{ value: '', label: 'Auto' }, ...LANGS.map((c) => ({ value: c, label: langName(c) }))]} />
+            </Row>
+            <Row title="Preferred quality" hint="Videos start at this quality (or the closest below)">
+              <CustomSelect label="Preferred quality" value={maxQ} onChange={(v) => (setMaxQ(v), toast(v ? `Preferred quality: ${v}p` : 'Preferred quality: Auto'))} placeholder="Auto" options={[{ value: '', label: 'Auto (best)' }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' }, { value: '480', label: '480p' }, { value: '360', label: '360p' }]} />
+            </Row>
+            <Row title="Preferred server" hint="Used when you open an episode">
+              <CustomSelect label="Preferred server" value={prefs.server ?? 'megaplay'} onChange={(v) => setPref({ server: v })} placeholder="MegaPlay" options={DIRECT.map((s) => ({ value: s.id, label: s.name }))} />
+            </Row>
+            <Row title="Autoplay next episode">
+              <Switch on={autoNext} onChange={flag(setAutoNext, 'Autoplay next')} label="Autoplay next episode" />
+            </Row>
+            <Row title="Auto-skip intro & outro">
+              <Switch on={autoSkip} onChange={flag(setAutoSkip, 'Auto-skip intro & outro')} label="Auto-skip intro and outro" />
+            </Row>
+            <Row title="Skip filler episodes" hint="Next and autoplay jump over filler and recaps">
+              <Switch on={skipFiller} onChange={flag(setSkipFiller, 'Skip filler')} label="Skip filler episodes" />
+            </Row>
+            <Row title="Episode cards" hint="Large cards instead of a compact list">
+              <Switch on={layout === 'card'} onChange={(v) => (setLayout(v ? 'card' : 'list'), toast(`Episode cards ${v ? 'on' : 'off'}`))} label="Episode cards" />
+            </Row>
+          </section>
+
+          {/* About & legal */}
+          <section id="legal" className={cn(card, 'scroll-mt-24 space-y-5 text-sm leading-relaxed text-muted')} aria-label="About and legal">
+            <h2 className={h2}>About &amp; legal</h2>
+            <div>
+              <h3 className="mb-1 font-semibold text-foreground">Disclaimer</h3>
+              <p>
+                Zenkai does not host, upload or store any video, novel text or manga images. Streams, chapters and pages are provided by third-party services and are fetched at the moment you watch or read. Zenkai has no control over that
+                content and is not affiliated with those services. All titles, artwork and trademarks belong to their respective owners.
+              </p>
+            </div>
+            <div>
+              <h3 className="mb-1 font-semibold text-foreground">DMCA / copyright</h3>
+              <p>
+                If you own a work and believe something linked from Zenkai infringes your copyright, the file lives on the third-party host, so please contact that host first. To tell us as well, reach the maintainers through{' '}
+                <a href={REPO_URL + '/issues'} target="_blank" rel="noopener noreferrer" className="text-foreground underline underline-offset-2">GitHub</a>,{' '}
+                <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" className="text-foreground underline underline-offset-2">Discord</a> or{' '}
+                <a href={TELEGRAM_URL} target="_blank" rel="noopener noreferrer" className="text-foreground underline underline-offset-2">Telegram</a>, and include: the work concerned, the exact Zenkai page or link, your contact details, a statement that you act in good faith, and a statement that your notice is accurate and you
+                are the owner or their authorised agent. We will review it and remove the link where appropriate.
+              </p>
+            </div>
+            <div>
+              <h3 className="mb-1 font-semibold text-foreground">Data &amp; credits</h3>
+              <p>
+                Anime data from AniList and MyAnimeList (via Jikan); filler information from AnimeFillerList; artwork and episode details from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Avatar frames come from the
+                SillyTavern-AvatarDecorations-CSS collection, and preset avatars and banners from the avatar-banner list; that artwork belongs to its respective owners.
+              </p>
+            </div>
+            <p>
+              Your profile and preferences are kept in this browser only. Clearing site data removes them. <Link to="/home" className="text-foreground underline underline-offset-2">Back to Zenkai</Link>
+            </p>
+          </section>
+        </>
       )}
-
-      {/* Preferences */}
-      <section id="settings" className={cn(card, 'scroll-mt-24')} aria-label="Settings">
-        <h2 className={cn(h2, 'mb-4')}>Settings</h2>
-        <Row title="Theme">
-          <div className="inline-flex gap-1 rounded-full border border-border bg-card/60 p-1">
-            {(['dark', 'light'] as const).map((t) => (
-              <button key={t} type="button" onClick={() => (setTheme(t), t !== theme && toast(`${t === 'dark' ? 'Dark' : 'Light'} theme on`))} aria-pressed={theme === t} className={cn('inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold capitalize transition', theme === t ? 'bg-foreground text-background' : 'text-muted')}>
-                {t === 'dark' ? <Moon className="size-3.5" /> : <Sun className="size-3.5" />}
-                {t}
-              </button>
-            ))}
-          </div>
-        </Row>
-        <Row title="Default audio" hint="Sub or dub, for servers that offer both">
-          <div className="inline-flex gap-1 rounded-full border border-border bg-card/60 p-1">
-            {(['sub', 'dub'] as const).map((a) => (
-              <button key={a} type="button" onClick={() => setPref({ audio: a })} aria-pressed={(prefs.audio ?? 'sub') === a} className={cn('h-8 rounded-full px-3.5 text-sm font-semibold uppercase transition', (prefs.audio ?? 'sub') === a ? 'bg-foreground text-background' : 'text-muted')}>
-                {a}
-              </button>
-            ))}
-          </div>
-        </Row>
-        <Row title="Preferred audio language" hint="For multi-audio streams">
-          <CustomSelect label="Preferred audio language" value={lang} onChange={(v) => (setLang(v), toast(v ? `Audio language: ${langName(v)}` : 'Audio language: Auto'))} placeholder="Auto" options={[{ value: '', label: 'Auto' }, ...LANGS.map((c) => ({ value: c, label: langName(c) }))]} />
-        </Row>
-        <Row title="Preferred quality" hint="Videos start at this quality (or the closest below)">
-          <CustomSelect label="Preferred quality" value={maxQ} onChange={(v) => (setMaxQ(v), toast(v ? `Preferred quality: ${v}p` : 'Preferred quality: Auto'))} placeholder="Auto" options={[{ value: '', label: 'Auto (best)' }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' }, { value: '480', label: '480p' }, { value: '360', label: '360p' }]} />
-        </Row>
-        <Row title="Preferred server" hint="Used when you open an episode">
-          <CustomSelect label="Preferred server" value={prefs.server ?? 'megaplay'} onChange={(v) => setPref({ server: v })} placeholder="MegaPlay" options={DIRECT.map((s) => ({ value: s.id, label: s.name }))} />
-        </Row>
-        <Row title="Autoplay next episode">
-          <Switch on={autoNext} onChange={flag(setAutoNext, 'Autoplay next')} label="Autoplay next episode" />
-        </Row>
-        <Row title="Auto-skip intro & outro">
-          <Switch on={autoSkip} onChange={flag(setAutoSkip, 'Auto-skip intro & outro')} label="Auto-skip intro and outro" />
-        </Row>
-        <Row title="Skip filler episodes" hint="Next and autoplay jump over filler and recaps">
-          <Switch on={skipFiller} onChange={flag(setSkipFiller, 'Skip filler')} label="Skip filler episodes" />
-        </Row>
-        <Row title="Episode cards" hint="Large cards instead of a compact list">
-          <Switch on={layout === 'card'} onChange={(v) => (setLayout(v ? 'card' : 'list'), toast(`Episode cards ${v ? 'on' : 'off'}`))} label="Episode cards" />
-        </Row>
-      </section>
-
-      {/* About & legal */}
-      <section id="legal" className={cn(card, 'scroll-mt-24 space-y-5 text-sm leading-relaxed text-muted')} aria-label="About and legal">
-        <h2 className={h2}>About &amp; legal</h2>
-        <div>
-          <h3 className="mb-1 font-semibold text-foreground">Disclaimer</h3>
-          <p>
-            Zenkai does not host, upload or store any video, novel text or manga images. Streams, chapters and pages are provided by third-party services and are fetched at the moment you watch or read. Zenkai has no control over that
-            content and is not affiliated with those services. All titles, artwork and trademarks belong to their respective owners.
-          </p>
-        </div>
-        <div>
-          <h3 className="mb-1 font-semibold text-foreground">DMCA / copyright</h3>
-          <p>
-            If you own a work and believe something linked from Zenkai infringes your copyright, the file lives on the third-party host, so please contact that host first. To tell us as well, reach the maintainers through{' '}
-            <a href={REPO_URL + '/issues'} target="_blank" rel="noopener noreferrer" className="text-foreground underline underline-offset-2">GitHub</a>,{' '}
-            <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" className="text-foreground underline underline-offset-2">Discord</a> or{' '}
-            <a href={TELEGRAM_URL} target="_blank" rel="noopener noreferrer" className="text-foreground underline underline-offset-2">Telegram</a>, and include: the work concerned, the exact Zenkai page or link, your contact details, a statement that you act in good faith, and a statement that your notice is accurate and you
-            are the owner or their authorised agent. We will review it and remove the link where appropriate.
-          </p>
-        </div>
-        <div>
-          <h3 className="mb-1 font-semibold text-foreground">Data &amp; credits</h3>
-          <p>
-            Anime data from AniList and MyAnimeList (via Jikan); filler information from AnimeFillerList; artwork and episode details from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Avatar frames come from the
-            SillyTavern-AvatarDecorations-CSS collection, and preset avatars and banners from the avatar-banner list; that artwork belongs to its respective owners.
-          </p>
-        </div>
-        <p>
-          Your profile and preferences are kept in this browser only. Clearing site data removes them. <Link to="/home" className="text-foreground underline underline-offset-2">Back to Zenkai</Link>
-        </p>
-      </section>
     </main>
   )
 }

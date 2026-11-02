@@ -2,6 +2,44 @@
 
 All notable changes to the Zenkai Web application will be documented in this file.
 
+## [1.0.4] - 2026-11-03
+
+### 📞 Direct Voice Calling
+
+- **One-on-One Voice Calling**:
+  - Call fellow otakus directly from your 1-on-1 chats.
+  - Dedicated full-screen call room with live call timer, speaking aura, and microphone controls.
+  - Full-screen incoming call sheet on mobile and desktop so you never miss a call.
+- **Call History in Chat**:
+  - Direct messages now show call cards with exact start times, duration, and status (completed, missed, or declined).
+  - One-tap "Call back" button directly inside the call card.
+
+### 🍿 Watch Together Voice Chat & Host Controls
+
+- **Live Voice Chat in Watch Parties**:
+  - Talk with party members in real time while watching anime synchronously.
+  - Individual microphone mute/unmute toggle.
+  - Ability to mute individual party members on your side.
+- **Party Host Controls**:
+  - Switch anime shows or change episodes on the fly without disbanding the party.
+  - Persistent party host sessions that remain intact if the host refreshes or switches tabs.
+- **Mobile-Optimized Emoji Reactions**:
+  - Emoji reactions now scale appropriately on mobile devices so video playback is never obstructed.
+
+### 💬 Full-Screen Messages
+
+- **Dedicated Inbox Experience**:
+  - Direct Messages is now a distraction-free full-screen interface without navigation bar interference.
+  - Convenient "Back to Zenkai" button to return to the catalog anytime.
+- **Clickable Otaku Profiles**:
+  - Clicking a user's avatar, name, or handle directly opens their public profile.
+
+### 🧭 Spacious Navigation
+
+- **Balanced Header Layout**:
+  - Top navigation bar expanded with clean link spacing and responsive layout.
+  - Prevents overlap across all tablet, laptop, and desktop screen sizes.
+
 ## [1.0.3] - 2026-11-01
 
 ### 🔌 Zenkai Player API
