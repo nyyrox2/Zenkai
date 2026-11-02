@@ -295,10 +295,10 @@ export class DirectVoiceCall {
 
   /** Toggle local mic mute */
   public async toggleMute(): Promise<boolean> {
-    if (!this.localStream || !this.localStream.active) {
+    if (!this.localStream || !this.localStream.active || this.localStream.getAudioTracks().every((t) => t.readyState === 'ended')) {
       try {
+        this.isMuted = false // acquireMicrophone enables the new track based on this flag
         await this.acquireMicrophone()
-        this.isMuted = false
         return false
       } catch {
         this.isMuted = true
@@ -306,12 +306,16 @@ export class DirectVoiceCall {
       }
     }
 
-    this.isMuted = !this.isMuted
-    if (this.localStream) {
-      for (const track of this.localStream.getAudioTracks()) {
-        track.enabled = !this.isMuted
+    // Muting stops the tracks so the browser releases the microphone (its "in use" indicator goes off);
+    // unmuting re-acquires it above.
+    this.isMuted = true
+    if (this.pc) {
+      for (const sender of this.pc.getSenders()) {
+        if (sender.track?.kind === 'audio') void sender.replaceTrack(null).catch(() => {})
       }
     }
+    for (const track of this.localStream.getTracks()) track.stop()
+    this.localStream = null
     return this.isMuted
   }
 

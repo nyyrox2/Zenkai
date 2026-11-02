@@ -39,6 +39,7 @@ export type SyncActionType =
   | 'CHANGE_SHOW'
   | 'CHANGE_SERVER'
   | 'CHANGE_AUDIO'
+  | 'CHANGE_AUDIO_TRACK'
 
 export interface SyncPayload {
   type: SyncActionType
@@ -49,6 +50,8 @@ export interface SyncPayload {
   animeTitle?: string
   server?: string
   audio?: 'sub' | 'dub'
+  /** the exact audio rendition picked inside a multi-audio stream (e.g. ACDN), matched by lang / label on each device */
+  audioTrack?: { label: string; lang: string }
   timestamp: number
   senderId: string
 }
@@ -95,6 +98,8 @@ export class WatchTogetherRoom {
   private onShowChangeCallback?: (animeId: number, animeTitle: string, episode: number) => void
   private onServerChangeCallback?: (server: string) => void
   private onAudioChangeCallback?: (audio: 'sub' | 'dub') => void
+  private onAudioTrackChangeCallback?: (track: { label: string; lang: string }) => void
+  private audioTrack: { label: string; lang: string } | null = null
   private onConnectionStatusChangeCallback?: (status: 'connecting' | 'connected' | 'p2p' | 'disconnected') => void
   private onLocalMicChangeCallback?: (active: boolean) => void
 
@@ -458,6 +463,16 @@ export class WatchTogetherRoom {
         this.notifyPeersChanged()
       }
       this.onConnectionStatusChangeCallback?.('p2p')
+      // bring a late joiner onto the host's current audio rendition
+      if (this.isHost && this.audioTrack) {
+        try {
+          dc.send(JSON.stringify({
+            kind: 'SYNC',
+            senderId: this.peerId,
+            payload: { type: 'CHANGE_AUDIO_TRACK', currentTime: 0, audioTrack: this.audioTrack, timestamp: Date.now(), senderId: this.peerId },
+          }))
+        } catch { /* channel not ready */ }
+      }
     }
 
     dc.onclose = () => {
@@ -507,6 +522,9 @@ export class WatchTogetherRoom {
           this.onServerChangeCallback?.(payload.server)
         } else if (payload.type === 'CHANGE_AUDIO' && payload.audio) {
           this.onAudioChangeCallback?.(payload.audio)
+        } else if (payload.type === 'CHANGE_AUDIO_TRACK' && payload.audioTrack) {
+          this.audioTrack = payload.audioTrack
+          this.onAudioTrackChangeCallback?.(payload.audioTrack)
         } else {
           this.onSyncCallback?.(payload)
         }
@@ -622,6 +640,7 @@ export class WatchTogetherRoom {
   public sendServerChange(server: string) {
     if (this.hostOnlyControl && !this.isHost) return
     this.server = server
+    this.audioTrack = null // every server has its own audio renditions; the host re-picks on the new one
 
     const payload: SyncPayload = {
       type: 'CHANGE_SERVER',
@@ -642,6 +661,23 @@ export class WatchTogetherRoom {
       type: 'CHANGE_AUDIO',
       currentTime: 0,
       audio,
+      timestamp: Date.now(),
+      senderId: this.peerId,
+    }
+
+    this.broadcastP2P({ kind: 'SYNC', payload })
+  }
+
+  /** Broadcast the audio rendition picked inside a multi-audio stream, so every peer switches to the same one */
+  public sendAudioTrackChange(track: { label: string; lang: string }) {
+    if (this.hostOnlyControl && !this.isHost) return
+    if (this.audioTrack && this.audioTrack.label === track.label && this.audioTrack.lang === track.lang) return
+    this.audioTrack = track
+
+    const payload: SyncPayload = {
+      type: 'CHANGE_AUDIO_TRACK',
+      currentTime: 0,
+      audioTrack: track,
       timestamp: Date.now(),
       senderId: this.peerId,
     }
@@ -691,10 +727,16 @@ export class WatchTogetherRoom {
 
     if (this.isMicActive) {
       this.isMicActive = false
+      // Detach from every peer, then stop the tracks. Only stopping releases the capture device;
+      // `enabled = false` merely silences it, which leaves the browser's "microphone in use" indicator on.
+      for (const pc of this.peerConnections.values()) {
+        for (const sender of pc.getSenders()) {
+          if (sender.track?.kind === 'audio') void sender.replaceTrack(null).catch(() => {})
+        }
+      }
       if (this.localAudioStream) {
-        this.localAudioStream.getAudioTracks().forEach((track) => {
-          track.enabled = false
-        })
+        this.localAudioStream.getTracks().forEach((t) => t.stop())
+        this.localAudioStream = null
       }
     } else {
       try {
@@ -802,6 +844,10 @@ export class WatchTogetherRoom {
 
   public onAudioChange(cb: (audio: 'sub' | 'dub') => void) {
     this.onAudioChangeCallback = cb
+  }
+
+  public onAudioTrackChange(cb: (track: { label: string; lang: string }) => void) {
+    this.onAudioTrackChangeCallback = cb
   }
 
   public onLocalMicChange(cb: (active: boolean) => void) {

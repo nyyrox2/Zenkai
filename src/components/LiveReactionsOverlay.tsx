@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { WatchReaction } from '../lib/webrtcWatchTogether'
 
-const LIFE = 2600 // ms a reaction stays on screen
+const LIFE = 2200 // ms a reaction stays on screen
 const MAX_ON_SCREEN = 10
 
 interface Bubble {
@@ -14,14 +14,21 @@ interface Bubble {
   rise: number // how far it floats up in px
 }
 
+/** Float up ~75% of the way from the origin to the top of the player (less on phones), then be gone. */
+function riseFor(root: HTMLElement | null) {
+  const h = root?.clientHeight ?? 360
+  const frac = window.innerWidth >= 640 ? 0.75 : 0.55
+  return (h / 2) * frac * (0.85 + Math.random() * 0.15)
+}
+
 /** Profile picture that fades into the emoji (Instagram-live style), floating up. */
 const ReactionBubble = memo(function ReactionBubble({ b }: { b: Bubble }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 0, x: 0, scale: 0.6 }}
       animate={{ opacity: [0, 1, 1, 0], y: -b.rise, x: [0, b.x * 0.5, b.x * 0.9, b.x], scale: [0.6, 1, 1, 0.9] }}
-      transition={{ duration: LIFE / 1000, times: [0, 0.12, 0.75, 1], ease: 'easeOut' }}
-      className="pointer-events-none absolute bottom-0 right-0 grid size-11 select-none place-items-center will-change-transform sm:size-14"
+      transition={{ duration: LIFE / 1000, times: [0, 0.12, 0.55, 1], ease: 'easeOut' }}
+      className="pointer-events-none absolute bottom-0 left-0 grid size-11 select-none place-items-center will-change-transform sm:size-14"
     >
       {/* avatar -> fades out */}
       <motion.span
@@ -65,6 +72,7 @@ export function LiveReactionsOverlay({
   // re-enabling never replays old reactions.
   const seen = useRef<Set<string> | null>(null)
   const timers = useRef<number[]>([])
+  const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (seen.current === null) {
@@ -83,7 +91,7 @@ export function LiveReactionsOverlay({
       name: r.senderName || '?',
       avatar: r.avatar,
       x: (Math.random() - 0.5) * 70,
-      rise: 150 + Math.random() * 60,
+      rise: riseFor(rootRef.current),
     }))
     setBubbles((prev) => [...prev, ...added].slice(-MAX_ON_SCREEN))
     for (const b of added) {
@@ -98,7 +106,7 @@ export function LiveReactionsOverlay({
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+    <div ref={rootRef} className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
       <AnimatePresence>
         {syncNotice && (
           <motion.div
@@ -116,7 +124,7 @@ export function LiveReactionsOverlay({
       </AnimatePresence>
 
       {enabled && (
-        <div className="absolute bottom-14 right-4 size-0 sm:bottom-20 sm:right-8">
+        <div className="absolute left-[calc(50%+5.5rem)] top-1/2 size-0 sm:left-[calc(50%+8rem)]">
           {bubbles.map((b) => (
             <ReactionBubble key={b.id} b={b} />
           ))}

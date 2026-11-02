@@ -2332,7 +2332,15 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.03 + i * 0.02, duration: 0.18 }}
                         className={cx('zp-row', t.i === audioIdx && 'on')}
-                        onClick={() => (setAudioTrack(t), closePop())}
+                        onClick={() => {
+                          if (isPartyGuest) {
+                            toast('Audio is controlled by party host', 'info')
+                            closePop()
+                            return
+                          }
+                          setAudioTrack(t)
+                          closePop()
+                        }}
                       >
                         <span>{t.label}</span>
                         {t.i === audioIdx && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}

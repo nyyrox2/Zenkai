@@ -18,7 +18,7 @@ import {
   Copy,
   Check,
   Film,
-  Sparkles,
+  Smile,
   EyeOff,
   LogOut,
   MessageSquare,
@@ -29,6 +29,7 @@ import {
   MicOff,
   Volume2,
   VolumeX,
+  Languages,
 } from 'lucide-react'
 import { WatchTogetherRoom, generateWatchRoomId, type PeerMember, type WatchChatMessage, type WatchReaction } from '../lib/webrtcWatchTogether'
 import {
@@ -181,6 +182,9 @@ export default function WatchPage() {
   const [tourOn, setTourOn] = useState(false)
   const [pageTourDone, setPageTourDone] = useState(() => tourSeen('watch'))
   const [audSel, setAudSel] = useState<{ i: number } | null>(null)
+  /** audio rendition the party host picked; applied here as soon as this server's track list has it */
+  const [partyTrack, setPartyTrack] = useState<{ label: string; lang: string; token: number } | null>(null)
+  const applyingPartyAudio = useRef(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [reportIssue, setReportIssue] = useState("Broken / Won't Play")
   const [reportDetails, setReportDetails] = useState('')
@@ -315,6 +319,11 @@ export default function WatchPage() {
     newRoom.onAudioChange((newAudio) => {
       showNotice(`Party host switched audio to ${newAudio.toUpperCase()}`)
       go({ audio: newAudio }, false, true)
+    })
+
+    newRoom.onAudioTrackChange((t) => {
+      showNotice(`Party host switched audio to ${t.label || t.lang || 'another track'}`)
+      setPartyTrack({ ...t, token: Date.now() })
     })
 
     newRoom.onPeersChange((p) => setPeers(p))
@@ -554,6 +563,36 @@ export default function WatchPage() {
     [directList, serverAudio, serverAudioQuery.loading]
   )
   const tracks = (server.multi || aud.tracks.length > 1) ? aud.tracks : []
+  const activeTrack = aud.tracks.find((t) => t.i === aud.active)
+  // Party host: whatever rendition is playing (picked in the player or from the panel) is broadcast to everyone
+  useEffect(() => {
+    if (!room?.isHost || !activeTrack) return
+    room.sendAudioTrackChange({ label: activeTrack.label, lang: activeTrack.lang })
+  }, [room, activeTrack?.label, activeTrack?.lang])
+  // Party guest: switch to the host's rendition once this server's track list contains it
+  useEffect(() => {
+    if (!partyTrack || !room || room.isHost) return
+    const n = (x: string) => x.trim().toLowerCase()
+    const hit =
+      aud.tracks.find((t) => n(t.label) === n(partyTrack.label) && n(t.lang) === n(partyTrack.lang)) ??
+      aud.tracks.find((t) => partyTrack.lang && n(t.lang) === n(partyTrack.lang)) ??
+      aud.tracks.find((t) => n(t.label) === n(partyTrack.label))
+    if (!hit) return
+    setPartyTrack(null)
+    if (hit.i === aud.active) return
+    applyingPartyAudio.current = true
+    setAudSel({ i: hit.i })
+    window.setTimeout(() => { applyingPartyAudio.current = false }, 800)
+  }, [partyTrack, aud.tracks, aud.active, room])
+  const pickTrack = (t: { i: number; label: string; lang: string }) => {
+    setAudSel({ i: t.i })
+    const l = t.label.toLowerCase()
+    const g = t.lang.toLowerCase()
+    const isDub = g === 'en' || g === 'eng' || l.includes('english') || l.includes('dub')
+    const isSub = g === 'ja' || g === 'jpn' || l.includes('native') || l.includes('japanese')
+    if (isDub && audio !== 'dub') go({ audio: 'dub' })
+    else if (isSub && audio !== 'sub') go({ audio: 'sub' })
+  }
   // first visit: pause and walk through the page once the player area has rendered
   useEffect(() => {
     if (!ready || pageTourDone || tourOn) return
@@ -660,7 +699,7 @@ export default function WatchPage() {
                   format={a.format}
                   directSubtitles={cur.d.subtitles.map((s, i) => ({ id: `s${i}`, label: s.label, lang: s.label, url: s.file }))}
                   audioMode={cur.audio}
-                  onAudio={(m) => go({ audio: m })}
+                  onAudio={(m) => go({ audio: m }, true, applyingPartyAudio.current)}
                   onAudioTracks={(tracks, active) => setAud({ tracks, active })}
                   audioSel={audSel}
                   tourReady={pageTourDone}
@@ -815,6 +854,12 @@ export default function WatchPage() {
                     <p className="text-[11px] text-muted">
                       {peers.length} {peers.length === 1 ? 'peer' : 'peers'} · {room.isHost ? 'You are Host' : 'Guest (Playback synced)'}
                     </p>
+                    {activeTrack && (
+                      <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted">
+                        <Languages className="size-3" /> Audio: <span className="font-semibold text-foreground">{activeTrack.label}</span>
+                        {!room.isHost && ' (set by host)'}
+                      </p>
+                    )}
                   </div>
                 </div>
                   <button
@@ -898,7 +943,7 @@ export default function WatchPage() {
                       hideEmojiOverlay ? 'text-muted' : 'text-foreground'
                     )}
                   >
-                    {hideEmojiOverlay ? <EyeOff className="size-3.5" /> : <Sparkles className="size-3.5" />}
+                    {hideEmojiOverlay ? <EyeOff className="size-3.5" /> : <Smile className="size-3.5" />}
                     <span>{hideEmojiOverlay ? 'Emoji off' : 'Emoji'}</span>
                   </button>
 
@@ -1155,12 +1200,32 @@ export default function WatchPage() {
                 <div className="rounded-3xl border border-border bg-card/85 p-4 sm:p-5 shadow-xl backdrop-blur-xl space-y-5">
                   <div className="rounded-2xl border border-accent/30 bg-accent/10 p-3 text-xs text-accent font-semibold flex items-center gap-2">
                     <Crown className="size-4 shrink-0 text-foreground" />
-                    <span>Host Control: Switching server or audio mode (Sub / Dub) will instantly sync it for all peers in the room.</span>
+                    <span>Host Control: Switching server or audio (track / Sub / Dub) will instantly sync it for all peers in the room.</span>
                   </div>
 
                   {/* Audio options */}
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-widest text-muted">Audio Mode</span>
+                  <div data-tour="w-audio">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-muted">
+                      {tracks.length > 0 ? `Audio · ${server.name}` : 'Audio Mode'}
+                    </span>
+                    {tracks.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1 rounded-3xl border border-border p-1 w-fit max-w-full">
+                        {tracks.map((t) => (
+                          <button
+                            key={t.i}
+                            onClick={() => pickTrack(t)}
+                            className={cn(
+                              'rounded-full px-4 py-2 text-xs font-bold uppercase transition active:scale-95',
+                              aud.active === t.i ? 'bg-foreground text-background shadow-sm' : 'text-muted hover:text-foreground'
+                            )}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : server.multi || server.kind === 'animesalt' ? (
+                      <p className="mt-2 text-xs text-muted">{stream.loading || salt.loading ? 'Loading audio tracks…' : 'Audio tracks are chosen inside the player on this server.'}</p>
+                    ) : (
                     <div className="mt-2 flex flex-wrap rounded-3xl border border-border p-1 w-fit">
                       {(['sub', 'dub'] as const).map((m) => (
                         <button
@@ -1177,6 +1242,7 @@ export default function WatchPage() {
                         </button>
                       ))}
                     </div>
+                    )}
                   </div>
 
                   {/* Direct Servers */}
@@ -1231,15 +1297,7 @@ export default function WatchPage() {
                       ? tracks.map((t) => (
                           <button
                             key={t.i}
-                            onClick={() => {
-                              setAudSel({ i: t.i })
-                              const l = t.label.toLowerCase()
-                              const g = t.lang.toLowerCase()
-                              const isDub = g === 'en' || g === 'eng' || l.includes('english') || l.includes('dub')
-                              const isSub = g === 'ja' || g === 'jpn' || l.includes('native') || l.includes('japanese')
-                              if (isDub && audio !== 'dub') go({ audio: 'dub' })
-                              else if (isSub && audio !== 'sub') go({ audio: 'sub' })
-                            }}
+                            onClick={() => pickTrack(t)}
                             className={cn('rounded-full px-4 py-1.5 text-xs font-bold uppercase transition', aud.active === t.i ? 'bg-foreground text-background' : 'text-muted')}
                           >
                             {t.label}
