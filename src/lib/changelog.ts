@@ -20,13 +20,16 @@ export interface ReleaseData {
 /** Offline fallback; the real notes come from the latest GitHub release of the web repo. */
 export const CURRENT_RELEASE: ReleaseData = {
   version: pkg.version,
-  releaseDate: 'November 1, 2026',
-  title: 'Zenkai Player API',
-  tagline: 'Put any anime episode on your own site with a single iframe. No keys, no setup.',
+  releaseDate: 'November 3, 2026',
+  title: 'Voice Calls, Watch Parties & Full-Screen Messaging',
+  tagline: 'Real-time voice calls, live watch party voice chat, dedicated messages view, and host room controls.',
   githubUrl: `${WEB_REPO_URL}/releases`,
   highlights: [
-    { badge: 'API', title: 'Embeddable player', description: 'Use /embed?id=<AniList ID>&ep=1 in an iframe. Pick the server and sub or dub with query parameters.' },
-    { badge: 'DOCS', title: 'Live embed generator', description: 'Build, preview and copy your snippet on the API page, with every option listed.' },
+    { badge: 'CALLS', title: 'Direct Voice Calling', description: 'Start one-on-one voice calls right from direct messages with dedicated call screens, speaking indicators, and call history.' },
+    { badge: 'PARTY', title: 'Watch Party Voice Chat', description: 'Talk live with friends during watch parties with individual mic and mute controls.' },
+    { badge: 'PARTY', title: 'Host Party Controls', description: 'Switch anime or episodes on the fly and keep your room alive even if you refresh.' },
+    { badge: 'INBOX', title: 'Full-Screen Messages', description: 'A distraction-free, edge-to-edge messaging experience with clickable profiles and call history cards.' },
+    { badge: 'NAVBAR', title: 'Spacious Navigation', description: 'Refined header layout with clean link spacing and instant search on all screen sizes.' },
   ],
 }
 
@@ -148,3 +151,4 @@ export function onChangelogToggle(callback: (open: boolean) => void): () => void
   window.addEventListener(EVENT_NAME, handler)
   return () => window.removeEventListener(EVENT_NAME, handler)
 }
+
