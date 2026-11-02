@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff, History, Lock, LogOut, Mail, RefreshCw, Smartphone, BookOpen, CloudCheck } from 'lucide-react'
+import { AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff, History, Lock, LogOut, Mail, RefreshCw, Smartphone, BookOpen, CloudCheck, User } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { syncNow, getLastSyncTime, formatLastSync } from '../lib/sync'
 import { useHistory, useList } from '../lib/library'
@@ -15,12 +15,13 @@ const PERKS = [
   { icon: BookOpen, title: 'Manga and novels too', text: 'Your reading progress comes along.' },
 ]
 
-/** Full sign-in / create-account panel shown to guests at the top of the profile page. */
+/** Full sign-in / create-account panel shown to guests on the profile page. */
 export function AuthPanel() {
   const { signIn, signUp } = useAuth()
   const [tab, setTab] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('')
   const [show, setShow] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,14 +31,17 @@ export function AuthPanel() {
     e.preventDefault()
     setError(null)
     setNotice(null)
-    if (tab === 'signup' && password.length < 6) return setError('Use at least 6 characters for your password.')
+    if (tab === 'signup') {
+      if (username.trim().length < 3) return setError('Username must be at least 3 characters.')
+      if (password.length < 6) return setError('Use at least 6 characters for your password.')
+    }
     setBusy(true)
     try {
       if (tab === 'signin') {
         const { error } = await signIn(email, password)
         if (error) setError(error.message)
       } else {
-        const { error, needsConfirm } = await signUp(email, password)
+        const { error, needsConfirm } = await signUp(email, password, username)
         if (error) setError(error.message)
         else if (needsConfirm) setNotice('Check your inbox and confirm your email, then sign in.')
       }
@@ -52,7 +56,7 @@ export function AuthPanel() {
         <Logo />
         <div>
           <h1 className="font-display text-2xl font-bold sm:text-3xl">Your library, everywhere</h1>
-          <p className="mt-2 text-sm text-muted">An account is optional. Zenkai works fully without one; signing in just backs up your progress.</p>
+          <p className="mt-2 text-sm text-muted">An account is optional. Zenkai works fully without one; signing in just backs up your watch history to the cloud.</p>
         </div>
         <ul className="space-y-4">
           {PERKS.map(({ icon: Icon, title, text }) => (
@@ -79,6 +83,25 @@ export function AuthPanel() {
         </div>
 
         <form onSubmit={submit} className="space-y-4" noValidate={false}>
+          {tab === 'signup' && (
+            <div>
+              <label htmlFor="auth-username" className="mb-1.5 block text-xs font-semibold text-muted">Username</label>
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+                <input
+                  id="auth-username"
+                  type="text"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="e.g. shadow_ninja"
+                  autoComplete="username"
+                  className={cn(input, 'pr-4')}
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label htmlFor="auth-email" className="mb-1.5 block text-xs font-semibold text-muted">Email</label>
             <div className="relative">
@@ -86,11 +109,12 @@ export function AuthPanel() {
               <input id="auth-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" className={cn(input, 'pr-4')} />
             </div>
           </div>
+
           <div>
             <label htmlFor="auth-password" className="mb-1.5 block text-xs font-semibold text-muted">Password</label>
             <div className="relative">
               <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-              <input id="auth-password" type={show ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete={tab === 'signin' ? 'current-password' : 'new-password'} className={cn(input, 'pr-11')} />
+              <input id="auth-password" type={show ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min. 6 characters)" autoComplete={tab === 'signin' ? 'current-password' : 'new-password'} className={cn(input, 'pr-11')} />
               <button type="button" onClick={() => setShow((p) => !p)} aria-label={show ? 'Hide password' : 'Show password'} className="absolute right-3 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-muted transition hover:text-foreground">
                 {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
@@ -126,7 +150,7 @@ export function AuthPanel() {
 
 /** Account + cloud sync status for signed-in users. */
 export function AccountPanel() {
-  const { user, signOut } = useAuth()
+  const { user, username: authUsername, signOut } = useAuth()
   const counts = [
     { label: 'Watch history', n: useHistory().length },
     { label: 'Watchlist', n: useList().length },
@@ -164,7 +188,16 @@ export function AccountPanel() {
             <CloudCheck className="size-5" />
           </span>
           <div className="min-w-0">
-            <h2 className="font-display text-lg font-bold">Account and sync</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-lg font-bold truncate">
+                {authUsername ? `@${authUsername}` : 'Account and sync'}
+              </h2>
+              {authUsername && (
+                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
+                  SYNCED
+                </span>
+              )}
+            </div>
             <p className="truncate text-xs text-muted">{user.email}</p>
           </div>
         </div>

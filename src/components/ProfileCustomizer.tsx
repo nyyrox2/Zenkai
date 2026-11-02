@@ -1,156 +1,337 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Camera, Check, ChevronDown, Crop, Frame, ImagePlus, Images, Pencil, Search, Sparkles, Trash2, UserRound, X, type LucideIcon } from 'lucide-react'
+import {
+  ArrowLeft,
+  AtSign,
+  Camera,
+  Check,
+  Crop,
+  Frame,
+  ImagePlus,
+  Images,
+  Palette,
+  Pencil,
+  Save,
+  Search,
+  Sparkles,
+  Trash2,
+  UserRound,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import { Avatar } from './Avatar'
-import { BlurText } from './BlurText'
 import { CustomSelect } from './CustomSelect'
 import { ImageCropper, type CropKind } from './ImageCropper'
-import { SpotlightCard } from './SpotlightCard'
 import { FRAMES, FRAME_GROUPS, frameById, frameGroup, frameUrl } from '../lib/frames'
 import { saveProfile, type Profile } from '../lib/profile'
 import { useAuth } from '../context/AuthContext'
 import { toast } from '../lib/toast'
 import { cn } from '../lib/utils'
 
-export type SectionKey = 'name' | 'avatar' | 'overlay' | 'banner'
+export type SectionKey = 'identity' | 'avatar' | 'overlay' | 'banner'
 
 const spring = { type: 'spring', stiffness: 260, damping: 22 } as const
-const solid = 'inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-bold text-background transition hover:opacity-90 active:scale-95'
-const pill = 'inline-flex h-10 items-center gap-2 rounded-full border border-border bg-card/60 px-4 text-sm font-semibold transition hover:border-accent hover:text-accent active:scale-95'
+const solid =
+  'inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-bold text-background transition hover:opacity-90 active:scale-95'
+const pill =
+  'inline-flex h-10 items-center gap-2 rounded-full border border-border bg-card/60 px-4 text-sm font-semibold transition hover:border-accent hover:text-accent active:scale-95'
 
-/* ------------------------------------------------------------------ hero */
+/* ------------------------------------------------------------------ Profile Hero */
 
-export function ProfileHero({ me, onEdit }: { me: Profile; onEdit: (k: SectionKey) => void }) {
-  const { user } = useAuth()
+export function ProfileHero({
+  me,
+  onEdit,
+}: {
+  me: Profile
+  onEdit: (tab?: SectionKey) => void
+}) {
+  const { user, username: authUsername } = useAuth()
   const frame = frameById(me.frame)
+
   return (
-    <motion.section initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.05 }} className="relative overflow-hidden rounded-3xl border border-border bg-card/60" aria-label="Profile preview">
-      <div className="relative h-40 overflow-hidden bg-card-2 sm:h-56">
+    <motion.section
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...spring, delay: 0.05 }}
+      className="relative overflow-hidden rounded-3xl border border-border bg-card/60 shadow-xl"
+      aria-label="Profile preview"
+    >
+      {/* Banner */}
+      <div className="relative h-44 overflow-hidden bg-card-2 sm:h-60">
         <AnimatePresence>
-          {me.banner && (
-            <motion.img key={me.banner} src={me.banner} alt="" referrerPolicy="no-referrer" className="absolute inset-0 size-full object-cover" initial={{ opacity: 0, scale: 1.14 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.9, ease: 'easeOut' }} />
+          {me.banner ? (
+            <motion.img
+              key={me.banner}
+              src={me.banner}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="absolute inset-0 size-full object-cover"
+              initial={{ opacity: 0, scale: 1.12 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-accent/20 via-card-2 to-card" />
           )}
         </AnimatePresence>
-        <motion.button type="button" onClick={() => onEdit('banner')} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} whileTap={{ scale: 0.93 }} className="absolute right-3 top-3 inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/45 px-3.5 text-xs font-semibold text-white backdrop-blur transition hover:bg-black/60">
-          <Camera className="size-3.5" /> Edit banner
+        <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-black/30" />
+
+        {/* Quick Edit Banner Button */}
+        <motion.button
+          type="button"
+          onClick={() => onEdit('banner')}
+          initial={{ opacity: 0, x: 12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+          whileTap={{ scale: 0.94 }}
+          className="absolute right-3.5 top-3.5 inline-flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-black/50 px-3.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/75"
+        >
+          <Camera className="size-3.5" />
+          <span>Edit banner</span>
         </motion.button>
       </div>
 
-      <div className="flex items-end gap-4 px-5 pb-5 sm:px-8">
-        <motion.div initial={{ scale: 0.3, rotate: -24, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 240, damping: 15, delay: 0.2 }} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} className="relative -mt-14 mb-2 ml-2 shrink-0 sm:-mt-16">
-          <Avatar size={112} src={me.avatar} frame={me.frame} name={me.name} animateFrame className="relative rounded-full ring-4 ring-card" />
-          <button type="button" onClick={() => onEdit('avatar')} aria-label="Edit profile picture" className="absolute -bottom-1 -right-1 z-10 grid size-9 place-items-center rounded-full border-2 border-card bg-accent text-accent-fg shadow-lg transition hover:scale-110 active:scale-90">
-            <Pencil className="size-4" />
-          </button>
-        </motion.div>
-        <div className="min-w-0 pb-2">
-          <motion.h1 initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.35 }} className="truncate font-display text-2xl font-bold">
-            {me.name || 'Guest'}
-          </motion.h1>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }} className="mt-0.5 text-sm">
-            <span className="text-muted">{user ? `Profile on device · Cloud sync active (${user.email})` : 'Saved on this device only. Cloud sync optional.'}</span>
-          </motion.p>
-          <AnimatePresence mode="popLayout">
-            {frame && (
-              <motion.span key={frame.id} layout initial={{ opacity: 0, scale: 0.7, y: 6 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.7 }} transition={spring} className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-card-2 px-3 py-1 text-xs font-semibold text-foreground">
-                <Sparkles className="size-3" /> {frame.name}
-              </motion.span>
-            )}
-          </AnimatePresence>
+      {/* Profile Bar */}
+      <div className="relative flex flex-col gap-4 px-5 pb-6 sm:flex-row sm:items-end sm:justify-between sm:px-8">
+        <div className="flex items-end gap-4 sm:gap-5">
+          {/* Avatar with Animated Frame */}
+          <motion.div
+            initial={{ scale: 0.4, rotate: -20, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 240, damping: 16, delay: 0.15 }}
+            className="relative -mt-16 ml-1 shrink-0 sm:-mt-20"
+          >
+            <Avatar
+              size={112}
+              src={me.avatar}
+              frame={me.frame}
+              name={me.name}
+              animateFrame
+              className="relative rounded-full ring-4 ring-card shadow-2xl"
+            />
+            <button
+              type="button"
+              onClick={() => onEdit('avatar')}
+              aria-label="Edit profile picture"
+              className="absolute -bottom-1 -right-1 z-10 grid size-9 place-items-center rounded-full border-2 border-card bg-accent text-accent-fg shadow-lg transition hover:scale-110 active:scale-90"
+            >
+              <Pencil className="size-4" />
+            </button>
+          </motion.div>
+
+          {/* Name & Handle */}
+          <div className="min-w-0 pb-1 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <motion.h1
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...spring, delay: 0.25 }}
+                className="truncate font-display text-2xl font-black tracking-tight sm:text-3xl"
+              >
+                {me.name || 'Guest'}
+              </motion.h1>
+              {authUsername && (
+                <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-bold text-accent">
+                  @{authUsername}
+                </span>
+              )}
+            </div>
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.35 }}
+              className="mt-1 text-xs text-muted"
+            >
+              {user
+                ? `Cloud sync active · ${user.email}`
+                : 'Local persona · Customise freely or sync to cloud'}
+            </motion.p>
+
+            <AnimatePresence mode="popLayout">
+              {frame && (
+                <motion.span
+                  key={frame.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.7, y: 6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.7 }}
+                  transition={spring}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-card-2 px-3 py-1 text-xs font-semibold text-foreground shadow-sm"
+                >
+                  <Sparkles className="size-3 text-accent" /> {frame.name}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Primary Edit Profile Trigger */}
+        <div className="shrink-0 pt-2 sm:pt-0">
+          <motion.button
+            type="button"
+            onClick={() => onEdit()}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.96 }}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-accent to-accent/80 px-5 text-sm font-bold text-accent-fg shadow-lg shadow-accent/25 transition sm:w-auto"
+          >
+            <Palette className="size-4" />
+            <span>Edit Profile</span>
+          </motion.button>
         </div>
       </div>
     </motion.section>
   )
 }
 
-/* ------------------------------------------------------------- accordion */
-
-function Section({ id, icon: Icon, title, summary, open, onToggle, children }: { id: SectionKey; icon: LucideIcon; title: string; summary: string; open: boolean; onToggle: () => void; children: ReactNode }) {
-  return (
-    <SpotlightCard className={cn('transition-colors', open ? 'border-accent/50' : '')}>
-      <div id={`pc-${id}`} className="scroll-mt-24">
-        <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={`pc-${id}-panel`} className="flex w-full items-center gap-3.5 p-4 text-left sm:p-5">
-          <span className={cn('grid size-11 shrink-0 place-items-center rounded-2xl transition-colors', open ? 'bg-accent text-accent-fg' : 'bg-card-2 text-foreground')}>
-            <Icon className="size-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-display text-base font-bold">{title}</span>
-            <span className="block truncate text-xs text-muted">{summary}</span>
-          </span>
-          <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.25 }} className="grid size-9 shrink-0 place-items-center rounded-full border border-border">
-            <ChevronDown className="size-4" />
-          </motion.span>
-        </button>
-        <AnimatePresence initial={false}>
-          {open && (
-            <motion.div id={`pc-${id}-panel`} role="region" aria-label={title} initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }} className="overflow-hidden">
-              <div className="border-t border-border p-4 sm:p-5">{children}</div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </SpotlightCard>
-  )
-}
-
-/* --------------------------------------------------------------- gallery */
+/* ------------------------------------------------------------- Preset Gallery */
 
 interface Pick {
   url: string
   group: string
 }
 
-/** Preset avatars / banners (lists from github.com/Nyyrox/avatar-banner-, loaded only when the section opens). */
-function Gallery({ kind, current, onPick }: { kind: CropKind; current: string | null; onPick: (url: string) => void }) {
+function Gallery({
+  kind,
+  current,
+  onPick,
+}: {
+  kind: CropKind
+  current: string | null
+  onPick: (url: string) => void
+}) {
   const [all, setAll] = useState<Pick[] | null>(null)
   const [q, setQ] = useState('')
   const [group, setGroup] = useState('')
   const [shown, setShown] = useState(24)
+
   useEffect(() => {
     let dead = false
     const load =
       kind === 'avatar'
-        ? import('../data/avatars.json').then((m) => m.default.map((a) => ({ url: a.url, group: a.tags.join(', ') })))
-        : import('../data/banners.json').then((m) => m.default.map((b) => ({ url: b.url, group: b.category })))
+        ? import('../data/avatars.json').then((m) =>
+            m.default.map((a) => ({ url: a.url, group: a.tags.join(', ') }))
+          )
+        : import('../data/banners.json').then((m) =>
+            m.default.map((b) => ({ url: b.url, group: b.category }))
+          )
     load.then((l) => !dead && setAll(l))
     return () => {
       dead = true
     }
   }, [kind])
 
-  const groups = useMemo(() => [...new Set((all ?? []).flatMap((p) => p.group.split(', ')))].sort(), [all])
-  const list = (all ?? []).filter((p) => (!group || p.group.split(', ').includes(group)) && p.group.toLowerCase().includes(q.trim().toLowerCase()))
+  const groups = useMemo(
+    () => [...new Set((all ?? []).flatMap((p) => p.group.split(', ')))].sort(),
+    [all]
+  )
+  const list = (all ?? []).filter(
+    (p) =>
+      (!group || p.group.split(', ').includes(group)) &&
+      p.group.toLowerCase().includes(q.trim().toLowerCase())
+  )
   const noun = kind === 'avatar' ? 'Series' : 'Anime'
 
   return (
-    <div className="rounded-2xl border border-border bg-background/40 p-3">
+    <div className="rounded-2xl border border-border bg-card/60 p-3 sm:p-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 basis-40">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-          <input value={q} onChange={(e) => (setQ(e.target.value), setShown(24))} placeholder={`Search ${kind}s…`} aria-label={`Search ${kind}s`} className="h-10 w-full rounded-full border border-border bg-card/60 pl-10 pr-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent" />
+          <input
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value)
+              setShown(24)
+            }}
+            placeholder={`Search ${kind}s by title…`}
+            aria-label={`Search ${kind}s`}
+            className="h-10 w-full rounded-full border border-border bg-card/80 pl-10 pr-4 text-sm outline-none transition focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent"
+          />
         </div>
-        <CustomSelect label={`${noun} filter`} value={group} onChange={(v) => (setGroup(v), setShown(24))} placeholder={`All ${noun.toLowerCase()}`} options={[{ value: '', label: `All ${noun.toLowerCase()}` }, ...groups.map((g) => ({ value: g, label: g }))]} />
+        <CustomSelect
+          label={`${noun} filter`}
+          value={group}
+          onChange={(v) => {
+            setGroup(v)
+            setShown(24)
+          }}
+          placeholder={`All ${noun.toLowerCase()}`}
+          options={[
+            { value: '', label: `All ${noun.toLowerCase()}` },
+            ...groups.map((g) => ({ value: g, label: g })),
+          ]}
+        />
       </div>
+
       {!all ? (
-        <p className="p-6 text-center text-sm text-muted">Loading…</p>
+        <div className="flex items-center justify-center p-8 text-sm text-muted">
+          <span className="size-4 animate-spin rounded-full border-2 border-accent border-t-transparent mr-2" />
+          Loading presets…
+        </div>
       ) : list.length === 0 ? (
-        <p className="p-6 text-center text-sm text-muted">Nothing matches. Try another {noun.toLowerCase()}.</p>
+        <p className="p-8 text-center text-sm text-muted">
+          Nothing matches. Try another {noun.toLowerCase()}.
+        </p>
       ) : (
         <>
-          <ul className={cn('mt-3 grid gap-2', kind === 'avatar' ? 'grid-cols-4 sm:grid-cols-6 md:grid-cols-8' : 'grid-cols-2 sm:grid-cols-3')}>
+          <ul
+            className={cn(
+              'mt-3.5 grid gap-2.5',
+              kind === 'avatar'
+                ? 'grid-cols-4 sm:grid-cols-6 md:grid-cols-8'
+                : 'grid-cols-2 sm:grid-cols-3'
+            )}
+          >
             {list.slice(0, shown).map((p, i) => (
-              <motion.li key={p.url} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: Math.min(i, 16) * 0.02 }}>
-                <button type="button" onClick={() => onPick(p.url)} title={p.group} aria-pressed={current === p.url} className={cn('relative block w-full overflow-hidden rounded-xl border transition hover:ring-2 hover:ring-accent active:scale-95', current === p.url ? 'border-accent ring-2 ring-accent' : 'border-border')}>
-                  <img src={p.url} alt={p.group} loading="lazy" decoding="async" referrerPolicy="no-referrer" className={cn('w-full object-cover', kind === 'avatar' ? 'aspect-square' : 'aspect-[3/1]')} />
-                  {current === p.url && <Check className="absolute right-1 top-1 size-4 rounded-full bg-accent p-0.5 text-accent-fg" />}
+              <motion.li
+                key={p.url}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: Math.min(i, 16) * 0.02 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => onPick(p.url)}
+                  title={p.group}
+                  aria-pressed={current === p.url}
+                  className={cn(
+                    'relative block w-full overflow-hidden rounded-2xl border transition duration-200 hover:ring-2 hover:ring-accent active:scale-95',
+                    current === p.url
+                      ? 'border-accent ring-2 ring-accent'
+                      : 'border-border bg-card'
+                  )}
+                >
+                  <img
+                    src={p.url}
+                    alt={p.group}
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    className={cn(
+                      'w-full object-cover transition-transform duration-300 hover:scale-105',
+                      kind === 'avatar' ? 'aspect-square' : 'aspect-[3/1]'
+                    )}
+                  />
+                  {current === p.url && (
+                    <div className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-accent text-accent-fg shadow">
+                      <Check className="size-3 stroke-[3]" />
+                    </div>
+                  )}
                 </button>
               </motion.li>
             ))}
           </ul>
           {shown < list.length && (
-            <button type="button" onClick={() => setShown((n) => n + 24)} className={cn(pill, 'mx-auto mt-3')}>
-              Show more ({list.length - shown})
-            </button>
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShown((n) => n + 24)}
+                className={pill}
+              >
+                Show more ({list.length - shown} remaining)
+              </button>
+            </div>
           )}
         </>
       )}
@@ -158,152 +339,580 @@ function Gallery({ kind, current, onPick }: { kind: CropKind; current: string | 
   )
 }
 
-/* ------------------------------------------------------------ customizer */
+/* ------------------------------------------------------------- Dedicated Profile Editor */
 
-export function ProfileCustomizer({ me, open, setOpen }: { me: Profile; open: Set<SectionKey>; setOpen: (s: Set<SectionKey>) => void }) {
+export function ProfileEditor({
+  me,
+  initialTab = 'identity',
+  onClose,
+}: {
+  me: Profile
+  initialTab?: SectionKey
+  onClose: () => void
+}) {
+  const { user, username: authUsername, updateUsername } = useAuth()
+  const [activeTab, setActiveTab] = useState<SectionKey>(initialTab)
+
+  // Local editable state
+  const [name, setName] = useState(me.name)
+  const [usernameInput, setUsernameInput] = useState(authUsername || '')
+  const [savingUsername, setSavingUsername] = useState(false)
+
+  // Modals & Cropper
   const [crop, setCrop] = useState<{ src: string; kind: CropKind; revoke?: boolean } | null>(null)
   const [gallery, setGallery] = useState<CropKind | null>(null)
   const [err, setErr] = useState('')
-  const [group, setGroup] = useState('')
+  const [frameFilter, setFrameFilter] = useState('')
   const [framesShown, setFramesShown] = useState(18)
-  const files = { avatar: useRef<HTMLInputElement>(null), banner: useRef<HTMLInputElement>(null) }
 
-  const toggle = (k: SectionKey) => {
-    const n = new Set(open)
-    if (!n.delete(k)) n.add(k)
-    setOpen(n)
+  const files = {
+    avatar: useRef<HTMLInputElement>(null),
+    banner: useRef<HTMLInputElement>(null),
   }
 
   function choose(file: File | undefined, kind: CropKind) {
     if (!file) return
     setErr('')
-    if (!file.type.startsWith('image/')) return (setErr('That file is not an image.'), toast('That file is not an image', 'error'))
-    if (file.size > 20 * 1048576) return (setErr('Image is too large (20 MB max).'), toast('Image is too large (20 MB max)', 'error'))
+    if (!file.type.startsWith('image/')) {
+      setErr('That file is not an image.')
+      toast('That file is not an image', 'error')
+      return
+    }
+    if (file.size > 20 * 1048576) {
+      setErr('Image is too large (20 MB max).')
+      toast('Image is too large (20 MB max)', 'error')
+      return
+    }
     setCrop({ src: URL.createObjectURL(file), kind, revoke: true })
   }
+
   function closeCrop() {
     if (crop?.revoke) URL.revokeObjectURL(crop.src)
     setCrop(null)
   }
 
+  async function handleSaveUsername(e: React.FormEvent) {
+    e.preventDefault()
+    const clean = usernameInput.trim()
+    if (!clean) return
+    if (clean.length < 3) {
+      toast('Username must be at least 3 characters', 'error')
+      return
+    }
+    setSavingUsername(true)
+    const { error } = await updateUsername(clean)
+    setSavingUsername(false)
+    if (!error) {
+      toast(`Username set to @${clean}!`)
+    }
+  }
+
   const frame = frameById(me.frame)
-  const kindSummary = (v: string | null) => (!v ? 'Not set' : v.startsWith('data:') ? 'Your photo' : 'Preset')
-  const frames = FRAMES.filter((f) => !group || frameGroup(f) === group)
+  const frames = FRAMES.filter((f) => !frameFilter || frameGroup(f) === frameFilter)
   const shownFrames = frames.slice(0, framesShown)
 
+  const TABS: { id: SectionKey; label: string; icon: LucideIcon }[] = [
+    { id: 'identity', label: 'Identity', icon: UserRound },
+    { id: 'avatar', label: 'Avatar (PFP)', icon: ImagePlus },
+    { id: 'overlay', label: 'Frame', icon: Frame },
+    { id: 'banner', label: 'Banner', icon: Images },
+  ]
+
   return (
-    <section aria-label="Customize profile" className="space-y-4">
-      <div className="px-1">
-        <BlurText text="Customize your profile" className="font-display text-2xl font-bold" />
-        <p className="mt-1 text-sm text-muted">Changes show in the preview above straight away.</p>
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -16 }}
+      transition={{ duration: 0.25 }}
+      className="space-y-6"
+    >
+      {/* Top Header / Back Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card/60 p-4 backdrop-blur-md sm:px-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-4 py-2 text-sm font-semibold transition hover:border-accent hover:text-accent active:scale-95"
+        >
+          <ArrowLeft className="size-4" />
+          <span>Back to Profile</span>
+        </button>
+
+        <div className="text-center sm:text-left">
+          <h1 className="font-display text-lg font-bold">Edit Profile & Persona</h1>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2 text-sm font-bold text-accent-fg shadow-lg shadow-accent/25 transition hover:brightness-110 active:scale-95"
+        >
+          <Check className="size-4" />
+          <span>Done</span>
+        </button>
       </div>
 
-      <Section id="name" icon={UserRound} title="Display name" summary={me.name || 'Guest'} open={open.has('name')} onToggle={() => toggle('name')}>
-        <label className="block">
-          <span className="sr-only">Display name</span>
-          <input value={me.name} maxLength={24} onChange={(e) => saveProfile({ name: e.target.value })} onBlur={() => me.name.trim() && toast('Name updated')} placeholder="What should we call you?" className="h-11 w-full rounded-full border border-border bg-card/60 px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent" />
-        </label>
-        <p className="mt-2 text-right text-xs tabular-nums text-muted">{me.name.length}/24</p>
-      </Section>
-
-      <Section id="avatar" icon={ImagePlus} title="Profile picture" summary={kindSummary(me.avatar)} open={open.has('avatar')} onToggle={() => toggle('avatar')}>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button type="button" className={solid} onClick={() => files.avatar.current?.click()}>
-            <ImagePlus className="size-4" /> Upload photo
-          </button>
-          <button type="button" className={cn(pill, gallery === 'avatar' && 'border-accent text-accent')} onClick={() => setGallery(gallery === 'avatar' ? null : 'avatar')}>
-            <Images className="size-4" /> Browse presets
-          </button>
-          {me.avatar?.startsWith('data:') && (
-            <button type="button" className={pill} onClick={() => setCrop({ src: me.avatar!, kind: 'avatar' })}>
-              <Crop className="size-4" /> Adjust
-            </button>
+      {/* Live Preview Hero Card */}
+      <div className="relative overflow-hidden rounded-3xl border border-border bg-card/60 shadow-xl">
+        <div className="relative h-36 overflow-hidden bg-card-2 sm:h-48">
+          {me.banner ? (
+            <img
+              src={me.banner}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="size-full object-cover"
+            />
+          ) : (
+            <div className="size-full bg-gradient-to-br from-accent/20 via-card-2 to-card" />
           )}
-          {me.avatar && (
-            <button type="button" className={pill} onClick={() => (saveProfile({ avatar: null }), toast('Profile picture removed', 'info'))}>
-              <Trash2 className="size-4" /> Remove
-            </button>
-          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-black/20" />
+          <span className="absolute left-3.5 top-3.5 inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white/90 backdrop-blur-md">
+            <Sparkles className="size-3 text-accent" /> LIVE PREVIEW
+          </span>
         </div>
-        <AnimatePresence initial={false}>
-          {gallery === 'avatar' && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-              <Gallery kind="avatar" current={me.avatar} onPick={(u) => (saveProfile({ avatar: u }), setGallery(null), toast('Profile picture updated'))} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Section>
 
-      <Section id="overlay" icon={Frame} title="Avatar overlay" summary={frame ? `${frame.name} · ${frameGroup(frame)}` : 'None'} open={open.has('overlay')} onToggle={() => toggle('overlay')}>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-muted">Animated. Plays everywhere your avatar appears.</p>
-          <CustomSelect label="Overlay category" value={group} onChange={(v) => (setGroup(v), setFramesShown(18))} placeholder="All overlays" options={[{ value: '', label: 'All overlays' }, ...Object.values(FRAME_GROUPS).map((g) => ({ value: g, label: g }))]} />
+        <div className="flex items-end gap-4 px-5 pb-5 sm:px-7">
+          <div className="relative -mt-12 ml-1 shrink-0 sm:-mt-16">
+            <Avatar
+              size={96}
+              src={me.avatar}
+              frame={me.frame}
+              name={name || me.name}
+              animateFrame
+              className="relative rounded-full ring-4 ring-card shadow-2xl"
+            />
+          </div>
+          <div className="min-w-0 pb-1 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="truncate font-display text-xl font-bold sm:text-2xl">
+                {name || me.name || 'Guest'}
+              </h2>
+              {authUsername && (
+                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-bold text-accent">
+                  @{authUsername}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted">
+              {frame ? `${frame.name} frame active` : 'No frame active'}
+            </p>
+          </div>
         </div>
-        <ul className="grid grid-cols-3 gap-2.5 sm:grid-cols-5 md:grid-cols-6" role="radiogroup" aria-label="Avatar overlay">
-          <li>
-            <button type="button" role="radio" aria-checked={!me.frame} onClick={() => (saveProfile({ frame: null }), toast('Overlay removed', 'info'))} className={cn('grid aspect-square w-full place-items-center rounded-2xl border text-xs font-semibold transition active:scale-95', !me.frame ? 'border-accent bg-accent/10 text-accent' : 'border-border text-muted hover:border-accent/50')}>
-              None
+      </div>
+
+      {/* Tabs Navigation */}
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {TABS.map(({ id, label, icon: Icon }) => {
+          const on = activeTab === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={cn(
+                'inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold transition active:scale-95',
+                on
+                  ? 'border-accent bg-accent/15 text-accent shadow-sm'
+                  : 'border-border bg-card/60 text-muted hover:border-border/80 hover:text-foreground'
+              )}
+            >
+              <Icon className="size-4" />
+              <span>{label}</span>
             </button>
-          </li>
-          {shownFrames.map((f, i) => {
-            const on = me.frame === f.id
-            return (
-              <motion.li key={f.id} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: Math.min(i, 14) * 0.018 }}>
-                <motion.button type="button" role="radio" aria-checked={on} aria-label={f.name} title={f.name} whileHover={{ scale: 1.06, y: -2 }} whileTap={{ scale: 0.93 }} onClick={() => (saveProfile({ frame: f.id }), toast(`Overlay: ${f.name}`))} className={cn('relative block aspect-square w-full overflow-hidden rounded-2xl border bg-card-2/60 transition-colors', on ? 'border-accent ring-2 ring-accent' : 'border-border hover:border-accent/50')}>
-                  <span className="absolute left-1/2 top-1/2 size-[83%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-card ring-1 ring-border">
-                    {me.avatar && <img src={me.avatar} alt="" referrerPolicy="no-referrer" className="size-full object-cover" />}
+          )
+        })}
+      </div>
+
+      {/* Tab Panels */}
+      <div className="rounded-3xl border border-border bg-card/60 p-5 sm:p-7 shadow-lg">
+        {/* 1. Identity & Username */}
+        {activeTab === 'identity' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="font-display text-lg font-bold flex items-center gap-2">
+                <UserRound className="size-5 text-accent" />
+                <span>Display Name</span>
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                Your visible display name across the app and community.
+              </p>
+              <div className="mt-3 max-w-md">
+                <div className="relative">
+                  <input
+                    value={name}
+                    maxLength={24}
+                    onChange={(e) => setName(e.target.value)}
+                    onBlur={() => {
+                      saveProfile({ name })
+                      toast('Display name saved')
+                    }}
+                    placeholder="e.g. Shadow Otaku"
+                    className="h-11 w-full rounded-2xl border border-border bg-card/80 px-4 text-sm font-medium outline-none transition focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted">
+                    {name.length}/24
                   </span>
-                  <img src={frameUrl(f)} alt="" loading="lazy" decoding="async" draggable={false} className="relative size-full object-contain" />
-                  {on && <Check className="absolute right-1 top-1 size-4 rounded-full bg-accent p-0.5 text-accent-fg" />}
-                </motion.button>
-              </motion.li>
-            )
-          })}
-        </ul>
-        {framesShown < frames.length && (
-          <button type="button" onClick={() => setFramesShown((n) => n + 18)} className={cn(pill, 'mx-auto mt-3')}>
-            Show more ({frames.length - framesShown})
-          </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-6">
+              <h2 className="font-display text-lg font-bold flex items-center gap-2">
+                <AtSign className="size-5 text-accent" />
+                <span>Backend Cloud Username</span>
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                Unique handle stored in the Supabase backend for cloud sync and profile identification.
+              </p>
+
+              {user ? (
+                <form onSubmit={handleSaveUsername} className="mt-3.5 max-w-md space-y-3">
+                  <div className="relative">
+                    <AtSign className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+                    <input
+                      type="text"
+                      value={usernameInput}
+                      onChange={(e) => setUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                      placeholder="e.g. shadow_ninja"
+                      maxLength={20}
+                      className="h-11 w-full rounded-2xl border border-border bg-card/80 pl-10 pr-4 text-sm font-medium outline-none transition focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={savingUsername || !usernameInput.trim()}
+                    className="inline-flex h-10 items-center gap-2 rounded-2xl bg-accent px-5 text-sm font-bold text-accent-fg shadow-md shadow-accent/20 transition hover:brightness-110 active:scale-95 disabled:opacity-50"
+                  >
+                    <Save className="size-4" />
+                    <span>{savingUsername ? 'Saving…' : 'Save Username'}</span>
+                  </button>
+                </form>
+              ) : (
+                <div className="mt-3.5 rounded-2xl border border-border bg-card-2/60 p-4">
+                  <p className="text-sm font-medium text-foreground">Cloud sync not active</p>
+                  <p className="mt-1 text-xs text-muted">
+                    Sign in or create an account from the profile page to link a unique @username and sync your history to the cloud.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         )}
-        <p className="mt-3 text-xs text-muted">{frame ? <>Selected: <span className="font-semibold text-foreground">{frame.name}</span></> : 'No overlay selected.'}</p>
-      </Section>
 
-      <Section id="banner" icon={Images} title="Profile banner" summary={kindSummary(me.banner)} open={open.has('banner')} onToggle={() => toggle('banner')}>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button type="button" className={solid} onClick={() => files.banner.current?.click()}>
-            <ImagePlus className="size-4" /> Upload banner
-          </button>
-          <button type="button" className={cn(pill, gallery === 'banner' && 'border-accent text-accent')} onClick={() => setGallery(gallery === 'banner' ? null : 'banner')}>
-            <Images className="size-4" /> Browse presets
-          </button>
-          {me.banner?.startsWith('data:') && (
-            <button type="button" className={pill} onClick={() => setCrop({ src: me.banner!, kind: 'banner' })}>
-              <Crop className="size-4" /> Adjust
-            </button>
-          )}
-          {me.banner && (
-            <button type="button" className={pill} onClick={() => (saveProfile({ banner: null }), toast('Banner removed', 'info'))}>
-              <Trash2 className="size-4" /> Remove
-            </button>
-          )}
-        </div>
-        <AnimatePresence initial={false}>
-          {gallery === 'banner' && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-              <Gallery kind="banner" current={me.banner} onPick={(u) => (saveProfile({ banner: u }), setGallery(null), toast('Banner updated'))} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Section>
+        {/* 2. Avatar (PFP) */}
+        {activeTab === 'avatar' && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="font-display text-lg font-bold flex items-center gap-2">
+                <ImagePlus className="size-5 text-accent" />
+                <span>Profile Picture</span>
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                Upload your own photo or pick from popular anime series presets.
+              </p>
+            </div>
 
-      <input ref={files.avatar} type="file" accept="image/*" hidden onChange={(e) => (choose(e.target.files?.[0], 'avatar'), (e.target.value = ''))} />
-      <input ref={files.banner} type="file" accept="image/*" hidden onChange={(e) => (choose(e.target.files?.[0], 'banner'), (e.target.value = ''))} />
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                className={solid}
+                onClick={() => files.avatar.current?.click()}
+              >
+                <ImagePlus className="size-4" />
+                <span>Upload custom photo</span>
+              </button>
+
+              <button
+                type="button"
+                className={cn(pill, gallery === 'avatar' && 'border-accent text-accent')}
+                onClick={() => setGallery(gallery === 'avatar' ? null : 'avatar')}
+              >
+                <Images className="size-4" />
+                <span>Browse presets gallery</span>
+              </button>
+
+              {me.avatar?.startsWith('data:') && (
+                <button
+                  type="button"
+                  className={pill}
+                  onClick={() => setCrop({ src: me.avatar!, kind: 'avatar' })}
+                >
+                  <Crop className="size-4" />
+                  <span>Adjust crop</span>
+                </button>
+              )}
+
+              {me.avatar && (
+                <button
+                  type="button"
+                  className={pill}
+                  onClick={() => {
+                    saveProfile({ avatar: null })
+                    toast('Profile picture removed', 'info')
+                  }}
+                >
+                  <Trash2 className="size-4 text-red-400" />
+                  <span>Remove</span>
+                </button>
+              )}
+            </div>
+
+            <AnimatePresence initial={false}>
+              {gallery === 'avatar' && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden pt-2"
+                >
+                  <Gallery
+                    kind="avatar"
+                    current={me.avatar}
+                    onPick={(u) => {
+                      saveProfile({ avatar: u })
+                      setGallery(null)
+                      toast('Profile picture updated')
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* 3. Avatar Frame (Overlay) */}
+        {activeTab === 'overlay' && (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-display text-lg font-bold flex items-center gap-2">
+                  <Frame className="size-5 text-accent" />
+                  <span>Animated Avatar Frame</span>
+                </h2>
+                <p className="mt-1 text-xs text-muted">
+                  Smooth animations rendered around your avatar everywhere on Zenkai.
+                </p>
+              </div>
+
+              <CustomSelect
+                label="Frame category"
+                value={frameFilter}
+                onChange={(v) => {
+                  setFrameFilter(v)
+                  setFramesShown(18)
+                }}
+                placeholder="All categories"
+                options={[
+                  { value: '', label: 'All categories' },
+                  ...Object.values(FRAME_GROUPS).map((g) => ({ value: g, label: g })),
+                ]}
+              />
+            </div>
+
+            <ul
+              className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-6"
+              role="radiogroup"
+              aria-label="Avatar frame options"
+            >
+              <li>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!me.frame}
+                  onClick={() => {
+                    saveProfile({ frame: null })
+                    toast('Frame removed', 'info')
+                  }}
+                  className={cn(
+                    'grid aspect-square w-full place-items-center rounded-2xl border text-xs font-bold transition active:scale-95',
+                    !me.frame
+                      ? 'border-accent bg-accent/15 text-accent ring-2 ring-accent'
+                      : 'border-border text-muted hover:border-accent/50'
+                  )}
+                >
+                  None
+                </button>
+              </li>
+
+              {shownFrames.map((f, i) => {
+                const on = me.frame === f.id
+                return (
+                  <motion.li
+                    key={f.id}
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: Math.min(i, 14) * 0.018 }}
+                  >
+                    <motion.button
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      aria-label={f.name}
+                      title={f.name}
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.94 }}
+                      onClick={() => {
+                        saveProfile({ frame: f.id })
+                        toast(`Frame: ${f.name}`)
+                      }}
+                      className={cn(
+                        'relative block aspect-square w-full overflow-hidden rounded-2xl border bg-card-2/60 transition-colors',
+                        on ? 'border-accent ring-2 ring-accent' : 'border-border hover:border-accent/50'
+                      )}
+                    >
+                      <span className="absolute left-1/2 top-1/2 size-[82%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-card ring-1 ring-border">
+                        {me.avatar && (
+                          <img
+                            src={me.avatar}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            className="size-full object-cover"
+                          />
+                        )}
+                      </span>
+                      <img
+                        src={frameUrl(f)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                        className="relative size-full object-contain"
+                      />
+                      {on && (
+                        <div className="absolute right-1 top-1 grid size-4 place-items-center rounded-full bg-accent text-accent-fg shadow">
+                          <Check className="size-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </motion.button>
+                  </motion.li>
+                )
+              })}
+            </ul>
+
+            {framesShown < frames.length && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setFramesShown((n) => n + 18)}
+                  className={pill}
+                >
+                  Show more frames ({frames.length - framesShown} remaining)
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 4. Banner */}
+        {activeTab === 'banner' && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="font-display text-lg font-bold flex items-center gap-2">
+                <Images className="size-5 text-accent" />
+                <span>Profile Banner</span>
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                Large header image displayed at the top of your profile.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                className={solid}
+                onClick={() => files.banner.current?.click()}
+              >
+                <ImagePlus className="size-4" />
+                <span>Upload banner</span>
+              </button>
+
+              <button
+                type="button"
+                className={cn(pill, gallery === 'banner' && 'border-accent text-accent')}
+                onClick={() => setGallery(gallery === 'banner' ? null : 'banner')}
+              >
+                <Images className="size-4" />
+                <span>Browse anime banners</span>
+              </button>
+
+              {me.banner?.startsWith('data:') && (
+                <button
+                  type="button"
+                  className={pill}
+                  onClick={() => setCrop({ src: me.banner!, kind: 'banner' })}
+                >
+                  <Crop className="size-4" />
+                  <span>Adjust crop</span>
+                </button>
+              )}
+
+              {me.banner && (
+                <button
+                  type="button"
+                  className={pill}
+                  onClick={() => {
+                    saveProfile({ banner: null })
+                    toast('Banner removed', 'info')
+                  }}
+                >
+                  <Trash2 className="size-4 text-red-400" />
+                  <span>Remove</span>
+                </button>
+              )}
+            </div>
+
+            <AnimatePresence initial={false}>
+              {gallery === 'banner' && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden pt-2"
+                >
+                  <Gallery
+                    kind="banner"
+                    current={me.banner}
+                    onPick={(u) => {
+                      saveProfile({ banner: u })
+                      setGallery(null)
+                      toast('Banner updated')
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+
+      {/* Hidden File Inputs */}
+      <input
+        ref={files.avatar}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          choose(e.target.files?.[0], 'avatar')
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={files.banner}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          choose(e.target.files?.[0], 'banner')
+          e.target.value = ''
+        }}
+      />
+
       {err && (
         <p role="alert" className="flex items-center gap-2 px-1 text-sm text-red-400">
           <X className="size-4" /> {err}
         </p>
       )}
 
+      {/* Image Cropper Modal */}
       <AnimatePresence>
         {crop && (
           <ImageCropper
@@ -319,6 +928,19 @@ export function ProfileCustomizer({ me, open, setOpen }: { me: Profile; open: Se
           />
         )}
       </AnimatePresence>
-    </section>
+    </motion.div>
   )
+}
+
+/** Legacy wrapper alias for backwards compatibility */
+export function ProfileCustomizer({
+  me,
+  open: _open,
+  setOpen: _setOpen,
+}: {
+  me: Profile
+  open: Set<SectionKey>
+  setOpen: (s: Set<SectionKey>) => void
+}) {
+  return <ProfileEditor me={me} onClose={() => {}} />
 }
