@@ -9,6 +9,7 @@ import { useSearch } from '../context/SearchContext'
 import { Logo } from './Logo'
 import { ThemeToggle } from './ThemeToggle'
 import { Avatar } from './Avatar'
+import { NavbarMessagesOverlay } from './NavbarMessagesOverlay'
 import { useProfile } from '../lib/profile'
 
 /** Floating glass navbar (Aceternity "Floating Navbar") with an animated hover pill. */
@@ -59,7 +60,7 @@ export function Navbar() {
               <Link
                 to={l.to}
                 className={cn(
-                  'relative z-10 block px-4 py-2 text-sm font-medium transition-colors hover:text-foreground',
+                  'relative z-10 block whitespace-nowrap px-2.5 py-1.5 text-xs font-medium transition-colors hover:text-foreground lg:px-3.5 lg:py-2 lg:text-sm',
                   pathname + (l.to.includes('?') ? search : '') === l.to ? 'text-foreground' : 'text-muted',
                 )}
               >
@@ -70,9 +71,9 @@ export function Navbar() {
         </ul>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {!anime && (
-            <Link to={`/${section}`} className={cn('items-center gap-2 rounded-full border border-border bg-card/60 px-3.5 py-1.5 text-sm font-semibold backdrop-blur transition active:scale-95', movies ? 'hidden sm:inline-flex' : 'inline-flex')}>
+            <Link to={`/${section}`} className={cn('shrink-0 items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1.5 text-xs font-semibold backdrop-blur transition active:scale-95 sm:px-3.5 sm:text-sm', movies ? 'hidden sm:inline-flex' : 'inline-flex')}>
               <span className="font-display text-accent">{section === 'novel' ? '小説' : movies ? '映画' : '漫画'}</span>
               {section === 'novel' ? 'Novels' : movies ? 'Movies' : 'Manga'}
             </Link>
@@ -82,7 +83,7 @@ export function Navbar() {
               to={browseTo}
               aria-label={movies ? 'Browse movies' : 'Browse manga'}
               className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition active:scale-95 sm:px-4',
+                'shrink-0 inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition active:scale-95 sm:px-4',
                 pathname === browseTo ? 'bg-foreground text-background' : 'bg-accent text-accent-fg hover:brightness-110',
               )}
             >
@@ -95,11 +96,12 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => openSearch()}
-            className="hidden h-9 items-center gap-2 rounded-full border border-border bg-card/60 pl-3 pr-2 text-sm text-muted transition hover:text-foreground sm:flex"
+            className="hidden h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card/60 pl-3 pr-2.5 text-sm text-muted transition hover:border-accent/40 hover:text-foreground sm:inline-flex"
           >
-            <Search className="size-4" />
-            <span>{movies ? 'Search movies' : 'Search anime'}</span>
-            <kbd className="rounded-md border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium">
+            <Search className="size-4 shrink-0 text-muted" />
+            <span className="hidden xl:inline">{movies ? 'Search movies' : 'Search anime'}</span>
+            <span className="inline xl:hidden">Search</span>
+            <kbd className="hidden lg:inline-flex rounded-md border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-muted">
               {isMac ? '⌘' : 'Ctrl'} K
             </kbd>
           </button>
@@ -107,14 +109,14 @@ export function Navbar() {
             type="button"
             aria-label="Search"
             onClick={() => openSearch()}
-            className="grid size-9 place-items-center rounded-full border border-border bg-card/60 transition active:scale-90 sm:hidden"
+            className="grid size-9 shrink-0 place-items-center rounded-full border border-border bg-card/60 transition active:scale-90 sm:hidden"
           >
             <Search className="size-4" />
           </button>
           {anime && <Link
             to="/app"
             className={cn(
-              'hidden h-9 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition active:scale-95 lg:inline-flex',
+              'hidden h-9 shrink-0 whitespace-nowrap items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition active:scale-95 xl:inline-flex',
               pathname === '/app' ? 'bg-foreground text-background' : 'bg-accent text-accent-fg hover:brightness-110',
             )}
           >
@@ -124,7 +126,8 @@ export function Navbar() {
             </>
           )}
           <ThemeToggle />
-          <Link to="/profile" aria-label="Your profile" title={me.name || 'Profile'} className="ml-1 rounded-full transition active:scale-90">
+          <NavbarMessagesOverlay />
+          <Link to="/profile" aria-label="Your profile" title={me.name || 'Profile'} className="ml-0.5 shrink-0 rounded-full transition active:scale-90 sm:ml-1">
             <Avatar size={34} src={me.avatar} frame={me.frame} name={me.name} />
           </Link>
         </div>

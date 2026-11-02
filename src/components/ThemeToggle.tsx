@@ -42,7 +42,7 @@ export function ThemeToggle() {
       type="button"
       onClick={handleClick}
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-      className="relative grid size-9 place-items-center overflow-hidden rounded-full border border-border bg-card/60 text-foreground backdrop-blur transition-transform hover:scale-105 active:scale-90"
+      className="relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-card/60 text-foreground backdrop-blur transition-transform hover:scale-105 active:scale-90"
     >
       <AnimatePresence mode="wait" initial={false}>
         <motion.span

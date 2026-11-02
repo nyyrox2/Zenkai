@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AniListDownBanner } from './components/AniListDownBanner'
 import { Footer } from './components/Footer'
@@ -16,6 +16,7 @@ import { Toaster } from './components/Toaster'
 import { MovieSearchModal } from './components/MovieSearchModal'
 import { SearchModal } from './components/SearchModal'
 import { ChangelogModal } from './components/ChangelogModal'
+import { ChooseUsernameModal } from './components/ChooseUsernameModal'
 import { useTrackHistory } from './lib/backToDetails'
 import { initAniListSync } from './lib/anilist'
 import { useApplyTvMode } from './lib/keys'
@@ -45,6 +46,8 @@ const MoviesBrowsePage = lazy(() => import('./pages/MoviesBrowsePage'))
 const MovieDetailsPage = lazy(() => import('./pages/MovieDetailsPage'))
 const MovieWatchPage = lazy(() => import('./pages/MovieWatchPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'))
+const MessagesPage = lazy(() => import('./pages/MessagesPage'))
 const CommunityPage = lazy(() => import('./pages/CommunityPage'))
 const AniListCallbackPage = lazy(() => import('./pages/AniListCallbackPage'))
 const FindPage = lazy(() => import('./pages/FindPage'))
@@ -56,10 +59,20 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 export default function App() {
   // The opening page is a clean full-screen picker: no navbar, dock, footer or search.
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+
+  // Redirect OAuth callbacks landing at root back to /profile
+  useEffect(() => {
+    if (pathname === '/' && (window.location.hash.includes('access_token=') || window.location.search.includes('code='))) {
+      navigate('/profile' + window.location.search + window.location.hash, { replace: true })
+    }
+  }, [pathname, navigate])
   const gate = pathname === '/'
   const reader = isReaderPath(pathname) // Novel / manga readers are full-screen too
   const isEmbed = pathname === '/embed' || pathname.startsWith('/embed/')
   const isApi = pathname === '/api' || pathname.startsWith('/api') || pathname === '/docs'
+  const isMessages = pathname.startsWith('/messages')
+  const inChat = /^\/messages\/[^/]+$/.test(pathname)
   const bare = gate || pathname === '/busted' || isEmbed || reader || isWatchPath(pathname)
   const section = sectionOf(pathname)
 
@@ -97,6 +110,10 @@ export default function App() {
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/app" element={<AppPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/u/:username" element={<PublicProfilePage />} />
+          <Route path="/user/:username" element={<PublicProfilePage />} />
+          <Route path="/messages" element={<MessagesPage />} />
+          <Route path="/messages/:partnerHandle" element={<MessagesPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/auth/anilist" element={<AniListCallbackPage />} />
           {/* Novels */}
@@ -129,14 +146,15 @@ export default function App() {
         </Routes>
       </Suspense>
       </ErrorBoundary>
-      {!bare && !isApi && <Footer />}
-      {!bare && !isApi && <MobileDock />}
+      {!bare && !isApi && !isMessages && <Footer />}
+      {!bare && !isApi && !inChat && <MobileDock />}
       {!bare && !isApi && section === 'anime' && <SearchModal />}
       {!bare && !isApi && section === 'movies' && <MovieSearchModal />}
       <Toaster />
       <ShortcutsHelp />
       <ShieldGate />
       <ChangelogModal />
+      <ChooseUsernameModal />
       {!isApi && !isEmbed && !reader && !isWatchPath(pathname) && pathname !== '/busted' && <ApiIntro />}
     </>
   )

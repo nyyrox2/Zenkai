@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -6,14 +7,17 @@ import {
   Camera,
   Check,
   Crop,
+  ExternalLink,
+  FileText,
   Frame,
+  Globe,
   ImagePlus,
   Images,
   Palette,
   Pencil,
+  Quote,
   Save,
   Search,
-  Sparkles,
   Trash2,
   UserRound,
   X,
@@ -22,7 +26,7 @@ import {
 import { Avatar } from './Avatar'
 import { CustomSelect } from './CustomSelect'
 import { ImageCropper, type CropKind } from './ImageCropper'
-import { FRAMES, FRAME_GROUPS, frameById, frameGroup, frameUrl } from '../lib/frames'
+import { FRAMES, FRAME_GROUPS, frameGroup, frameUrl } from '../lib/frames'
 import { saveProfile, type Profile } from '../lib/profile'
 import { useAuth } from '../context/AuthContext'
 import { toast } from '../lib/toast'
@@ -45,8 +49,7 @@ export function ProfileHero({
   me: Profile
   onEdit: (tab?: SectionKey) => void
 }) {
-  const { user, username: authUsername } = useAuth()
-  const frame = frameById(me.frame)
+  const { username: authUsername } = useAuth()
 
   return (
     <motion.section
@@ -129,7 +132,7 @@ export function ProfileHero({
                 transition={{ ...spring, delay: 0.25 }}
                 className="truncate font-display text-2xl font-black tracking-tight sm:text-3xl"
               >
-                {me.name || 'Guest'}
+                {me.name || 'Otaku'}
               </motion.h1>
               {authUsername && (
                 <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-bold text-accent">
@@ -138,48 +141,58 @@ export function ProfileHero({
               )}
             </div>
 
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.35 }}
-              className="mt-1 text-xs text-muted"
-            >
-              {user
-                ? `Cloud sync active · ${user.email}`
-                : 'Local persona · Customise freely or sync to cloud'}
-            </motion.p>
-
-            <AnimatePresence mode="popLayout">
-              {frame && (
-                <motion.span
-                  key={frame.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.7, y: 6 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.7 }}
-                  transition={spring}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-card-2 px-3 py-1 text-xs font-semibold text-foreground shadow-sm"
-                >
-                  <Sparkles className="size-3 text-accent" /> {frame.name}
-                </motion.span>
-              )}
-            </AnimatePresence>
+            
           </div>
         </div>
 
-        {/* Primary Edit Profile Trigger */}
-        <div className="shrink-0 pt-2 sm:pt-0">
+        {/* Action Buttons: Public Profile & Edit */}
+        <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-0">
+          {authUsername && (
+            <Link
+              to={`/u/${authUsername}`}
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-card-2/80 px-4 text-xs font-semibold text-foreground transition hover:border-accent hover:text-accent active:scale-95"
+            >
+              <Globe className="size-3.5 text-accent" />
+              <span>Public View</span>
+              <ExternalLink className="size-3 text-muted" />
+            </Link>
+          )}
           <motion.button
             type="button"
             onClick={() => onEdit()}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.96 }}
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-accent to-accent/80 px-5 text-sm font-bold text-accent-fg shadow-lg shadow-accent/25 transition sm:w-auto"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-accent to-accent/80 px-5 text-sm font-bold text-accent-fg shadow-lg shadow-accent/25 transition"
           >
             <Palette className="size-4" />
             <span>Edit Profile</span>
           </motion.button>
         </div>
+      </div>
+
+      {/* Bio Section down in hero card */}
+      <div className="border-t border-border/60 bg-card-2/40 px-5 py-3.5 sm:px-8">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+            <Quote className="size-3 text-accent" /> Bio / About
+          </span>
+          <button
+            type="button"
+            onClick={() => onEdit('identity')}
+            className="text-xs font-semibold text-accent hover:underline"
+          >
+            {me.bio ? 'Edit bio' : '+ Add bio'}
+          </button>
+        </div>
+        {me.bio ? (
+          <p className="mt-1.5 text-sm leading-relaxed text-foreground/90 whitespace-pre-line font-medium">
+            “{me.bio}”
+          </p>
+        ) : (
+          <p className="mt-1.5 text-xs italic text-muted">
+            No bio yet. Tap <button type="button" onClick={() => onEdit('identity')} className="text-accent underline font-semibold">Edit Profile</button> to introduce yourself!
+          </p>
+        )}
       </div>
     </motion.section>
   )
@@ -355,8 +368,14 @@ export function ProfileEditor({
 
   // Local editable state
   const [name, setName] = useState(me.name)
+  const [bio, setBio] = useState(me.bio || '')
   const [usernameInput, setUsernameInput] = useState(authUsername || '')
   const [savingUsername, setSavingUsername] = useState(false)
+
+  useEffect(() => {
+    setName(me.name)
+    setBio(me.bio || '')
+  }, [me.name, me.bio])
 
   // Modals & Cropper
   const [crop, setCrop] = useState<{ src: string; kind: CropKind; revoke?: boolean } | null>(null)
@@ -407,7 +426,6 @@ export function ProfileEditor({
     }
   }
 
-  const frame = frameById(me.frame)
   const frames = FRAMES.filter((f) => !frameFilter || frameGroup(f) === frameFilter)
   const shownFrames = frames.slice(0, framesShown)
 
@@ -449,54 +467,6 @@ export function ProfileEditor({
           <Check className="size-4" />
           <span>Done</span>
         </button>
-      </div>
-
-      {/* Live Preview Hero Card */}
-      <div className="relative overflow-hidden rounded-3xl border border-border bg-card/60 shadow-xl">
-        <div className="relative h-36 overflow-hidden bg-card-2 sm:h-48">
-          {me.banner ? (
-            <img
-              src={me.banner}
-              alt=""
-              referrerPolicy="no-referrer"
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="size-full bg-gradient-to-br from-accent/20 via-card-2 to-card" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-black/20" />
-          <span className="absolute left-3.5 top-3.5 inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white/90 backdrop-blur-md">
-            <Sparkles className="size-3 text-accent" /> LIVE PREVIEW
-          </span>
-        </div>
-
-        <div className="flex items-end gap-4 px-5 pb-5 sm:px-7">
-          <div className="relative -mt-12 ml-1 shrink-0 sm:-mt-16">
-            <Avatar
-              size={96}
-              src={me.avatar}
-              frame={me.frame}
-              name={name || me.name}
-              animateFrame
-              className="relative rounded-full ring-4 ring-card shadow-2xl"
-            />
-          </div>
-          <div className="min-w-0 pb-1 flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="truncate font-display text-xl font-bold sm:text-2xl">
-                {name || me.name || 'Guest'}
-              </h2>
-              {authUsername && (
-                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-bold text-accent">
-                  @{authUsername}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted">
-              {frame ? `${frame.name} frame active` : 'No frame active'}
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Tabs Navigation */}
@@ -551,6 +521,37 @@ export function ProfileEditor({
                   <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted">
                     {name.length}/24
                   </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bio Editor */}
+            <div className="border-t border-border pt-6">
+              <h2 className="font-display text-lg font-bold flex items-center gap-2">
+                <FileText className="size-5 text-accent" />
+                <span>Bio / About</span>
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                Your personal anime bio or quote, visible on your public profile and lounge.
+              </p>
+              <div className="mt-3 max-w-md">
+                <div className="relative">
+                  <textarea
+                    value={bio}
+                    maxLength={180}
+                    rows={3}
+                    onChange={(e) => setBio(e.target.value)}
+                    onBlur={() => {
+                      saveProfile({ bio: bio.trim() })
+                      toast('Bio saved')
+                    }}
+                    placeholder="Tell other otakus what you're watching or your all-time favorite anime quote..."
+                    className="w-full rounded-2xl border border-border bg-card/80 p-3.5 text-sm font-medium outline-none transition resize-none focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent"
+                  />
+                  <div className="flex justify-between items-center mt-1 px-1">
+                    <span className="text-[11px] text-muted">Auto-saves on blur</span>
+                    <span className="text-xs text-muted">{bio.length}/180</span>
+                  </div>
                 </div>
               </div>
             </div>

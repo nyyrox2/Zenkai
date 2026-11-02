@@ -12,8 +12,10 @@ export const supabase = createClient(SUPABASE_URL || 'https://placeholder.supaba
 export interface CommunityPost {
   id: string
   created_at: string
+  user_id?: string | null
   username: string
   avatar_url: string | null
+  frame?: string | null
   title: string
   content: string
   category: string
@@ -64,7 +66,10 @@ export async function getCommunityPosts(category?: string, limit = 150): Promise
 export async function createCommunityPost(post: {
   title: string
   content: string
+  user_id?: string | null
   username?: string
+  avatar_url?: string | null
+  frame?: string | null
   category?: string
   anime_title?: string
   anime_id?: string
@@ -75,9 +80,12 @@ export async function createCommunityPost(post: {
       .from('community_posts')
       .insert([
         {
+          user_id: post.user_id || null,
           title: post.title.trim(),
           content: post.content.trim(),
           username: post.username?.trim() || 'Otaku',
+          avatar_url: post.avatar_url || null,
+          frame: post.frame || null,
           category: post.category || 'General',
           anime_title: post.anime_title?.trim() || null,
           anime_id: post.anime_id || null,
