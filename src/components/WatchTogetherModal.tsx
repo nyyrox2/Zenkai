@@ -204,14 +204,14 @@ export function WatchTogetherModal({
             <div className="flex flex-1 flex-col overflow-hidden min-h-0">
               {/* Header */}
               <div className="border-b border-border pb-3 shrink-0">
-                <div className="flex items-center justify-between pr-8">
+                <div className="flex items-center justify-between pr-9">
                   <div className="flex items-center gap-2">
                     <div className="grid size-8 place-items-center rounded-xl border border-border bg-card-2 text-foreground">
                       <MonitorPlay className="size-4" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-display text-sm font-bold">Room {room.roomId}</span>
+                        <span className="font-display whitespace-nowrap text-sm font-bold">Room {room.roomId}</span>
                         <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[9px] font-semibold text-muted">
                           <span className="size-1.5 rounded-full bg-emerald-400" />
                           Synced
@@ -222,8 +222,9 @@ export function WatchTogetherModal({
                       </p>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="mt-3 grid grid-cols-2 gap-2">
                     {/* Voice Chat Mic Toggle */}
                     <button
                       type="button"
@@ -259,16 +260,16 @@ export function WatchTogetherModal({
                       }}
                       title={isMicActive ? 'Mute Microphone' : 'Enable Microphone'}
                       className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition active:scale-90',
+                        'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition active:scale-95',
                         isMicActive
                           ? 'bg-foreground text-background'
                           : 'border border-border bg-card-2 text-muted hover:text-foreground hover:border-accent'
                       )}
                     >
                       {isMicActive ? (
-                        <Mic className="size-3 animate-pulse" />
+                        <Mic className="size-3.5" />
                       ) : (
-                        <MicOff className="size-3" />
+                        <MicOff className="size-3.5" />
                       )}
                       <span>{isMicActive ? 'Mic On' : 'Mic'}</span>
                     </button>
@@ -277,13 +278,12 @@ export function WatchTogetherModal({
                       type="button"
                       onClick={handleCopyLink}
                       title="Copy invite link"
-                      className="inline-flex items-center gap-1 rounded-full border border-border bg-card-2 px-2.5 py-1 text-[11px] font-semibold text-foreground transition hover:border-accent hover:text-accent active:scale-90"
+                      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 text-xs font-semibold text-foreground transition hover:border-accent active:scale-95"
                     >
-                      {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                       <span>{copied ? 'Copied' : 'Invite'}</span>
                     </button>
                   </div>
-                </div>
 
                 {/* Sub-tabs */}
                 <div className="mt-3 flex gap-2">

@@ -83,6 +83,16 @@ export function NavDrawer({
     onClose()
   }, [pathname])
 
+  // While open, pause the page's running animations so the slide-in stays smooth
+  useEffect(() => {
+    if (!open) return
+    const el = document.documentElement
+    el.dataset.drawer = ''
+    return () => {
+      delete el.dataset.drawer
+    }
+  }, [open])
+
   // Close on Escape key
   useEffect(() => {
     if (!open) return
@@ -149,7 +159,7 @@ export function NavDrawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/70"
           />
 
           {/* Drawer Sidebar */}
@@ -159,7 +169,7 @@ export function NavDrawer({
             animate={{ x: '0%' }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="relative flex h-full w-[88vw] max-w-sm flex-col border-r border-border bg-card/95 shadow-2xl backdrop-blur-2xl"
+            className="relative flex h-full w-[88vw] max-w-sm flex-col border-r border-border bg-card shadow-2xl"
           >
             {/* Drawer Header */}
             <div className="flex items-center justify-between border-b border-border/70 p-4 sm:px-6">

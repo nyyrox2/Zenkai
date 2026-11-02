@@ -761,13 +761,13 @@ export default function WatchPage() {
                   pill,
                   'inline-flex items-center gap-2 border shadow-sm transition active:scale-95',
                   room
-                    ? 'border-accent border border-border bg-card-2 text-foreground ring-2 ring-accent/30'
-                    : 'border-border bg-card/60 text-foreground hover:border-accent hover:text-accent'
+                    ? 'border-border bg-card-2 text-foreground'
+                    : 'border-border bg-card/60 text-foreground hover:border-accent'
                 )}
               >
                 <Users className="size-4" />
                 <span>{room ? `Party (${peers.length})` : 'Watch Together'}</span>
-                {room && <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />}
+                {room && <span className="size-1.5 rounded-full bg-emerald-400" />}
               </button>
               <button
                 disabled={!hasPrev || Boolean(room && !room.isHost)}
@@ -796,9 +796,10 @@ export default function WatchPage() {
             /* Watch Together Control Center & Live Chat below Player */
             <div className="mt-5 space-y-4">
               {/* Watch Together Control & Status Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card/80 p-3.5 sm:p-4 backdrop-blur-xl shadow-xl">
-                <div className="flex items-center gap-3">
-                  <div className="grid size-10 place-items-center rounded-2xl border border-border bg-card-2 text-foreground">
+              <div className="space-y-3 rounded-3xl border border-border bg-card/80 p-3.5 sm:p-4">
+                <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-2xl border border-border bg-card-2 text-foreground">
                     <MonitorPlay className="size-5" />
                   </div>
                   <div>
@@ -816,8 +817,18 @@ export default function WatchPage() {
                     </p>
                   </div>
                 </div>
+                  <button
+                    type="button"
+                    onClick={handleLeaveRoom}
+                    title="Leave Watch Party"
+                    aria-label="Leave Watch Party"
+                    className="grid size-9 shrink-0 place-items-center rounded-full border border-border text-muted transition hover:border-rose-500/40 hover:text-rose-400 active:scale-90"
+                  >
+                    <LogOut className="size-4" />
+                  </button>
+                </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {/* Voice Chat Mic Toggle */}
                   <button
                     type="button"
@@ -853,13 +864,13 @@ export default function WatchPage() {
                     }}
                     title={isMicActive ? 'Mute Microphone' : 'Enable Microphone'}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition active:scale-95 shadow-sm',
+                      'inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-95',
                       isMicActive
-                        ? 'border-emerald-500/50 bg-emerald-500 text-white shadow-emerald-500/30 ring-2 ring-emerald-500/20'
+                        ? 'border-transparent bg-foreground text-background'
                         : 'border-border bg-card-2 text-muted hover:text-foreground hover:border-accent'
                     )}
                   >
-                    {isMicActive ? <Mic className="size-3.5 animate-pulse" /> : <MicOff className="size-3.5" />}
+                    {isMicActive ? <Mic className="size-3.5" /> : <MicOff className="size-3.5" />}
                     <span>{isMicActive ? 'Mic On' : 'Mic Off'}</span>
                   </button>
 
@@ -867,7 +878,7 @@ export default function WatchPage() {
                   <button
                     type="button"
                     onClick={handleCopyInvite}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-accent hover:text-accent active:scale-95"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 text-xs font-semibold text-foreground transition hover:border-accent active:scale-95"
                   >
                     {copiedInvite ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
                     <span>{copiedInvite ? 'Copied' : 'Invite'}</span>
@@ -883,12 +894,12 @@ export default function WatchPage() {
                     }}
                     title={hideEmojiOverlay ? 'Show floating emoji reactions' : 'Hide floating emoji reactions'}
                     className={cn(
-                      'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition active:scale-95',
-                      hideEmojiOverlay ? 'border-border bg-card-2 text-muted' : 'border-accent/40 bg-accent/10 text-accent'
+                      'inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 text-xs font-semibold transition active:scale-95',
+                      hideEmojiOverlay ? 'text-muted' : 'text-foreground'
                     )}
                   >
                     {hideEmojiOverlay ? <EyeOff className="size-3.5" /> : <Sparkles className="size-3.5" />}
-                    <span>{hideEmojiOverlay ? 'Emojis Off' : 'Emojis On'}</span>
+                    <span>{hideEmojiOverlay ? 'Emoji off' : 'Emoji'}</span>
                   </button>
 
                   {/* Host Controls: Change Show & Control Mode */}
@@ -897,7 +908,7 @@ export default function WatchPage() {
                       <button
                         type="button"
                         onClick={() => setChangeShowOpen(true)}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-bold text-accent-fg shadow-md shadow-accent/20 transition hover:brightness-110 active:scale-95"
+                        className="col-span-2 inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 text-xs font-semibold text-foreground transition hover:border-accent active:scale-95"
                       >
                         <Film className="size-3.5" />
                         <span>Change Show</span>
@@ -912,29 +923,20 @@ export default function WatchPage() {
                           toast(nextMode ? 'Playback Control: Host Only' : 'Playback Control: Free for All', 'info')
                         }}
                         title="Toggle playback control permission"
-                        className="inline-flex items-center gap-1 rounded-xl border border-border bg-card-2 px-2.5 py-1.5 text-xs font-semibold text-muted hover:text-foreground transition active:scale-95"
+                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 text-xs font-semibold text-muted transition hover:text-foreground active:scale-95"
                       >
-                        {room.hostOnlyControl ? <Lock className="size-3 text-accent" /> : <Unlock className="size-3 text-emerald-400" />}
+                        {room.hostOnlyControl ? <Lock className="size-3.5" /> : <Unlock className="size-3.5" />}
                         <span>{room.hostOnlyControl ? 'Host Only' : 'Free Mode'}</span>
                       </button>
                     </>
                   )}
 
-                  {/* Leave Party */}
-                  <button
-                    type="button"
-                    onClick={handleLeaveRoom}
-                    title="Leave Watch Party"
-                    className="grid size-8 place-items-center rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 transition hover:bg-rose-500/20 active:scale-90"
-                  >
-                    <LogOut className="size-3.5" />
-                  </button>
                 </div>
               </div>
 
               {/* Connected Members & Voice Mute Strip */}
               {peers.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/50 bg-card-2/40 px-3 py-2 backdrop-blur-md">
+                <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/50 bg-card-2/40 px-3 py-2 ">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
                     Members ({peers.length}):
                   </span>
@@ -949,14 +951,14 @@ export default function WatchPage() {
                           <div className="relative">
                             <Avatar size={20} name={p.displayName} src={p.avatar} />
                             {p.isMicActive && (
-                              <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-emerald-400 ring-1 ring-card animate-pulse" />
+                              <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-emerald-400 ring-1 ring-card" />
                             )}
                           </div>
                           <span className="font-semibold text-foreground text-[11px] max-w-[100px] truncate">
                             {p.displayName}
                           </span>
                           {isSelf && (
-                            <span className="rounded bg-accent/15 px-1 py-0.2 text-[9px] font-bold text-accent">
+                            <span className="rounded border border-border px-1 text-[9px] font-semibold text-muted">
                               You
                             </span>
                           )}
@@ -966,7 +968,7 @@ export default function WatchPage() {
 
                           {/* Speaking / Muted indicator */}
                           {p.isMicActive ? (
-                            <Mic className="size-2.5 text-emerald-400 shrink-0 animate-pulse" />
+                            <Mic className="size-2.5 text-foreground shrink-0" />
                           ) : (
                             <MicOff className="size-2.5 text-muted/60 shrink-0" />
                           )}
@@ -1086,7 +1088,7 @@ export default function WatchPage() {
                         type="button"
                         onClick={() => {
                           if (room) {
-                            const r = room.sendReaction(emoji, userProfile.displayName)
+                            const r = room.sendReaction(emoji, userProfile.displayName, userProfile.avatar)
                             setReactions((prev) => [...prev.slice(-30), r])
                           }
                         }}
@@ -1507,7 +1509,11 @@ export default function WatchPage() {
         peers={peers}
         chatMessages={chatMessages}
         onSendChat={(t) => room?.sendChat(t, { displayName: userProfile.displayName, avatar: userProfile.avatar })}
-        onSendReaction={(em) => room?.sendReaction(em, userProfile.displayName)}
+        onSendReaction={(em) => {
+          if (!room) return
+          const r = room.sendReaction(em, userProfile.displayName, userProfile.avatar)
+          setReactions((prev) => [...prev.slice(-30), r])
+        }}
         onCreateRoom={handleCreateRoom}
         onJoinRoom={handleJoinRoom}
         onLeaveRoom={handleLeaveRoom}

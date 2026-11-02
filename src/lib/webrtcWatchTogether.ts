@@ -27,6 +27,7 @@ export interface WatchReaction {
   id: string
   emoji: string
   senderName: string
+  avatar?: string | null
 }
 
 export type SyncActionType =
@@ -664,11 +665,12 @@ export class WatchTogetherRoom {
   }
 
   /** Broadcast live floating emoji reaction */
-  public sendReaction(emoji: string, senderName: string): WatchReaction {
+  public sendReaction(emoji: string, senderName: string, avatar?: string | null): WatchReaction {
     const r: WatchReaction = {
       id: `rx_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       emoji,
       senderName,
+      avatar: avatar ?? null,
     }
 
     this.broadcastP2P({ kind: 'REACTION', payload: r })
