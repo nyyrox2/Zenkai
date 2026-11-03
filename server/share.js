@@ -183,29 +183,30 @@ export async function shareCard({ request, env, kind, id, type, party = false })
   let title = `${c.title} — ${cfg.suffix}`;
   let desc = c.desc || cfg.fallback(name);
 
-  // Watch-party invite: /watch/:id?room=zk-xxxxxx&host=Name&ep=6&pfp=...
+  // Default image is the TMDB or AniList high-resolution artwork directly
+  let ogImage = c.image;
+
+  // Watch-party invite: /watch/:id?room=zk-xxxxxx&host=Name&ep=6
   const room = (reqUrl.searchParams.get("room") || "").toLowerCase();
   const isParty = party && /^zk-[a-z0-9]{3,12}$/.test(room);
-  let ogImage = c.image;
 
   if (isParty) {
     const host = clip(plain(reqUrl.searchParams.get("host") || ""), 40);
     const ep = /^\d{1,4}$/.test(reqUrl.searchParams.get("ep") || "") ? reqUrl.searchParams.get("ep") : "";
-    const pfp = httpsUrl(reqUrl.searchParams.get("pfp"));
     title = `${host || "A friend"} is inviting you to watch ${name} together`;
     desc = `Join the Zenkai watch party${ep ? ` · Episode ${ep}` : ""} · Code ${room.toUpperCase()} — everyone stays in sync. Tap to join.`;
 
-    if (pfp && c.image) {
-      // Designed invite card showing host's avatar over the anime banner
-      ogImage = `https://quickchart.io/watermark?mainImageUrl=${encodeURIComponent(c.image)}&markImageUrl=${encodeURIComponent(pfp)}&position=bottomLeft&markRatio=0.28&margin=36&imageWidth=1200&imageHeight=630`;
-    } else if (pfp) {
-      ogImage = pfp;
-    } else if (c.image) {
-      ogImage = `https://quickchart.io/watermark?mainImageUrl=${encodeURIComponent(c.image)}&markImageUrl=${encodeURIComponent("https://zenkai.cfd/logo.png")}&position=bottomRight&markRatio=0.18&margin=25&imageWidth=1200&imageHeight=630`;
+    // Watch together custom user card with banner in background, host profile avatar, and room code
+    const cardUrl = `https://wcvazatblggnbnrguopj.supabase.co/storage/v1/object/public/share-cards/${room}.png`;
+    try {
+      const head = await fetch(cardUrl, { method: "HEAD", signal: AbortSignal.timeout(1000) });
+      if (head.ok) {
+        ogImage = cardUrl;
+      }
+    } catch {
+      // If card storage is still processing, use the direct TMDB/AniList artwork
+      ogImage = c.image;
     }
-  } else if (c.image) {
-    // Details page sharing: show media artwork with Zenkai logo watermarked in the bottom corner
-    ogImage = `https://quickchart.io/watermark?mainImageUrl=${encodeURIComponent(c.image)}&markImageUrl=${encodeURIComponent("https://zenkai.cfd/logo.png")}&position=bottomRight&markRatio=0.18&margin=25&imageWidth=1200&imageHeight=630`;
   }
 
   const set = (value) => ({ element: (e) => e.setAttribute("content", value) });
@@ -220,9 +221,8 @@ export async function shareCard({ request, env, kind, id, type, party = false })
 
   if (ogImage) {
     rw.on('meta[property="og:image"], meta[property="og:image:secure_url"], meta[name="twitter:image"]', set(ogImage))
-      .on('meta[property="og:image:type"]', set("image/png"))
-      .on('meta[property="og:image:width"]', set("1200"))
-      .on('meta[property="og:image:height"]', set("630"));
+      .on('meta[property="og:image:type"]', { element: (e) => e.remove() })
+      .on('meta[property="og:image:width"], meta[property="og:image:height"]', { element: (e) => e.remove() });
   }
 
   return new Response(rw.transform(asset).body, {

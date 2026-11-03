@@ -94,6 +94,29 @@ export function WatchTogetherModal({
       }
     : null
 
+  // Pre-render and sync the invite card image to Supabase public storage for rich social preview cards
+  useEffect(() => {
+    if (!room || !card) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const { safeRenderShareCard } = await import('../lib/shareCard')
+        const blob = await safeRenderShareCard(card)
+        if (cancelled) return
+        const { supabase } = await import('../lib/supabase')
+        await supabase.storage.from('share-cards').upload(`${room.roomId}.png`, blob, {
+          contentType: 'image/png',
+          upsert: true,
+        })
+      } catch (e) {
+        console.warn('[WatchTogether] Card upload deferred:', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [room?.roomId, animeTitle, episode, image, me?.avatar, selfName])
+
   const copy = async (what: 'code' | 'link') => {
     if (!room) return
     try {
