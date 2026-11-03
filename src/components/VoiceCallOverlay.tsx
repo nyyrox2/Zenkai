@@ -38,6 +38,7 @@ export function VoiceCallOverlay({
   const [duration, setDuration] = useState(0)
   const [isMuted, setIsMuted] = useState(call?.isMuted || false)
   const [isDeafened, setIsDeafened] = useState(call?.isDeafened || false)
+  const [disconnectSecs, setDisconnectSecs] = useState(call?.partnerDisconnectSecondsLeft || 60)
 
   useEffect(() => {
     if (!call) return
@@ -52,6 +53,9 @@ export function VoiceCallOverlay({
         if (newStatus === 'ended') {
           setTimeout(onEndCall, 800)
         }
+      },
+      onPartnerDisconnectTick: (sec) => {
+        setDisconnectSecs(sec)
       },
     })
   }, [call, onEndCall])
@@ -227,7 +231,9 @@ export function VoiceCallOverlay({
                   {status === 'calling'
                     ? 'Ringing…'
                     : status === 'connecting'
-                    ? 'Connecting…'
+                    ? call.connectedAt
+                      ? `Waiting for partner… (${disconnectSecs}s)`
+                      : 'Connecting…'
                     : status === 'hold'
                     ? `Hold • ${formatSeconds(duration)}`
                     : formatSeconds(duration)}

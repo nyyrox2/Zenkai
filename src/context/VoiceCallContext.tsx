@@ -69,9 +69,9 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.id, username, me])
 
-  // Save active call to sessionStorage
+  // Save active call to sessionStorage only if call was accepted and active
   useEffect(() => {
-    if (activeCall && activeCall.status !== 'ended') {
+    if (activeCall && activeCall.status !== 'ended' && activeCall.isAccepted) {
       try {
         sessionStorage.setItem('zk:voice_call', JSON.stringify({
           callId: activeCall.callId,
@@ -85,7 +85,36 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.removeItem('zk:voice_call')
       } catch {}
     }
-  }, [activeCall, activeCall?.status])
+  }, [activeCall, activeCall?.status, activeCall?.isAccepted])
+
+  // Automatically clear activeCall state and sessionStorage when call ends
+  useEffect(() => {
+    if (!activeCall) return
+    const unlisten = activeCall.addCallEndedListener(() => {
+      try {
+        sessionStorage.removeItem('zk:voice_call')
+      } catch {}
+      setTimeout(() => {
+        setActiveCall((curr) => (curr?.callId === activeCall.callId ? null : curr))
+      }, 1200)
+    })
+    return unlisten
+  }, [activeCall])
+
+  // Inform partner if we are refreshing / reloading tab during an active call
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (activeCall && (activeCall.status === 'connected' || activeCall.status === 'hold')) {
+        void activeCall.signalChannel?.send({
+          type: 'broadcast',
+          event: 'call:partner_reloading',
+          payload: { by: user?.id },
+        })
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [activeCall, user?.id])
 
   // Listen for global incoming call invitations targeted at current logged in user
   useEffect(() => {
@@ -97,11 +126,22 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       .on('broadcast', { event: 'incoming_call_invite' }, async ({ payload }) => {
         if (!payload || !payload.caller) return
 
-        // If already in call with the same partner who reloaded/re-called, switch cleanly
-        if (activeCall && activeCall.status !== 'ended') {
+        // If already in an active call, reject new call as busy so it doesn't interrupt or create duplicate
+        if (activeCall && activeCall.status !== 'ended' && activeCall.status !== 'idle') {
           if (activeCall.partner.id === payload.caller.id) {
             activeCall.endCall(false, 'ended')
           } else {
+            const busyChan = supabase.channel(`call_session_${payload.callId}`)
+            await busyChan.subscribe(async (s) => {
+              if (s === 'SUBSCRIBED') {
+                await busyChan.send({
+                  type: 'broadcast',
+                  event: 'call:rejected',
+                  payload: { by: user.id, reason: 'busy' },
+                })
+                await supabase.removeChannel(busyChan)
+              }
+            })
             return
           }
         }

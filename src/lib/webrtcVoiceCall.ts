@@ -27,6 +27,8 @@ export class DirectVoiceCall {
   public myUser: CallUserInfo
   public partner: CallUserInfo
   public isCaller: boolean
+  public isAccepted: boolean = false
+  public pendingOffer: RTCSessionDescriptionInit | null = null
   public status: CallStatus = 'idle'
   public isMuted: boolean = false
   public isDeafened: boolean = false
@@ -38,6 +40,9 @@ export class DirectVoiceCall {
   public connectedAt?: number
   public duration: number = 0
   public micPermissionDenied: boolean = false
+  public partnerDisconnectSecondsLeft: number = 60
+  private partnerDisconnectTimer?: number
+  private audioWatchdogTimer?: number
 
   private pc: RTCPeerConnection | null = null
   private localStream: MediaStream | null = null
@@ -55,6 +60,7 @@ export class DirectVoiceCall {
   private onRemoteSpeakingChange?: (speaking: boolean) => void
   private onCallEnded?: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void
   private onMicPermissionError?: (error: any) => void
+  private onPartnerDisconnectTick?: (secondsLeft: number) => void
 
   constructor(options: {
     callId: string
@@ -66,6 +72,7 @@ export class DirectVoiceCall {
     this.myUser = options.myUser
     this.partner = options.partner
     this.isCaller = options.isCaller
+    this.isAccepted = options.isCaller
     this.status = options.isCaller ? 'calling' : 'incoming'
     this.syncRinging()
     this.ensureRemoteAudio()
@@ -87,16 +94,85 @@ export class DirectVoiceCall {
         el.id = 'zk-voice-remote-audio'
         el.autoplay = true
         ;(el as any).playsInline = true
-        el.style.display = 'none'
+        // Keep active with invisible fixed placement so browser power saver does not mute/pause it
+        el.style.position = 'fixed'
+        el.style.bottom = '0'
+        el.style.right = '0'
+        el.style.width = '1px'
+        el.style.height = '1px'
+        el.style.opacity = '0.01'
+        el.style.pointerEvents = 'none'
+        el.style.zIndex = '-9999'
         document.body.appendChild(el)
       }
       this.remoteAudio = el
+      this.remoteAudio.onpause = () => {
+        if (this.status === 'connected' && !this.isOnHold && !this.isDeafened && this.remoteStream) {
+          void this.remoteAudio?.play().catch(() => {})
+        }
+      }
     }
-    if (this.remoteStream) {
+    if (this.remoteStream && this.remoteAudio.srcObject !== this.remoteStream) {
       this.remoteAudio.srcObject = this.remoteStream
     }
     this.remoteAudio.muted = this.isDeafened || this.isOnHold
     return this.remoteAudio
+  }
+
+  /** Periodic watchdog to guarantee remote audio continues playing and local mic remains live */
+  private startAudioWatchdog() {
+    if (this.audioWatchdogTimer) return
+    this.audioWatchdogTimer = window.setInterval(() => {
+      if (this.status !== 'connected') return
+      if (this.remoteAudio && this.remoteStream && !this.isOnHold && !this.isDeafened) {
+        if (this.remoteAudio.paused) {
+          void this.remoteAudio.play().catch(() => {})
+        }
+      }
+      if (this.localStream && !this.isMuted && !this.isOnHold) {
+        const audioTracks = this.localStream.getAudioTracks()
+        if (audioTracks.length === 0 || audioTracks.every((t) => t.readyState === 'ended')) {
+          void this.acquireMicrophone().catch(() => {})
+        }
+      }
+    }, 2500)
+  }
+
+  private stopAudioWatchdog() {
+    if (this.audioWatchdogTimer) {
+      clearInterval(this.audioWatchdogTimer)
+      this.audioWatchdogTimer = undefined
+    }
+  }
+
+  /** Start a 60-second reconnect window when partner temporarily disconnects / refreshes */
+  public handlePartnerDisconnected() {
+    if (this.status === 'ended') return
+    if (this.connectedAt) {
+      this.updateStatus('connecting')
+      if (this.partnerDisconnectTimer) return
+      this.partnerDisconnectSecondsLeft = 60
+      this.onPartnerDisconnectTick?.(60)
+
+      this.partnerDisconnectTimer = window.setInterval(() => {
+        this.partnerDisconnectSecondsLeft--
+        this.onPartnerDisconnectTick?.(this.partnerDisconnectSecondsLeft)
+        if (this.partnerDisconnectSecondsLeft <= 0) {
+          this.clearPartnerDisconnectTimer()
+          // 60 seconds elapsed without partner rejoining: end call
+          this.endCall(true, 'ended')
+        }
+      }, 1000)
+    }
+  }
+
+  public clearPartnerDisconnectTimer() {
+    if (this.partnerDisconnectTimer) {
+      clearInterval(this.partnerDisconnectTimer)
+      this.partnerDisconnectTimer = undefined
+    }
+    this.partnerDisconnectSecondsLeft = 60
+    this.onPartnerDisconnectTick?.(60)
   }
 
   /** Ringtone while a call comes in, soft ringback while we are calling, silence otherwise. */
@@ -111,6 +187,7 @@ export class DirectVoiceCall {
     onRemoteSpeakingChange?: (speaking: boolean) => void
     onCallEnded?: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void
     onMicPermissionError?: (error: any) => void
+    onPartnerDisconnectTick?: (secondsLeft: number) => void
   }) {
     if (cbs.onStatusChange !== undefined) this.onStatusChange = cbs.onStatusChange
     if (cbs.onRemoteSpeakingChange !== undefined) this.onRemoteSpeakingChange = cbs.onRemoteSpeakingChange
@@ -119,6 +196,7 @@ export class DirectVoiceCall {
       this.onCallEnded = cbs.onCallEnded
     }
     if (cbs.onMicPermissionError !== undefined) this.onMicPermissionError = cbs.onMicPermissionError
+    if (cbs.onPartnerDisconnectTick !== undefined) this.onPartnerDisconnectTick = cbs.onPartnerDisconnectTick
   }
 
   public addCallEndedListener(fn: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void) {
@@ -164,12 +242,28 @@ export class DirectVoiceCall {
         .maybeSingle()
       if (!data) return
 
+      // Terminal checks first! If call ended or was declined, stop and exit immediately.
+      if (data.status === 'declined' && this.status !== 'ended') {
+        this.clearPartnerDisconnectTimer()
+        this.endCall(false, 'declined')
+        return
+      }
+      if (data.status === 'ended' && this.status !== 'ended') {
+        this.clearPartnerDisconnectTimer()
+        this.endCall(false, 'ended')
+        return
+      }
+
       if (this.isCaller && (data.status === 'accepted' || data.status === 'connecting') && !this.handledOffer) {
         await this.startPeerConnectionAsCaller()
       }
 
-      if (!this.isCaller && data.offer && !this.handledOffer) {
-        await this.handleOffer(data.offer)
+      if (!this.isCaller && data.offer) {
+        this.pendingOffer = data.offer
+        // Callee only processes offer if user has clicked "Accept"
+        if (this.isAccepted && !this.handledOffer) {
+          await this.handleOffer(data.offer)
+        }
       } else if (this.isCaller && data.answer && !this.handledAnswer && this.pc) {
         try {
           await this.pc.setRemoteDescription(new RTCSessionDescription(data.answer))
@@ -186,12 +280,6 @@ export class DirectVoiceCall {
       } else if (data.status === 'connected' && this.isRemoteOnHold) {
         this.isRemoteOnHold = false
         if (!this.isOnHold) this.updateStatus('connected')
-      }
-
-      if (data.status === 'declined' && this.status !== 'ended') {
-        this.endCall(false, 'declined')
-      } else if (data.status === 'ended' && this.status !== 'ended') {
-        this.endCall(false, 'ended')
       }
 
       this.applyDbCandidates(data)
@@ -237,12 +325,27 @@ export class DirectVoiceCall {
         const row = payload.new as any
         if (!row) return
 
+        // Terminal checks first!
+        if (row.status === 'declined' && this.status !== 'ended') {
+          this.clearPartnerDisconnectTimer()
+          this.endCall(false, 'declined')
+          return
+        }
+        if (row.status === 'ended' && this.status !== 'ended') {
+          this.clearPartnerDisconnectTimer()
+          this.endCall(false, 'ended')
+          return
+        }
+
         if (this.isCaller && (row.status === 'accepted' || row.status === 'connecting') && !this.handledOffer) {
           await this.startPeerConnectionAsCaller()
         }
 
-        if (!this.isCaller && row.offer && !this.handledOffer) {
-          await this.handleOffer(row.offer)
+        if (!this.isCaller && row.offer) {
+          this.pendingOffer = row.offer
+          if (this.isAccepted && !this.handledOffer) {
+            await this.handleOffer(row.offer)
+          }
         } else if (this.isCaller && row.answer && !this.handledAnswer && this.pc) {
           try {
             await this.pc.setRemoteDescription(new RTCSessionDescription(row.answer))
@@ -261,12 +364,6 @@ export class DirectVoiceCall {
           if (!this.isOnHold) this.updateStatus('connected')
         }
 
-        if (row.status === 'declined' && this.status !== 'ended') {
-          this.endCall(false, 'declined')
-        } else if (row.status === 'ended' && this.status !== 'ended') {
-          this.endCall(false, 'ended')
-        }
-
         this.applyDbCandidates(row)
       }
     )
@@ -274,15 +371,25 @@ export class DirectVoiceCall {
     this.signalChannel
       .on('broadcast', { event: 'call:accepted' }, async () => {
         if (this.isCaller) {
+          this.clearPartnerDisconnectTimer()
           this.updateStatus('connecting')
           await this.startPeerConnectionAsCaller()
         }
       })
-      .on('broadcast', { event: 'call:rejected' }, () => {
+      .on('broadcast', { event: 'call:rejected' }, ({ payload }) => {
+        this.clearPartnerDisconnectTimer()
+        if (payload?.reason === 'busy') {
+          // Inform caller that user is busy
+          console.warn('[VoiceCall] Partner is busy on another call')
+        }
         this.endCall(false, 'declined')
       })
       .on('broadcast', { event: 'call:ended' }, () => {
-        this.endCall(false, this.status === 'incoming' ? 'missed' : undefined)
+        this.clearPartnerDisconnectTimer()
+        this.endCall(false, 'ended')
+      })
+      .on('broadcast', { event: 'call:partner_reloading' }, () => {
+        this.handlePartnerDisconnected()
       })
       .on('broadcast', { event: 'call:hold' }, () => {
         this.isRemoteOnHold = true
@@ -294,6 +401,7 @@ export class DirectVoiceCall {
       })
       .on('broadcast', { event: 'call:reconnect' }, async (eventPayload) => {
         console.log('[VoiceCall] Partner reconnected:', eventPayload)
+        this.clearPartnerDisconnectTimer()
         if (this.pc) {
           try {
             this.pc.close()
@@ -335,8 +443,11 @@ export class DirectVoiceCall {
         }
       })
       .on('broadcast', { event: 'signal:offer' }, async ({ payload }) => {
-        if (!this.isCaller && payload.sdp && !this.handledOffer) {
-          await this.handleOffer(payload.sdp)
+        if (!this.isCaller && payload.sdp) {
+          this.pendingOffer = payload.sdp
+          if (this.isAccepted && !this.handledOffer) {
+            await this.handleOffer(payload.sdp)
+          }
         }
       })
       .on('broadcast', { event: 'signal:answer' }, async ({ payload }) => {
@@ -504,8 +615,10 @@ export class DirectVoiceCall {
   /** Callee accepts incoming call */
   public async acceptCall(preacquiredStream?: MediaStream) {
     try {
+      this.isAccepted = true
+      this.clearPartnerDisconnectTimer()
       this.updateStatus('connecting')
-      this.createPeerConnection()
+      const pc = this.createPeerConnection()
 
       try {
         await this.acquireMicrophone(preacquiredStream)
@@ -514,11 +627,16 @@ export class DirectVoiceCall {
         console.warn('[VoiceCall] Callee mic deferred/denied:', micErr)
         this.micPermissionDenied = true
         this.onMicPermissionError?.(micErr)
-        if (this.pc && this.pc.getSenders().length === 0) {
+        if (pc.getSenders().length === 0) {
           try {
-            this.pc.addTransceiver('audio', { direction: 'sendrecv' })
+            pc.addTransceiver('audio', { direction: 'sendrecv' })
           } catch {}
         }
+      }
+
+      // If caller's offer already arrived while ringing, process it immediately!
+      if (this.pendingOffer && !this.handledOffer) {
+        await this.handleOffer(this.pendingOffer)
       }
 
       // Update backend status to accepted / connecting
@@ -830,13 +948,22 @@ export class DirectVoiceCall {
       this.connectingPollTimer = undefined
     }
 
-    if (newStatus === 'connected' && prev !== 'connected' && prev !== 'hold') playConnected()
-    else if (newStatus === 'ended' && prev !== 'ended') playHangup()
+    if (newStatus === 'connected') {
+      this.startAudioWatchdog()
+      this.clearPartnerDisconnectTimer()
+      if (prev !== 'connected' && prev !== 'hold') playConnected()
+    } else if (newStatus === 'ended') {
+      this.stopAudioWatchdog()
+      this.clearPartnerDisconnectTimer()
+      if (prev !== 'ended') playHangup()
+    }
     this.onStatusChange?.(newStatus)
   }
 
   /** Reject or end call */
   public endCall(sendBroadcast = true, reason?: 'ended' | 'missed' | 'declined') {
+    this.clearPartnerDisconnectTimer()
+    this.stopAudioWatchdog()
     if (this.connectingPollTimer) {
       clearInterval(this.connectingPollTimer)
       this.connectingPollTimer = undefined
@@ -871,12 +998,19 @@ export class DirectVoiceCall {
         () => {}
       )
 
-    if (sendBroadcast && this.signalChannel) {
-      void this.signalChannel.send({
-        type: 'broadcast',
-        event: this.status === 'incoming' ? 'call:rejected' : 'call:ended',
-        payload: { by: this.myUser.id, reason: finalStatus },
-      })
+    if (this.signalChannel) {
+      const chan = this.signalChannel
+      if (sendBroadcast) {
+        void chan.send({
+          type: 'broadcast',
+          event: this.status === 'incoming' ? 'call:rejected' : 'call:ended',
+          payload: { by: this.myUser.id, reason: finalStatus },
+        })
+      }
+      setTimeout(() => {
+        void supabase.removeChannel(chan)
+      }, 350)
+      this.signalChannel = null
     }
 
     // Stop local mic
@@ -898,12 +1032,6 @@ export class DirectVoiceCall {
     if (this.pc) {
       this.pc.close()
       this.pc = null
-    }
-
-    // Leave channel
-    if (this.signalChannel) {
-      void supabase.removeChannel(this.signalChannel)
-      this.signalChannel = null
     }
 
     this.updateStatus('ended')

@@ -40,6 +40,7 @@ export default function CallPage() {
   const [status, setStatus] = useState(activeCall?.status || 'idle')
   const [micBlocked, setMicBlocked] = useState(activeCall?.micPermissionDenied || false)
   const [retryingMic, setRetryingMic] = useState(false)
+  const [disconnectSecs, setDisconnectSecs] = useState(activeCall?.partnerDisconnectSecondsLeft || 60)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement))
 
   // Redirect if no active call
@@ -85,6 +86,9 @@ export default function CallPage() {
       },
       onMicPermissionError: () => {
         setMicBlocked(true)
+      },
+      onPartnerDisconnectTick: (sec) => {
+        setDisconnectSecs(sec)
       },
     })
   }, [activeCall, navigate, returnPath])
@@ -249,7 +253,11 @@ export default function CallPage() {
           {status === 'connecting' && (
             <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/90 px-4 py-1.5 text-xs font-semibold text-zinc-200">
               <Loader2 className="size-3.5 text-zinc-300 animate-spin" />
-              <span>Connecting…</span>
+              <span>
+                {activeCall.connectedAt
+                  ? `Waiting for ${activeCall.partner.displayName}… (${disconnectSecs}s)`
+                  : 'Connecting…'}
+              </span>
             </div>
           )}
 
