@@ -34,6 +34,7 @@ export default function CallPage() {
   // Real continuous call duration that persists across page navigations & minimizes
   const [duration, setDuration] = useState(() => (activeCall ? activeCall.getDuration() : 0))
   const [isMuted, setIsMuted] = useState(activeCall?.isMuted || false)
+  const [isRemoteMuted, setIsRemoteMuted] = useState(activeCall?.isRemoteMuted || false)
   const [isDeafened, setIsDeafened] = useState(activeCall?.isDeafened || false)
   const [isOnHold, setIsOnHold] = useState(activeCall?.isOnHold || false)
   const [isRemoteOnHold, setIsRemoteOnHold] = useState(activeCall?.isRemoteOnHold || false)
@@ -68,6 +69,7 @@ export default function CallPage() {
 
     setStatus(activeCall.status)
     setIsMuted(activeCall.isMuted)
+    setIsRemoteMuted(activeCall.isRemoteMuted)
     setIsDeafened(activeCall.isDeafened)
     setIsOnHold(activeCall.isOnHold)
     setIsRemoteOnHold(activeCall.isRemoteOnHold)
@@ -78,11 +80,15 @@ export default function CallPage() {
         setStatus(newStatus)
         setIsOnHold(activeCall.isOnHold)
         setIsRemoteOnHold(activeCall.isRemoteOnHold)
+        setIsRemoteMuted(activeCall.isRemoteMuted)
         if (newStatus === 'ended') {
           setTimeout(() => {
             navigate(returnPath || '/messages', { replace: true })
           }, 1200)
         }
+      },
+      onRemoteMuteChange: (muted) => {
+        setIsRemoteMuted(muted)
       },
       onMicPermissionError: () => {
         setMicBlocked(true)
@@ -232,6 +238,14 @@ export default function CallPage() {
               src={activeCall.partner.avatar}
               animateFrame
             />
+            {isRemoteMuted && (
+              <div
+                title="Partner is muted"
+                className="absolute bottom-1 right-1 grid size-7 place-items-center rounded-full border border-rose-500/50 bg-zinc-950 text-rose-400 shadow-lg ring-2 ring-zinc-950"
+              >
+                <MicOff className="size-3.5" />
+              </div>
+            )}
           </div>
         </div>
 
@@ -269,9 +283,14 @@ export default function CallPage() {
 
               {/* Status or Visualizer */}
               {isPaused ? (
-                <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/90 px-3.5 py-1 text-xs font-semibold text-zinc-200 shadow-md">
-                  <Pause className="size-3.5" />
-                  <span>{isRemoteOnHold ? 'Partner put call on hold' : 'Call is on hold'}</span>
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/90 px-3.5 py-1 text-xs font-semibold text-zinc-300 shadow-sm">
+                  <Pause className="size-3.5 text-zinc-400" />
+                  <span>On hold</span>
+                </div>
+              ) : isRemoteMuted ? (
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3.5 py-1 text-xs font-semibold text-rose-300 shadow-sm">
+                  <MicOff className="size-3.5 text-rose-400" />
+                  <span>Muted</span>
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-1 h-5">

@@ -8,9 +8,18 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turns:openrelay.metered.ca:443?transport=tcp',
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
-  iceCandidatePoolSize: 6,
+  iceCandidatePoolSize: 8,
 }
 
 export interface CallUserInfo {
@@ -37,6 +46,7 @@ export class DirectVoiceCall {
   public localAnswer?: RTCSessionDescriptionInit
   private connectingPollTimer?: number
   public isRemoteOnHold: boolean = false
+  public isRemoteMuted: boolean = false
   public connectedAt?: number
   public duration: number = 0
   public micPermissionDenied: boolean = false
@@ -58,6 +68,7 @@ export class DirectVoiceCall {
 
   private onStatusChange?: (status: CallStatus) => void
   private onRemoteSpeakingChange?: (speaking: boolean) => void
+  private onRemoteMuteChange?: (isMuted: boolean) => void
   private onCallEnded?: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void
   private onMicPermissionError?: (error: any) => void
   private onPartnerDisconnectTick?: (secondsLeft: number) => void
@@ -93,7 +104,10 @@ export class DirectVoiceCall {
         el = document.createElement('audio')
         el.id = 'zk-voice-remote-audio'
         el.autoplay = true
+        el.volume = 1.0
         ;(el as any).playsInline = true
+        el.setAttribute('playsinline', 'true')
+        el.setAttribute('webkit-playsinline', 'true')
         // Keep active with invisible fixed placement so browser power saver does not mute/pause it
         el.style.position = 'fixed'
         el.style.bottom = '0'
@@ -106,16 +120,27 @@ export class DirectVoiceCall {
         document.body.appendChild(el)
       }
       this.remoteAudio = el
+      this.remoteAudio.volume = 1.0
       this.remoteAudio.onpause = () => {
         if (this.status === 'connected' && !this.isOnHold && !this.isDeafened && this.remoteStream) {
           void this.remoteAudio?.play().catch(() => {})
         }
       }
+
+      // Unlock browser autoplay policy on any user interaction
+      const unlockAudio = () => {
+        if (this.remoteAudio && this.remoteStream && this.remoteAudio.paused && !this.isOnHold && !this.isDeafened) {
+          void this.remoteAudio.play().catch(() => {})
+        }
+      }
+      window.addEventListener('click', unlockAudio, { passive: true })
+      window.addEventListener('touchstart', unlockAudio, { passive: true })
     }
     if (this.remoteStream && this.remoteAudio.srcObject !== this.remoteStream) {
       this.remoteAudio.srcObject = this.remoteStream
     }
     this.remoteAudio.muted = this.isDeafened || this.isOnHold
+    this.remoteAudio.volume = 1.0
     return this.remoteAudio
   }
 
@@ -185,12 +210,14 @@ export class DirectVoiceCall {
   public setCallbacks(cbs: {
     onStatusChange?: (status: CallStatus) => void
     onRemoteSpeakingChange?: (speaking: boolean) => void
+    onRemoteMuteChange?: (isMuted: boolean) => void
     onCallEnded?: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void
     onMicPermissionError?: (error: any) => void
     onPartnerDisconnectTick?: (secondsLeft: number) => void
   }) {
     if (cbs.onStatusChange !== undefined) this.onStatusChange = cbs.onStatusChange
     if (cbs.onRemoteSpeakingChange !== undefined) this.onRemoteSpeakingChange = cbs.onRemoteSpeakingChange
+    if (cbs.onRemoteMuteChange !== undefined) this.onRemoteMuteChange = cbs.onRemoteMuteChange
     if (cbs.onCallEnded !== undefined) {
       this.onCallEndedListeners.push(cbs.onCallEnded)
       this.onCallEnded = cbs.onCallEnded
@@ -486,6 +513,10 @@ export class DirectVoiceCall {
           this.updateStatus('connected')
         }
       })
+      .on('broadcast', { event: 'call:mute' }, ({ payload }) => {
+        this.isRemoteMuted = Boolean(payload?.muted)
+        this.onRemoteMuteChange?.(this.isRemoteMuted)
+      })
       .on('broadcast', { event: 'signal:ice' }, async ({ payload }) => {
         if (payload.candidate) {
           await this.addIceCandidateSafe(payload.candidate)
@@ -560,10 +591,14 @@ export class DirectVoiceCall {
   /** Caller initiates WebRTC offer */
   public async startPeerConnectionAsCaller(forceFresh = false) {
     if (!forceFresh && this.handledOffer && this.localOffer && this.pc && this.pc.signalingState !== 'closed') {
+      const offerPayload: RTCSessionDescriptionInit = {
+        type: this.localOffer.type,
+        sdp: this.localOffer.sdp,
+      }
       void this.signalChannel?.send({
         type: 'broadcast',
         event: 'signal:offer',
-        payload: { sdp: this.localOffer },
+        payload: { sdp: offerPayload },
       })
       void supabase
         .from('call_sessions')
@@ -571,7 +606,7 @@ export class DirectVoiceCall {
           call_id: this.callId,
           caller_id: this.myUser.id,
           callee_id: this.partner.id,
-          offer: this.localOffer,
+          offer: offerPayload,
           status: 'connecting',
           updated_at: new Date().toISOString(),
         })
@@ -610,8 +645,12 @@ export class DirectVoiceCall {
         offerToReceiveAudio: true,
       })
       await pc.setLocalDescription(offer)
+      const offerPayload: RTCSessionDescriptionInit = {
+        type: offer.type,
+        sdp: offer.sdp,
+      }
       this.handledOffer = true
-      this.localOffer = offer
+      this.localOffer = offerPayload
 
       // Persist offer in Supabase backend
       void supabase
@@ -620,7 +659,7 @@ export class DirectVoiceCall {
           call_id: this.callId,
           caller_id: this.myUser.id,
           callee_id: this.partner.id,
-          offer: offer,
+          offer: offerPayload,
           status: 'connecting',
           updated_at: new Date().toISOString(),
         })
@@ -629,7 +668,7 @@ export class DirectVoiceCall {
       void this.signalChannel?.send({
         type: 'broadcast',
         event: 'signal:offer',
-        payload: { sdp: offer },
+        payload: { sdp: offerPayload },
       })
     } catch (err) {
       console.warn('[VoiceCall] Caller setup error:', err)
@@ -643,20 +682,14 @@ export class DirectVoiceCall {
       this.isAccepted = true
       this.clearPartnerDisconnectTimer()
       this.updateStatus('connecting')
-      const pc = this.createPeerConnection()
+      this.createPeerConnection()
 
       try {
         await this.acquireMicrophone(preacquiredStream)
-        await this.attachLocalAudio()
       } catch (micErr) {
         console.warn('[VoiceCall] Callee mic deferred/denied:', micErr)
         this.micPermissionDenied = true
         this.onMicPermissionError?.(micErr)
-        if (pc.getSenders().length === 0) {
-          try {
-            pc.addTransceiver('audio', { direction: 'sendrecv' })
-          } catch {}
-        }
       }
 
       // If caller's offer already arrived while ringing, process it immediately!
@@ -713,17 +746,23 @@ export class DirectVoiceCall {
         this.updateStatus('connecting')
         await this.pc.setRemoteDescription(new RTCSessionDescription(sdp))
         allowSendingAudio(this.pc)
-        await this.attachLocalAudio()
+        if (this.localStream) {
+          await this.attachLocalAudio()
+        }
         const answer = await this.pc.createAnswer()
         await this.pc.setLocalDescription(answer)
+        const answerPayload: RTCSessionDescriptionInit = {
+          type: answer.type,
+          sdp: answer.sdp,
+        }
         this.handledAnswer = true
-        this.localAnswer = answer
+        this.localAnswer = answerPayload
 
         // Persist answer in backend
         void supabase
           .from('call_sessions')
           .update({
-            answer: answer,
+            answer: answerPayload,
             status: 'connecting',
             updated_at: new Date().toISOString(),
           })
@@ -733,7 +772,7 @@ export class DirectVoiceCall {
         void this.signalChannel?.send({
           type: 'broadcast',
           event: 'signal:answer',
-          payload: { sdp: answer },
+          payload: { sdp: answerPayload },
         })
 
         // Apply any caller ICE candidates that arrived early
@@ -776,8 +815,18 @@ export class DirectVoiceCall {
         if (this.remoteAudio) {
           this.remoteAudio.srcObject = this.remoteStream
           this.remoteAudio.muted = this.isDeafened || this.isOnHold
-          this.remoteAudio.play().catch(() => {})
+          this.remoteAudio.volume = 1.0
+          void this.remoteAudio.play().catch(() => {})
         }
+
+        if (e.track) {
+          e.track.onunmute = () => {
+            if (this.remoteAudio && !this.isOnHold && !this.isDeafened) {
+              void this.remoteAudio.play().catch(() => {})
+            }
+          }
+        }
+
         if (this.status === 'connecting' || this.status === 'calling') {
           this.updateStatus('connected')
         }
@@ -868,6 +917,12 @@ export class DirectVoiceCall {
 
     if (this.isMuted) playMicOff()
     else playMicOn()
+
+    void this.signalChannel?.send({
+      type: 'broadcast',
+      event: 'call:mute',
+      payload: { muted: this.isMuted, by: this.myUser.id },
+    })
 
     return this.isMuted
   }

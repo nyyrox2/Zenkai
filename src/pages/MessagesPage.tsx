@@ -193,21 +193,31 @@ export default function MessagesPage() {
       .channel(`dm_messages_page:${user.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'direct_messages' },
+        { event: '*', schema: 'public', table: 'direct_messages' },
         (payload) => {
-          const newMsg = payload.new as DirectMessage
+          if (payload.eventType === 'INSERT') {
+            const newMsg = payload.new as DirectMessage
 
-          // If message belongs to current active conversation
-          if (
-            activePartner &&
-            (newMsg.sender_id === activePartner.id || newMsg.receiver_id === activePartner.id)
-          ) {
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev
-              return [...prev, newMsg]
-            })
-            setTimeout(() => scrollToBottom(true), 40)
-            if (user.id === newMsg.receiver_id) void markConversationAsRead(user.id, newMsg.sender_id)
+            // If message belongs to current active conversation
+            if (
+              activePartner &&
+              (newMsg.sender_id === activePartner.id || newMsg.receiver_id === activePartner.id)
+            ) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === newMsg.id)) return prev
+                return [...prev, newMsg]
+              })
+              setTimeout(() => scrollToBottom(true), 40)
+              if (user.id === newMsg.receiver_id) void markConversationAsRead(user.id, newMsg.sender_id)
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedMsg = payload.new as DirectMessage
+            if (
+              activePartner &&
+              (updatedMsg.sender_id === activePartner.id || updatedMsg.receiver_id === activePartner.id)
+            ) {
+              setMessages((prev) => prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m)))
+            }
           }
 
           // Refresh conversation list preview

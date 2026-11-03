@@ -37,6 +37,7 @@ export function VoiceCallOverlay({
   const [status, setStatus] = useState<CallStatus>(call?.status || 'idle')
   const [duration, setDuration] = useState(0)
   const [isMuted, setIsMuted] = useState(call?.isMuted || false)
+  const [isRemoteMuted, setIsRemoteMuted] = useState(call?.isRemoteMuted || false)
   const [isDeafened, setIsDeafened] = useState(call?.isDeafened || false)
   const [disconnectSecs, setDisconnectSecs] = useState(call?.partnerDisconnectSecondsLeft || 60)
 
@@ -45,14 +46,19 @@ export function VoiceCallOverlay({
 
     setStatus(call.status)
     setIsMuted(call.isMuted)
+    setIsRemoteMuted(call.isRemoteMuted)
     setIsDeafened(call.isDeafened)
 
     call.setCallbacks({
       onStatusChange: (newStatus) => {
         setStatus(newStatus)
+        setIsRemoteMuted(call.isRemoteMuted)
         if (newStatus === 'ended') {
           setTimeout(onEndCall, 800)
         }
+      },
+      onRemoteMuteChange: (muted) => {
+        setIsRemoteMuted(muted)
       },
       onPartnerDisconnectTick: (sec) => {
         setDisconnectSecs(sec)
@@ -235,7 +241,9 @@ export function VoiceCallOverlay({
                       ? `Waiting for partner… (${disconnectSecs}s)`
                       : 'Connecting…'
                     : status === 'hold'
-                    ? `Hold • ${formatSeconds(duration)}`
+                    ? `On hold • ${formatSeconds(duration)}`
+                    : isRemoteMuted
+                    ? `Muted • ${formatSeconds(duration)}`
                     : formatSeconds(duration)}
                 </p>
               </div>

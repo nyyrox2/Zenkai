@@ -232,13 +232,16 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     outgoing.addCallEndedListener(async (summary) => {
       if (outgoing.isCaller) {
         try {
-          const duration = outgoing.getDuration() || summary.duration || 0
-          const content =
-            summary.status === 'ended' || duration > 0
-              ? `[CALL:ended:${duration}]`
-              : summary.status === 'declined'
-              ? `[CALL:declined]`
-              : `[CALL:missed]`
+          const duration = outgoing.connectedAt
+            ? Math.max(1, Math.floor((Date.now() - outgoing.connectedAt) / 1000))
+            : (summary.duration || outgoing.getDuration() || 0)
+
+          const isAnsweredCall = Boolean(outgoing.connectedAt || duration > 0 || summary.status === 'ended')
+          const content = isAnsweredCall
+            ? `[CALL:ended:${duration}]`
+            : summary.status === 'declined'
+            ? `[CALL:declined]`
+            : `[CALL:missed]`
 
           if (startedMsgId) {
             const { error } = await supabase
