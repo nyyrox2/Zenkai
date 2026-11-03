@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { requestMicrophoneStream } from './microphone'
+import { allowSendingAudio, sendAudioTrack, silenceAudio } from './rtcAudio'
 import { playConnected, playHangup, playMicOff, playMicOn, startRinging, stopRinging } from './sounds'
 
 const RTC_CONFIG: RTCConfiguration = {
@@ -131,11 +132,7 @@ export class DirectVoiceCall {
 
       try {
         await this.acquireMicrophone()
-        if (this.pc && this.localStream) {
-          for (const track of this.localStream.getTracks()) {
-            this.pc.addTrack(track, this.localStream)
-          }
-        }
+        await this.attachLocalAudio()
       } catch (micErr) {
         console.warn('[VoiceCall] Mic acquisition deferred/denied:', micErr)
         this.micPermissionDenied = true
@@ -172,11 +169,7 @@ export class DirectVoiceCall {
 
       try {
         await this.acquireMicrophone(preacquiredStream)
-        if (this.pc && this.localStream) {
-          for (const track of this.localStream.getTracks()) {
-            this.pc.addTrack(track, this.localStream)
-          }
-        }
+        await this.attachLocalAudio()
       } catch (micErr) {
         console.warn('[VoiceCall] Callee mic deferred/denied:', micErr)
         this.micPermissionDenied = true
@@ -205,13 +198,9 @@ export class DirectVoiceCall {
     if (!this.pc) this.createPeerConnection()
     try {
       if (this.pc) {
-        if (this.localStream) {
-          for (const track of this.localStream.getTracks()) {
-            this.pc.addTrack(track, this.localStream)
-          }
-        }
-
         await this.pc.setRemoteDescription(new RTCSessionDescription(sdp))
+        allowSendingAudio(this.pc)
+        await this.attachLocalAudio()
         const answer = await this.pc.createAnswer()
         await this.pc.setLocalDescription(answer)
 
@@ -244,8 +233,9 @@ export class DirectVoiceCall {
     }
 
     this.pc.ontrack = (e) => {
-      if (e.streams && e.streams[0]) {
-        this.remoteStream = e.streams[0]
+      const incoming = e.streams && e.streams[0] ? e.streams[0] : e.track ? new MediaStream([e.track]) : null
+      if (incoming) {
+        this.remoteStream = incoming
         if (!this.remoteAudio) {
           this.remoteAudio = new Audio()
           this.remoteAudio.autoplay = true
@@ -268,6 +258,15 @@ export class DirectVoiceCall {
     }
   }
 
+  /** Send the current microphone track (once) over the peer connection, honouring mute. */
+  private async attachLocalAudio() {
+    if (!this.pc || !this.localStream) return
+    const track = this.localStream.getAudioTracks()[0]
+    if (!track) return
+    track.enabled = !this.isMuted
+    await sendAudioTrack(this.pc, track, this.localStream)
+  }
+
   public async acquireMicrophone(preacquiredStream?: MediaStream): Promise<MediaStream> {
     if (preacquiredStream && preacquiredStream.active && preacquiredStream.getAudioTracks().length > 0) {
       this.localStream = preacquiredStream
@@ -286,18 +285,7 @@ export class DirectVoiceCall {
     this.micPermissionDenied = false
 
     // Attach acquired track to active peer connection if already created
-    if (this.pc && this.localStream) {
-      const audioTrack = this.localStream.getAudioTracks()[0]
-      if (audioTrack) {
-        audioTrack.enabled = !this.isMuted
-        const sender = this.pc.getSenders().find((s) => s.track?.kind === 'audio' || !s.track)
-        if (sender) {
-          void sender.replaceTrack(audioTrack)
-        } else {
-          this.pc.addTrack(audioTrack, this.localStream)
-        }
-      }
-    }
+    await this.attachLocalAudio()
 
     return this.localStream
   }
@@ -319,11 +307,7 @@ export class DirectVoiceCall {
     // Muting stops the tracks so the browser releases the microphone (its "in use" indicator goes off);
     // unmuting re-acquires it above.
     this.isMuted = true
-    if (this.pc) {
-      for (const sender of this.pc.getSenders()) {
-        if (sender.track?.kind === 'audio') void sender.replaceTrack(null).catch(() => {})
-      }
-    }
+    if (this.pc) silenceAudio(this.pc)
     for (const track of this.localStream.getTracks()) track.stop()
     this.localStream = null
     playMicOff()
@@ -344,17 +328,7 @@ export class DirectVoiceCall {
     try {
       await this.acquireMicrophone()
       this.micPermissionDenied = false
-      if (this.pc && this.localStream) {
-        const audioTrack = this.localStream.getAudioTracks()[0]
-        if (audioTrack) {
-          const sender = this.pc.getSenders().find((s) => s.track?.kind === 'audio' || !s.track)
-          if (sender) {
-            await sender.replaceTrack(audioTrack)
-          } else {
-            this.pc.addTrack(audioTrack, this.localStream)
-          }
-        }
-      }
+      await this.attachLocalAudio()
       return true
     } catch (err) {
       this.micPermissionDenied = true

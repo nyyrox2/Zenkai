@@ -1,6 +1,7 @@
 import { playJoin, playLeave, playMicOff, playMicOn } from './sounds'
 import { supabase } from './supabase'
 import { requestMicrophoneStream } from './microphone'
+import { allowSendingAudio, sendAudioTrack, silenceAudio } from './rtcAudio'
 
 export interface PeerMember {
   peerId: string
@@ -388,18 +389,7 @@ export class WatchTogetherRoom {
         this.peerConnections.set(fromPeerId, pc)
         const targetPc = pc
 
-        if (this.localAudioStream && this.localAudioStream.getAudioTracks().length > 0) {
-          this.localAudioStream.getAudioTracks().forEach((track) => {
-            targetPc.addTrack(track, this.localAudioStream!)
-          })
-        } else {
-          try {
-            targetPc.addTransceiver('audio', { direction: 'sendrecv' })
-          } catch {
-            // ignore
-          }
-        }
-
+        // The audio transceiver comes from the remote offer (a pre-made one would never be negotiated, so our voice would never be sent)
         this.setupPeerConnectionEvents(targetPc, fromPeerId)
 
         // Listen for the DataChannel opened by initiator
@@ -409,6 +399,9 @@ export class WatchTogetherRoom {
       }
 
       await pc.setRemoteDescription(new RTCSessionDescription(sdp))
+      allowSendingAudio(pc)
+      const liveTrack = this.localAudioStream?.getAudioTracks()[0]
+      if (liveTrack && this.localAudioStream) await sendAudioTrack(pc, liveTrack, this.localAudioStream)
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
 
@@ -481,7 +474,12 @@ export class WatchTogetherRoom {
       audioEl.srcObject = stream
       audioEl.muted = this.mutedPeers.has(targetPeerId)
       audioEl.play().catch(() => {
-        // Autoplay may wait for user interaction
+        // Autoplay blocked: retry on the next tap so remote voices are never stuck silent
+        const retry = () => {
+          void audioEl!.play().catch(() => {})
+          window.removeEventListener('pointerdown', retry)
+        }
+        window.addEventListener('pointerdown', retry, { once: true })
       })
     }
 
@@ -788,11 +786,7 @@ export class WatchTogetherRoom {
       this.isMicActive = false
       // Detach from every peer, then stop the tracks. Only stopping releases the capture device;
       // `enabled = false` merely silences it, which leaves the browser's "microphone in use" indicator on.
-      for (const pc of this.peerConnections.values()) {
-        for (const sender of pc.getSenders()) {
-          if (sender.track?.kind === 'audio') void sender.replaceTrack(null).catch(() => {})
-        }
-      }
+      for (const pc of this.peerConnections.values()) silenceAudio(pc)
       if (this.localAudioStream) {
         this.localAudioStream.getTracks().forEach((t) => t.stop())
         this.localAudioStream = null
@@ -810,12 +804,7 @@ export class WatchTogetherRoom {
           audioTrack.enabled = true
 
           for (const pc of this.peerConnections.values()) {
-            const sender = pc.getSenders().find((s) => s.track?.kind === 'audio' || !s.track)
-            if (sender) {
-              void sender.replaceTrack(audioTrack)
-            } else {
-              pc.addTrack(audioTrack, this.localAudioStream)
-            }
+            await sendAudioTrack(pc, audioTrack, this.localAudioStream).catch((e) => console.warn('[WebRTC] sendAudioTrack', e))
           }
         }
         this.isMicActive = true
