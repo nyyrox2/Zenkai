@@ -212,12 +212,12 @@ export class DirectVoiceCall {
     const key = `${candidate.candidate}-${candidate.sdpMid}-${candidate.sdpMLineIndex}`
     if (this.processedCandidates.has(key)) return
     if (!this.pc.remoteDescription) {
-      setTimeout(() => void this.addIceCandidateSafe(candidate), 350)
+      setTimeout(() => void this.addIceCandidateSafe(candidate), 300)
       return
     }
     this.processedCandidates.add(key)
     try {
-      await this.pc.addIceCandidate(new RTCIceCandidate(candidate))
+      await this.pc.addIceCandidate(candidate)
     } catch {
       // ignore duplicate candidate
     }
@@ -268,7 +268,7 @@ export class DirectVoiceCall {
         try {
           await this.pc.setRemoteDescription(new RTCSessionDescription(data.answer))
           this.handledAnswer = true
-          this.updateStatus('connecting')
+          this.updateStatus('connected')
         } catch (e) {
           console.warn('[VoiceCall] Apply answer from DB error:', e)
         }
@@ -277,9 +277,11 @@ export class DirectVoiceCall {
       if (data.status === 'hold') {
         this.isRemoteOnHold = true
         if (this.status !== 'hold') this.updateStatus('hold')
-      } else if (data.status === 'connected' && this.isRemoteOnHold) {
+      } else if (data.status === 'connected') {
         this.isRemoteOnHold = false
-        if (!this.isOnHold) this.updateStatus('connected')
+        if (this.status !== 'connected' && this.status !== 'ended' && !this.isOnHold) {
+          this.updateStatus('connected')
+        }
       }
 
       this.applyDbCandidates(data)
@@ -350,7 +352,7 @@ export class DirectVoiceCall {
           try {
             await this.pc.setRemoteDescription(new RTCSessionDescription(row.answer))
             this.handledAnswer = true
-            this.updateStatus('connecting')
+            this.updateStatus('connected')
           } catch (e) {
             console.warn('[VoiceCall] Apply answer from DB error:', e)
           }
@@ -359,9 +361,11 @@ export class DirectVoiceCall {
         if (row.status === 'hold') {
           this.isRemoteOnHold = true
           if (this.status !== 'hold') this.updateStatus('hold')
-        } else if (row.status === 'connected' && this.isRemoteOnHold) {
+        } else if (row.status === 'connected') {
           this.isRemoteOnHold = false
-          if (!this.isOnHold) this.updateStatus('connected')
+          if (this.status !== 'connected' && this.status !== 'ended' && !this.isOnHold) {
+            this.updateStatus('connected')
+          }
         }
 
         this.applyDbCandidates(row)
@@ -373,13 +377,20 @@ export class DirectVoiceCall {
         if (this.isCaller) {
           this.clearPartnerDisconnectTimer()
           this.updateStatus('connecting')
-          await this.startPeerConnectionAsCaller()
+          if (!this.localOffer || !this.pc || this.pc.signalingState === 'closed') {
+            await this.startPeerConnectionAsCaller(false)
+          } else {
+            void this.signalChannel?.send({
+              type: 'broadcast',
+              event: 'signal:offer',
+              payload: { sdp: this.localOffer },
+            })
+          }
         }
       })
       .on('broadcast', { event: 'call:rejected' }, ({ payload }) => {
         this.clearPartnerDisconnectTimer()
         if (payload?.reason === 'busy') {
-          // Inform caller that user is busy
           console.warn('[VoiceCall] Partner is busy on another call')
         }
         this.endCall(false, 'declined')
@@ -439,7 +450,15 @@ export class DirectVoiceCall {
       })
       .on('broadcast', { event: 'signal:request_offer' }, async () => {
         if (this.isCaller) {
-          await this.startPeerConnectionAsCaller(true)
+          if (this.localOffer && this.pc && this.pc.signalingState !== 'closed') {
+            void this.signalChannel?.send({
+              type: 'broadcast',
+              event: 'signal:offer',
+              payload: { sdp: this.localOffer },
+            })
+          } else {
+            await this.startPeerConnectionAsCaller(false)
+          }
         }
       })
       .on('broadcast', { event: 'signal:offer' }, async ({ payload }) => {
@@ -455,10 +474,16 @@ export class DirectVoiceCall {
           try {
             await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
             this.handledAnswer = true
-            this.updateStatus('connecting')
+            this.updateStatus('connected')
           } catch (e) {
             console.warn('[VoiceCall] Remote answer error:', e)
           }
+        }
+      })
+      .on('broadcast', { event: 'call:connected' }, () => {
+        this.clearPartnerDisconnectTimer()
+        if (this.status !== 'connected' && this.status !== 'ended') {
+          this.updateStatus('connected')
         }
       })
       .on('broadcast', { event: 'signal:ice' }, async ({ payload }) => {
@@ -655,12 +680,14 @@ export class DirectVoiceCall {
         payload: { acceptedBy: this.myUser.id },
       })
 
-      // Prompt caller to send offer immediately
-      void this.signalChannel?.send({
-        type: 'broadcast',
-        event: 'signal:request_offer',
-        payload: { requestedBy: this.myUser.id },
-      })
+      // Only request offer from caller if we didn't receive one already
+      if (!this.handledOffer && !this.pendingOffer) {
+        void this.signalChannel?.send({
+          type: 'broadcast',
+          event: 'signal:request_offer',
+          payload: { requestedBy: this.myUser.id },
+        })
+      }
 
       // Ensure remote audio element is created and unlocked
       this.ensureRemoteAudio()
@@ -951,7 +978,23 @@ export class DirectVoiceCall {
     if (newStatus === 'connected') {
       this.startAudioWatchdog()
       this.clearPartnerDisconnectTimer()
-      if (prev !== 'connected' && prev !== 'hold') playConnected()
+      if (prev !== 'connected' && prev !== 'hold') {
+        playConnected()
+        // Broadcast connected event to partner
+        void this.signalChannel?.send({
+          type: 'broadcast',
+          event: 'call:connected',
+          payload: { by: this.myUser.id },
+        })
+        // Persist connected state in Supabase backend
+        void supabase
+          .from('call_sessions')
+          .update({
+            status: 'connected',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('call_id', this.callId)
+      }
     } else if (newStatus === 'ended') {
       this.stopAudioWatchdog()
       this.clearPartnerDisconnectTimer()
