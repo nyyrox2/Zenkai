@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -43,6 +43,30 @@ export default function CallPage() {
   const [retryingMic, setRetryingMic] = useState(false)
   const [disconnectSecs, setDisconnectSecs] = useState(activeCall?.partnerDisconnectSecondsLeft || 60)
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement))
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Attach remote stream directly to page audio element
+  useEffect(() => {
+    if (!activeCall) return
+
+    const attach = (stream: MediaStream) => {
+      if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== stream) {
+        remoteAudioRef.current.srcObject = stream
+        remoteAudioRef.current.muted = activeCall.isDeafened || activeCall.isOnHold
+        remoteAudioRef.current.volume = 1.0
+        remoteAudioRef.current.play().catch(() => {})
+      }
+    }
+
+    const currentStream = activeCall.getRemoteStream()
+    if (currentStream) attach(currentStream)
+
+    activeCall.setCallbacks({
+      onRemoteStreamChange: (stream) => {
+        attach(stream)
+      },
+    })
+  }, [activeCall])
 
   // Redirect if no active call
   useEffect(() => {
@@ -130,12 +154,18 @@ export default function CallPage() {
   const handleToggleDeafen = () => {
     const next = activeCall.toggleDeafen()
     setIsDeafened(next)
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = next || isOnHold
+    }
     toast(next ? 'Speaker deafened' : 'Speaker undeafened', 'info')
   }
 
   const handleToggleHold = async () => {
     const held = await activeCall.toggleHold()
     setIsOnHold(held)
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = isDeafened || held
+    }
     toast(held ? 'Call put on hold' : 'Call resumed', 'info')
   }
 
@@ -448,6 +478,14 @@ export default function CallPage() {
           </div>
         </div>
       </footer>
+
+      {/* Hardware-routed direct audio element */}
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        className="fixed -bottom-10 -right-10 size-1 opacity-0 pointer-events-none"
+      />
     </div>
   )
 }

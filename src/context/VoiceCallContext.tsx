@@ -159,6 +159,9 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
           partner: payload.caller,
           isCaller: false,
         })
+        if (payload.offer) {
+          incoming.pendingOffer = payload.offer
+        }
 
         // Save current location as return path when receiving call
         setReturnPath(window.location.pathname + window.location.search)
@@ -169,6 +172,26 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
             toast(`Missed call from ${name}`, 'info')
             if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
               new Notification('Missed call', { body: `${name} tried to call you`, icon: '/favicon.ico' })
+            }
+          } else if (summary.status === 'ended' && incoming.connectedAt) {
+            // Guarantee ended call duration is recorded even if caller lost connection
+            const duration = Math.max(1, Math.floor((Date.now() - incoming.connectedAt) / 1000))
+            try {
+              const { data: latestMsgs } = await supabase
+                .from('direct_messages')
+                .select('id, content')
+                .or(
+                  `and(sender_id.eq.${user.id},receiver_id.eq.${payload.caller.id}),and(sender_id.eq.${payload.caller.id},receiver_id.eq.${user.id})`
+                )
+                .order('created_at', { ascending: false })
+                .limit(3)
+
+              const hasEndedMsg = latestMsgs?.some((m) => m.content.startsWith('[CALL:ended:'))
+              if (!hasEndedMsg) {
+                await sendDirectMessage(user.id, payload.caller.id, `[CALL:ended:${duration}]`)
+              }
+            } catch (err) {
+              console.warn('[VoiceCall] Callee log call ended fallback:', err)
             }
           }
         })
@@ -257,25 +280,15 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    if (preacquiredStream) {
-      void outgoing.acquireMicrophone(preacquiredStream)
-    }
-
     await outgoing.initSignaling()
     setActiveCall(outgoing)
 
-    // Pre-generate WebRTC offer so it is immediately waiting in the backend for callee
-    void outgoing.startPeerConnectionAsCaller()
+    // Pre-generate WebRTC offer with audio track ready
+    const offerPayload = await outgoing.startPeerConnectionAsCaller(preacquiredStream)
 
     window.setTimeout(() => {
       if (outgoing.status === 'calling') outgoing.endCall(true, 'missed')
     }, 45_000)
-
-    if (!preacquiredStream) {
-      void outgoing.acquireMicrophone().catch((err) => {
-        console.warn('[VoiceCall] Caller mic permission deferred:', err)
-      })
-    }
 
     // Send call started message to Supabase direct messages
     try {
@@ -285,10 +298,11 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       console.warn('[VoiceCall] Failed to send call started message:', err)
     }
 
-    // Broadcast incoming call invite to partner's listener channel
+    // Broadcast incoming call invite to partner with pre-generated offer included
     await sendIncomingCallAlert(partner.id, {
       callId,
       caller: myUser,
+      offer: offerPayload,
     })
   }
 

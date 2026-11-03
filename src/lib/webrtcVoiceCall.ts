@@ -8,18 +8,11 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    {
-      urls: [
-        'turn:openrelay.metered.ca:80',
-        'turn:openrelay.metered.ca:443',
-        'turns:openrelay.metered.ca:443?transport=tcp',
-      ],
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
   ],
-  iceCandidatePoolSize: 8,
+  iceCandidatePoolSize: 6,
 }
 
 export interface CallUserInfo {
@@ -58,6 +51,9 @@ export class DirectVoiceCall {
   private localStream: MediaStream | null = null
   private remoteStream: MediaStream | null = null
   private remoteAudio: HTMLAudioElement | null = null
+  private audioCtx: AudioContext | null = null
+  private audioSourceNode: MediaStreamAudioSourceNode | null = null
+  private audioGainNode: GainNode | null = null
   public signalChannel: ReturnType<typeof supabase.channel> | null = null
 
   // Listeners & signaling tracking
@@ -69,6 +65,7 @@ export class DirectVoiceCall {
   private onStatusChange?: (status: CallStatus) => void
   private onRemoteSpeakingChange?: (speaking: boolean) => void
   private onRemoteMuteChange?: (isMuted: boolean) => void
+  private onRemoteStreamChange?: (stream: MediaStream) => void
   private onCallEnded?: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void
   private onMicPermissionError?: (error: any) => void
   private onPartnerDisconnectTick?: (secondsLeft: number) => void
@@ -87,6 +84,10 @@ export class DirectVoiceCall {
     this.status = options.isCaller ? 'calling' : 'incoming'
     this.syncRinging()
     this.ensureRemoteAudio()
+  }
+
+  public getRemoteStream(): MediaStream | null {
+    return this.remoteStream
   }
 
   /** Continuous elapsed call duration (seconds) that persists across page navigations */
@@ -153,6 +154,9 @@ export class DirectVoiceCall {
         if (this.remoteAudio.paused) {
           void this.remoteAudio.play().catch(() => {})
         }
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+          void this.audioCtx.resume().catch(() => {})
+        }
       }
       if (this.localStream && !this.isMuted && !this.isOnHold) {
         const audioTracks = this.localStream.getAudioTracks()
@@ -211,6 +215,7 @@ export class DirectVoiceCall {
     onStatusChange?: (status: CallStatus) => void
     onRemoteSpeakingChange?: (speaking: boolean) => void
     onRemoteMuteChange?: (isMuted: boolean) => void
+    onRemoteStreamChange?: (stream: MediaStream) => void
     onCallEnded?: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void
     onMicPermissionError?: (error: any) => void
     onPartnerDisconnectTick?: (secondsLeft: number) => void
@@ -218,6 +223,7 @@ export class DirectVoiceCall {
     if (cbs.onStatusChange !== undefined) this.onStatusChange = cbs.onStatusChange
     if (cbs.onRemoteSpeakingChange !== undefined) this.onRemoteSpeakingChange = cbs.onRemoteSpeakingChange
     if (cbs.onRemoteMuteChange !== undefined) this.onRemoteMuteChange = cbs.onRemoteMuteChange
+    if (cbs.onRemoteStreamChange !== undefined) this.onRemoteStreamChange = cbs.onRemoteStreamChange
     if (cbs.onCallEnded !== undefined) {
       this.onCallEndedListeners.push(cbs.onCallEnded)
       this.onCallEnded = cbs.onCallEnded
@@ -235,16 +241,16 @@ export class DirectVoiceCall {
 
   /** Safely add candidate without dropping if remote description is still preparing */
   private async addIceCandidateSafe(candidate: RTCIceCandidateInit) {
-    if (!candidate || !this.pc) return
+    if (!candidate || !candidate.candidate || !this.pc) return
     const key = `${candidate.candidate}-${candidate.sdpMid}-${candidate.sdpMLineIndex}`
     if (this.processedCandidates.has(key)) return
-    if (!this.pc.remoteDescription) {
-      setTimeout(() => void this.addIceCandidateSafe(candidate), 300)
+    if (!this.pc.remoteDescription || !this.pc.remoteDescription.type) {
+      setTimeout(() => void this.addIceCandidateSafe(candidate), 250)
       return
     }
     this.processedCandidates.add(key)
     try {
-      await this.pc.addIceCandidate(candidate)
+      await this.pc.addIceCandidate(new RTCIceCandidate(candidate))
     } catch {
       // ignore duplicate candidate
     }
@@ -282,7 +288,7 @@ export class DirectVoiceCall {
       }
 
       if (this.isCaller && (data.status === 'accepted' || data.status === 'connecting') && !this.handledOffer) {
-        await this.startPeerConnectionAsCaller()
+        await this.startPeerConnectionAsCaller(undefined, false)
       }
 
       if (!this.isCaller && data.offer) {
@@ -335,7 +341,7 @@ export class DirectVoiceCall {
             callee_id: this.partner.id,
             status: 'calling',
             updated_at: new Date().toISOString(),
-          })
+          }, { onConflict: 'call_id' })
       } catch (err: any) {
         console.warn('[VoiceCall] DB init session error:', err)
       }
@@ -367,7 +373,7 @@ export class DirectVoiceCall {
         }
 
         if (this.isCaller && (row.status === 'accepted' || row.status === 'connecting') && !this.handledOffer) {
-          await this.startPeerConnectionAsCaller()
+          await this.startPeerConnectionAsCaller(undefined, false)
         }
 
         if (!this.isCaller && row.offer) {
@@ -405,7 +411,7 @@ export class DirectVoiceCall {
           this.clearPartnerDisconnectTimer()
           this.updateStatus('connecting')
           if (!this.localOffer || !this.pc || this.pc.signalingState === 'closed') {
-            await this.startPeerConnectionAsCaller(false)
+            await this.startPeerConnectionAsCaller(undefined, false)
           } else {
             void this.signalChannel?.send({
               type: 'broadcast',
@@ -460,7 +466,7 @@ export class DirectVoiceCall {
         }
 
         if (this.isCaller) {
-          await this.startPeerConnectionAsCaller(true)
+          await this.startPeerConnectionAsCaller(undefined, true)
         } else {
           this.createPeerConnection()
           if (this.pc) {
@@ -484,7 +490,7 @@ export class DirectVoiceCall {
               payload: { sdp: this.localOffer },
             })
           } else {
-            await this.startPeerConnectionAsCaller(false)
+            await this.startPeerConnectionAsCaller(undefined, false)
           }
         }
       })
@@ -562,7 +568,7 @@ export class DirectVoiceCall {
     }
 
     if (this.isCaller) {
-      await this.startPeerConnectionAsCaller(true)
+      await this.startPeerConnectionAsCaller(undefined, true)
       void this.signalChannel?.send({
         type: 'broadcast',
         event: 'call:reconnect',
@@ -589,7 +595,10 @@ export class DirectVoiceCall {
   }
 
   /** Caller initiates WebRTC offer */
-  public async startPeerConnectionAsCaller(forceFresh = false) {
+  public async startPeerConnectionAsCaller(
+    preacquiredStream?: MediaStream,
+    forceFresh = false
+  ): Promise<RTCSessionDescriptionInit | undefined> {
     if (!forceFresh && this.handledOffer && this.localOffer && this.pc && this.pc.signalingState !== 'closed') {
       const offerPayload: RTCSessionDescriptionInit = {
         type: this.localOffer.type,
@@ -600,20 +609,27 @@ export class DirectVoiceCall {
         event: 'signal:offer',
         payload: { sdp: offerPayload },
       })
-      void supabase
+      await supabase
         .from('call_sessions')
-        .upsert({
-          call_id: this.callId,
-          caller_id: this.myUser.id,
-          callee_id: this.partner.id,
-          offer: offerPayload,
-          status: 'connecting',
-          updated_at: new Date().toISOString(),
-        })
-      return
+        .upsert(
+          {
+            call_id: this.callId,
+            caller_id: this.myUser.id,
+            callee_id: this.partner.id,
+            offer: offerPayload,
+            status: this.status === 'calling' ? 'calling' : 'connecting',
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'call_id' }
+        )
+        .then(
+          () => {},
+          (err) => console.warn('[VoiceCall] Offer upsert error:', err)
+        )
+      return offerPayload
     }
+
     try {
-      this.updateStatus('connecting')
       if (this.pc) {
         try {
           this.pc.close()
@@ -627,7 +643,7 @@ export class DirectVoiceCall {
       const pc = this.createPeerConnection()
 
       try {
-        await this.acquireMicrophone()
+        await this.acquireMicrophone(preacquiredStream)
         await this.attachLocalAudio()
       } catch (micErr) {
         console.warn('[VoiceCall] Mic acquisition deferred/denied:', micErr)
@@ -653,16 +669,23 @@ export class DirectVoiceCall {
       this.localOffer = offerPayload
 
       // Persist offer in Supabase backend
-      void supabase
+      await supabase
         .from('call_sessions')
-        .upsert({
-          call_id: this.callId,
-          caller_id: this.myUser.id,
-          callee_id: this.partner.id,
-          offer: offerPayload,
-          status: 'connecting',
-          updated_at: new Date().toISOString(),
-        })
+        .upsert(
+          {
+            call_id: this.callId,
+            caller_id: this.myUser.id,
+            callee_id: this.partner.id,
+            offer: offerPayload,
+            status: this.status === 'calling' ? 'calling' : 'connecting',
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'call_id' }
+        )
+        .then(
+          () => {},
+          (err) => console.warn('[VoiceCall] Offer DB persist error:', err)
+        )
 
       // Broadcast offer for ultra-low latency
       void this.signalChannel?.send({
@@ -670,9 +693,12 @@ export class DirectVoiceCall {
         event: 'signal:offer',
         payload: { sdp: offerPayload },
       })
+
+      return offerPayload
     } catch (err) {
       console.warn('[VoiceCall] Caller setup error:', err)
       this.endCall(true, 'missed')
+      return undefined
     }
   }
 
@@ -686,6 +712,7 @@ export class DirectVoiceCall {
 
       try {
         await this.acquireMicrophone(preacquiredStream)
+        await this.attachLocalAudio()
       } catch (micErr) {
         console.warn('[VoiceCall] Callee mic deferred/denied:', micErr)
         this.micPermissionDenied = true
@@ -695,9 +722,11 @@ export class DirectVoiceCall {
       // If caller's offer already arrived while ringing, process it immediately!
       if (this.pendingOffer && !this.handledOffer) {
         await this.handleOffer(this.pendingOffer)
+      } else {
+        await this.syncFromBackend()
       }
 
-      // Update backend status to accepted / connecting
+      // Update backend status to connecting
       void supabase
         .from('call_sessions')
         .update({
@@ -727,9 +756,6 @@ export class DirectVoiceCall {
       if (this.remoteAudio) {
         this.remoteAudio.play().catch(() => {})
       }
-
-      // Immediately sync with backend to retrieve offer
-      void this.syncFromBackend()
     } catch (err) {
       console.warn('[VoiceCall] acceptCall error:', err)
       this.endCall(true, 'declined')
@@ -759,7 +785,7 @@ export class DirectVoiceCall {
         this.localAnswer = answerPayload
 
         // Persist answer in backend
-        void supabase
+        const { error: ansErr } = await supabase
           .from('call_sessions')
           .update({
             answer: answerPayload,
@@ -767,6 +793,9 @@ export class DirectVoiceCall {
             updated_at: new Date().toISOString(),
           })
           .eq('call_id', this.callId)
+        if (ansErr) {
+          console.warn('[VoiceCall] Callee answer DB update error:', ansErr)
+        }
 
         // Fast broadcast
         void this.signalChannel?.send({
@@ -784,6 +813,49 @@ export class DirectVoiceCall {
     }
   }
 
+  public playRemoteStream(stream: MediaStream) {
+    this.remoteStream = stream
+    this.ensureRemoteAudio()
+    if (this.remoteAudio) {
+      if (this.remoteAudio.srcObject !== stream) {
+        this.remoteAudio.srcObject = stream
+      }
+      this.remoteAudio.muted = this.isDeafened || this.isOnHold
+      this.remoteAudio.volume = 1.0
+      void this.remoteAudio.play().catch(() => {})
+    }
+
+    // Direct Web Audio routing straight to hardware output (bypasses browser autoplay limits)
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+      if (AudioCtx) {
+        if (!this.audioCtx || this.audioCtx.state === 'closed') {
+          this.audioCtx = new AudioCtx()
+        }
+        if (this.audioCtx.state === 'suspended') {
+          void this.audioCtx.resume()
+        }
+        if (this.audioSourceNode) {
+          try {
+            this.audioSourceNode.disconnect()
+          } catch {}
+          this.audioSourceNode = null
+        }
+        this.audioSourceNode = this.audioCtx.createMediaStreamSource(stream)
+        if (!this.audioGainNode) {
+          this.audioGainNode = this.audioCtx.createGain()
+          this.audioGainNode.gain.value = this.isDeafened || this.isOnHold ? 0 : 1.0
+          this.audioGainNode.connect(this.audioCtx.destination)
+        } else {
+          this.audioGainNode.gain.value = this.isDeafened || this.isOnHold ? 0 : 1.0
+        }
+        this.audioSourceNode.connect(this.audioGainNode)
+      }
+    } catch (err) {
+      console.warn('[VoiceCall] Web Audio API routing error:', err)
+    }
+  }
+
   private createPeerConnection(): RTCPeerConnection {
     if (this.pc) return this.pc
     const pc = new RTCPeerConnection(RTC_CONFIG)
@@ -791,18 +863,19 @@ export class DirectVoiceCall {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
+        const candJson = e.candidate.toJSON()
         // Fast broadcast
         void this.signalChannel?.send({
           type: 'broadcast',
           event: 'signal:ice',
-          payload: { candidate: e.candidate },
+          payload: { candidate: candJson },
         })
 
         // Backend persistence in Supabase
         void supabase.rpc('append_call_candidate', {
           p_call_id: this.callId,
           p_is_caller: this.isCaller,
-          p_candidate: e.candidate.toJSON(),
+          p_candidate: candJson,
         })
       }
     }
@@ -811,18 +884,13 @@ export class DirectVoiceCall {
       const incoming = e.streams && e.streams[0] ? e.streams[0] : e.track ? new MediaStream([e.track]) : null
       if (incoming) {
         this.remoteStream = incoming
-        this.ensureRemoteAudio()
-        if (this.remoteAudio) {
-          this.remoteAudio.srcObject = this.remoteStream
-          this.remoteAudio.muted = this.isDeafened || this.isOnHold
-          this.remoteAudio.volume = 1.0
-          void this.remoteAudio.play().catch(() => {})
-        }
+        this.playRemoteStream(incoming)
+        this.onRemoteStreamChange?.(incoming)
 
         if (e.track) {
           e.track.onunmute = () => {
-            if (this.remoteAudio && !this.isOnHold && !this.isDeafened) {
-              void this.remoteAudio.play().catch(() => {})
+            if (this.remoteStream) {
+              this.playRemoteStream(this.remoteStream)
             }
           }
         }
@@ -939,6 +1007,9 @@ export class DirectVoiceCall {
     if (this.remoteAudio) {
       this.remoteAudio.muted = this.isDeafened || this.isOnHold
     }
+    if (this.audioGainNode) {
+      this.audioGainNode.gain.value = this.isDeafened || this.isOnHold ? 0 : 1.0
+    }
 
     const nextStatus: CallStatus = this.isOnHold ? 'hold' : (this.connectedAt ? 'connected' : 'connecting')
     this.updateStatus(nextStatus)
@@ -968,6 +1039,9 @@ export class DirectVoiceCall {
     this.isDeafened = !this.isDeafened
     if (this.remoteAudio) {
       this.remoteAudio.muted = this.isDeafened || this.isOnHold
+    }
+    if (this.audioGainNode) {
+      this.audioGainNode.gain.value = this.isDeafened || this.isOnHold ? 0 : 1.0
     }
     return this.isDeafened
   }
@@ -1120,6 +1194,24 @@ export class DirectVoiceCall {
     }
 
     // Clean up audio
+    if (this.audioSourceNode) {
+      try {
+        this.audioSourceNode.disconnect()
+      } catch {}
+      this.audioSourceNode = null
+    }
+    if (this.audioGainNode) {
+      try {
+        this.audioGainNode.disconnect()
+      } catch {}
+      this.audioGainNode = null
+    }
+    if (this.audioCtx && this.audioCtx.state !== 'closed') {
+      try {
+        void this.audioCtx.close()
+      } catch {}
+      this.audioCtx = null
+    }
     if (this.remoteAudio) {
       this.remoteAudio.srcObject = null
       this.remoteAudio.remove()
@@ -1152,6 +1244,7 @@ export async function sendIncomingCallAlert(
   callInfo: {
     callId: string
     caller: CallUserInfo
+    offer?: RTCSessionDescriptionInit
   }
 ): Promise<void> {
   const channel = supabase.channel(`call_invite_user_${partnerId}`)

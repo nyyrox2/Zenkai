@@ -1,6 +1,5 @@
 /**
- * Helpers that attach / detach the local microphone track on a peer connection without ever creating
- * duplicate senders or broken transceivers.
+ * Helpers that attach / detach the local microphone track on a peer connection.
  */
 
 /** The audio transceiver of this connection (a voice connection has exactly one). */
@@ -14,40 +13,47 @@ export function audioTransceiver(pc: RTCPeerConnection): RTCRtpTransceiver | nul
   )
 }
 
-/** Make sure our side is allowed to send on the audio m-line (answerers default to matching remote direction). */
+/** Make sure our side is allowed to send on the audio m-line. */
 export function allowSendingAudio(pc: RTCPeerConnection) {
-  const t = audioTransceiver(pc)
-  if (t && (t.direction === 'recvonly' || t.direction === 'inactive')) {
-    t.direction = 'sendrecv'
+  for (const t of pc.getTransceivers()) {
+    if (!t.receiver.track || t.receiver.track.kind === 'audio') {
+      if (t.direction === 'recvonly' || t.direction === 'inactive') {
+        t.direction = 'sendrecv'
+      }
+    }
   }
 }
 
-/** Send this microphone track: reuse existing transceiver sender or add track with stream */
+/** Send this microphone track on the peer connection */
 export async function sendAudioTrack(
   pc: RTCPeerConnection,
   track: MediaStreamTrack,
   stream: MediaStream
 ) {
-  const transceivers = pc.getTransceivers()
-  const t = transceivers.find(
-    (tr) => tr.receiver.track?.kind === 'audio' || tr.sender.track?.kind === 'audio'
-  )
-  if (t) {
-    if (t.direction === 'recvonly' || t.direction === 'inactive') {
-      t.direction = 'sendrecv'
+  const senders = pc.getSenders()
+  if (senders.some((s) => s.track === track)) {
+    return
+  }
+
+  const emptySender = senders.find((s) => !s.track)
+  if (emptySender) {
+    try {
+      await emptySender.replaceTrack(track)
+    } catch {
+      pc.addTrack(track, stream)
     }
-    if (t.sender.track !== track) {
-      await t.sender.replaceTrack(track)
-    }
-  } else if (!pc.getSenders().some((s) => s.track === track)) {
+  } else {
     pc.addTrack(track, stream)
   }
+
+  allowSendingAudio(pc)
 }
 
 /** Stop sending audio (the track itself is stopped by the caller). */
 export function silenceAudio(pc: RTCPeerConnection) {
-  const t = audioTransceiver(pc)
-  if (t?.sender.track) {
-    void t.sender.replaceTrack(null).catch(() => {})
+  for (const s of pc.getSenders()) {
+    if (s.track?.kind === 'audio') {
+      void s.replaceTrack(null).catch(() => {})
+    }
   }
 }
