@@ -32,6 +32,13 @@ export function parseCallMessage(content: string): CallLogPayload {
   return { isCall: false }
 }
 
+export function formatCallTimer(sec: number): string {
+  if (!sec || sec <= 0) return '00:00'
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`
+}
+
 export function formatCallDuration(seconds?: number): string {
   if (!seconds || seconds <= 0) return '0s'
   const m = Math.floor(seconds / 60)

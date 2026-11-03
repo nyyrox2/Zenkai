@@ -261,7 +261,7 @@ export default function CallPage() {
 
               {/* Status or Visualizer */}
               {isPaused ? (
-                <div className="inline-flex items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/15 px-3.5 py-1 text-xs font-bold text-rose-300">
+                <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/90 px-3.5 py-1 text-xs font-semibold text-zinc-200 shadow-md">
                   <Pause className="size-3.5" />
                   <span>{isRemoteOnHold ? 'Partner put call on hold' : 'Call is on hold'}</span>
                 </div>
@@ -339,8 +339,8 @@ export default function CallPage() {
               className={cn(
                 'grid size-13 sm:size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
                 isMuted
-                  ? 'border-rose-500/60 bg-rose-500/15 text-rose-400 ring-2 ring-rose-500/20'
-                  : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white'
+                  ? 'border-zinc-700 bg-zinc-800 text-white shadow-inner ring-1 ring-white/10'
+                  : 'border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:border-zinc-700 hover:text-white'
               )}
             >
               {isMuted ? <MicOff className="size-5 sm:size-6" /> : <Mic className="size-5 sm:size-6" />}
@@ -348,7 +348,7 @@ export default function CallPage() {
             <span
               className={cn(
                 'text-[10px] font-bold uppercase tracking-wider',
-                isMuted ? 'text-rose-400' : 'text-zinc-400'
+                isMuted ? 'text-zinc-200' : 'text-zinc-500'
               )}
             >
               {isMuted ? 'Muted' : 'Mute'}
@@ -364,8 +364,8 @@ export default function CallPage() {
               className={cn(
                 'grid size-13 sm:size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
                 isOnHold
-                  ? 'border-rose-500/60 bg-rose-500/15 text-rose-400 ring-2 ring-rose-500/20'
-                  : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white'
+                  ? 'border-zinc-700 bg-zinc-800 text-white shadow-inner ring-1 ring-white/10'
+                  : 'border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:border-zinc-700 hover:text-white'
               )}
             >
               {isOnHold ? <Play className="size-5 sm:size-6" /> : <Pause className="size-5 sm:size-6" />}
@@ -373,7 +373,7 @@ export default function CallPage() {
             <span
               className={cn(
                 'text-[10px] font-bold uppercase tracking-wider',
-                isOnHold ? 'text-rose-400' : 'text-zinc-400'
+                isOnHold ? 'text-zinc-200' : 'text-zinc-500'
               )}
             >
               {isOnHold ? 'Resume' : 'Hold'}
@@ -404,8 +404,8 @@ export default function CallPage() {
               className={cn(
                 'grid size-13 sm:size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
                 isDeafened
-                  ? 'border-rose-500/60 bg-rose-500/15 text-rose-400 ring-2 ring-rose-500/20'
-                  : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white'
+                  ? 'border-zinc-700 bg-zinc-800 text-white shadow-inner ring-1 ring-white/10'
+                  : 'border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:border-zinc-700 hover:text-white'
               )}
             >
               {isDeafened ? <VolumeX className="size-5 sm:size-6" /> : <Volume2 className="size-5 sm:size-6" />}
@@ -413,7 +413,7 @@ export default function CallPage() {
             <span
               className={cn(
                 'text-[10px] font-bold uppercase tracking-wider',
-                isDeafened ? 'text-rose-400' : 'text-zinc-400'
+                isDeafened ? 'text-zinc-200' : 'text-zinc-500'
               )}
             >
               {isDeafened ? 'Deafened' : 'Speaker'}

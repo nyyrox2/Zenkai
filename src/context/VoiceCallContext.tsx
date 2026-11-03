@@ -24,6 +24,69 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   const [activeCall, setActiveCall] = useState<DirectVoiceCall | null>(null)
   const [returnPath, setReturnPath] = useState<string | null>(null)
 
+  // Restore active call on page refresh / reload
+  useEffect(() => {
+    if (!user?.id) return
+    const saved = sessionStorage.getItem('zk:voice_call')
+    if (!saved) return
+    try {
+      const parsed = JSON.parse(saved)
+      if (!parsed?.callId || !parsed?.partner) return
+      void (async () => {
+        const { data } = await supabase
+          .from('call_sessions')
+          .select('status')
+          .eq('call_id', parsed.callId)
+          .maybeSingle()
+
+        if (!data || data.status === 'ended' || data.status === 'declined') {
+          sessionStorage.removeItem('zk:voice_call')
+          return
+        }
+
+        const myUser: CallUserInfo = {
+          id: user.id,
+          username,
+          displayName: me.name || user.user_metadata?.full_name || 'Otaku',
+          avatar: me.avatar,
+        }
+
+        const restored = new DirectVoiceCall({
+          callId: parsed.callId,
+          myUser,
+          partner: parsed.partner,
+          isCaller: parsed.isCaller,
+        })
+        if (parsed.connectedAt) {
+          restored.connectedAt = parsed.connectedAt
+        }
+        await restored.initSignaling()
+        setActiveCall(restored)
+        await restored.reconnect()
+      })()
+    } catch {
+      sessionStorage.removeItem('zk:voice_call')
+    }
+  }, [user?.id, username, me])
+
+  // Save active call to sessionStorage
+  useEffect(() => {
+    if (activeCall && activeCall.status !== 'ended') {
+      try {
+        sessionStorage.setItem('zk:voice_call', JSON.stringify({
+          callId: activeCall.callId,
+          isCaller: activeCall.isCaller,
+          partner: activeCall.partner,
+          connectedAt: activeCall.connectedAt,
+        }))
+      } catch {}
+    } else {
+      try {
+        sessionStorage.removeItem('zk:voice_call')
+      } catch {}
+    }
+  }, [activeCall, activeCall?.status])
+
   // Listen for global incoming call invitations targeted at current logged in user
   useEffect(() => {
     if (!user?.id) return
@@ -34,9 +97,13 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       .on('broadcast', { event: 'incoming_call_invite' }, async ({ payload }) => {
         if (!payload || !payload.caller) return
 
-        // If already in an ongoing call, decline automatically
+        // If already in call with the same partner who reloaded/re-called, switch cleanly
         if (activeCall && activeCall.status !== 'ended') {
-          return
+          if (activeCall.partner.id === payload.caller.id) {
+            activeCall.endCall(false, 'ended')
+          } else {
+            return
+          }
         }
 
         const myUser: CallUserInfo = {
@@ -91,8 +158,12 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (activeCall && activeCall.status !== 'ended') {
-      toast('Already in a call', 'info')
-      return
+      if (activeCall.partner.id === partner.id) {
+        activeCall.endCall(false, 'ended')
+      } else {
+        toast('Already in a call', 'info')
+        return
+      }
     }
 
     const currentLoc = window.location.pathname + window.location.search
@@ -179,6 +250,9 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   }
 
   const endCall = () => {
+    try {
+      sessionStorage.removeItem('zk:voice_call')
+    } catch {}
     if (activeCall) {
       activeCall.endCall()
       setActiveCall(null)

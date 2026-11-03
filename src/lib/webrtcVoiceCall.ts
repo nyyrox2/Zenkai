@@ -43,7 +43,7 @@ export class DirectVoiceCall {
   private localStream: MediaStream | null = null
   private remoteStream: MediaStream | null = null
   private remoteAudio: HTMLAudioElement | null = null
-  private signalChannel: ReturnType<typeof supabase.channel> | null = null
+  public signalChannel: ReturnType<typeof supabase.channel> | null = null
 
   // Listeners & signaling tracking
   private onCallEndedListeners: Array<(summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void> = []
@@ -292,13 +292,46 @@ export class DirectVoiceCall {
         this.isRemoteOnHold = false
         if (!this.isOnHold) this.updateStatus('connected')
       })
-      .on('broadcast', { event: 'signal:request_offer' }, () => {
-        if (this.isCaller && this.localOffer) {
+      .on('broadcast', { event: 'call:reconnect' }, async (eventPayload) => {
+        console.log('[VoiceCall] Partner reconnected:', eventPayload)
+        if (this.pc) {
+          try {
+            this.pc.close()
+          } catch {}
+          this.pc = null
+        }
+        this.handledOffer = false
+        this.handledAnswer = false
+        this.localOffer = undefined
+        this.localAnswer = undefined
+        this.processedCandidates.clear()
+        this.updateStatus('connecting')
+
+        if (!this.localStream || !this.localStream.active) {
+          try {
+            await this.acquireMicrophone()
+          } catch {}
+        }
+
+        if (this.isCaller) {
+          await this.startPeerConnectionAsCaller(true)
+        } else {
+          this.createPeerConnection()
+          if (this.pc) {
+            allowSendingAudio(this.pc)
+            await this.attachLocalAudio()
+          }
           void this.signalChannel?.send({
             type: 'broadcast',
-            event: 'signal:offer',
-            payload: { sdp: this.localOffer },
+            event: 'signal:request_offer',
+            payload: { requestedBy: this.myUser.id },
           })
+          void this.syncFromBackend()
+        }
+      })
+      .on('broadcast', { event: 'signal:request_offer' }, async () => {
+        if (this.isCaller) {
+          await this.startPeerConnectionAsCaller(true)
         }
       })
       .on('broadcast', { event: 'signal:offer' }, async ({ payload }) => {
@@ -332,9 +365,65 @@ export class DirectVoiceCall {
     void this.syncFromBackend()
   }
 
+  /** Restore or recover an ongoing active voice call across refresh or tab reopen */
+  public async reconnect(): Promise<void> {
+    this.updateStatus('connecting')
+    if (this.pc) {
+      try {
+        this.pc.close()
+      } catch {}
+      this.pc = null
+    }
+    this.handledOffer = false
+    this.handledAnswer = false
+    this.localOffer = undefined
+    this.localAnswer = undefined
+    this.processedCandidates.clear()
+
+    // Ensure audio element exists and is active
+    this.ensureRemoteAudio()
+    if (this.remoteAudio) {
+      this.remoteAudio.play().catch(() => {})
+    }
+
+    try {
+      await this.acquireMicrophone()
+    } catch (err) {
+      console.warn('[VoiceCall] Mic acquisition during reconnect:', err)
+      this.micPermissionDenied = true
+      this.onMicPermissionError?.(err)
+    }
+
+    if (this.isCaller) {
+      await this.startPeerConnectionAsCaller(true)
+      void this.signalChannel?.send({
+        type: 'broadcast',
+        event: 'call:reconnect',
+        payload: { by: this.myUser.id, role: 'caller' },
+      })
+    } else {
+      this.createPeerConnection()
+      if (this.pc) {
+        allowSendingAudio(this.pc)
+        await this.attachLocalAudio()
+      }
+      void this.signalChannel?.send({
+        type: 'broadcast',
+        event: 'call:reconnect',
+        payload: { by: this.myUser.id, role: 'callee' },
+      })
+      void this.signalChannel?.send({
+        type: 'broadcast',
+        event: 'signal:request_offer',
+        payload: { requestedBy: this.myUser.id },
+      })
+      void this.syncFromBackend()
+    }
+  }
+
   /** Caller initiates WebRTC offer */
-  public async startPeerConnectionAsCaller() {
-    if (this.handledOffer && this.localOffer) {
+  public async startPeerConnectionAsCaller(forceFresh = false) {
+    if (!forceFresh && this.handledOffer && this.localOffer && this.pc && this.pc.signalingState !== 'closed') {
       void this.signalChannel?.send({
         type: 'broadcast',
         event: 'signal:offer',
@@ -354,7 +443,17 @@ export class DirectVoiceCall {
     }
     try {
       this.updateStatus('connecting')
-      this.createPeerConnection()
+      if (this.pc) {
+        try {
+          this.pc.close()
+        } catch {}
+        this.pc = null
+      }
+      this.handledOffer = false
+      this.handledAnswer = false
+      this.localOffer = undefined
+      this.processedCandidates.clear()
+      const pc = this.createPeerConnection()
 
       try {
         await this.acquireMicrophone()
@@ -365,39 +464,37 @@ export class DirectVoiceCall {
         this.onMicPermissionError?.(micErr)
       }
 
-      if (this.pc) {
-        if (this.pc.getSenders().length === 0) {
-          try {
-            this.pc.addTransceiver('audio', { direction: 'sendrecv' })
-          } catch {}
-        }
-
-        const offer = await this.pc.createOffer({
-          offerToReceiveAudio: true,
-        })
-        await this.pc.setLocalDescription(offer)
-        this.handledOffer = true
-        this.localOffer = offer
-
-        // Persist offer in Supabase backend
-        void supabase
-          .from('call_sessions')
-          .upsert({
-            call_id: this.callId,
-            caller_id: this.myUser.id,
-            callee_id: this.partner.id,
-            offer: offer,
-            status: 'connecting',
-            updated_at: new Date().toISOString(),
-          })
-
-        // Broadcast offer for ultra-low latency
-        void this.signalChannel?.send({
-          type: 'broadcast',
-          event: 'signal:offer',
-          payload: { sdp: offer },
-        })
+      if (pc.getSenders().length === 0) {
+        try {
+          pc.addTransceiver('audio', { direction: 'sendrecv' })
+        } catch {}
       }
+
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+      })
+      await pc.setLocalDescription(offer)
+      this.handledOffer = true
+      this.localOffer = offer
+
+      // Persist offer in Supabase backend
+      void supabase
+        .from('call_sessions')
+        .upsert({
+          call_id: this.callId,
+          caller_id: this.myUser.id,
+          callee_id: this.partner.id,
+          offer: offer,
+          status: 'connecting',
+          updated_at: new Date().toISOString(),
+        })
+
+      // Broadcast offer for ultra-low latency
+      void this.signalChannel?.send({
+        type: 'broadcast',
+        event: 'signal:offer',
+        payload: { sdp: offer },
+      })
     } catch (err) {
       console.warn('[VoiceCall] Caller setup error:', err)
       this.endCall(true, 'missed')
@@ -503,11 +600,12 @@ export class DirectVoiceCall {
     }
   }
 
-  private createPeerConnection() {
-    if (this.pc) return
-    this.pc = new RTCPeerConnection(RTC_CONFIG)
+  private createPeerConnection(): RTCPeerConnection {
+    if (this.pc) return this.pc
+    const pc = new RTCPeerConnection(RTC_CONFIG)
+    this.pc = pc
 
-    this.pc.onicecandidate = (e) => {
+    pc.onicecandidate = (e) => {
       if (e.candidate) {
         // Fast broadcast
         void this.signalChannel?.send({
@@ -525,7 +623,7 @@ export class DirectVoiceCall {
       }
     }
 
-    this.pc.ontrack = (e) => {
+    pc.ontrack = (e) => {
       const incoming = e.streams && e.streams[0] ? e.streams[0] : e.track ? new MediaStream([e.track]) : null
       if (incoming) {
         this.remoteStream = incoming
@@ -541,8 +639,8 @@ export class DirectVoiceCall {
       }
     }
 
-    this.pc.onconnectionstatechange = () => {
-      const state = this.pc?.connectionState
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState
       if (state === 'connected') {
         this.updateStatus('connected')
       } else if (state === 'disconnected') {
@@ -559,14 +657,16 @@ export class DirectVoiceCall {
       }
     }
 
-    this.pc.oniceconnectionstatechange = () => {
-      const ice = this.pc?.iceConnectionState
+    pc.oniceconnectionstatechange = () => {
+      const ice = pc.iceConnectionState
       if (ice === 'connected' || ice === 'completed') {
         this.updateStatus('connected')
       } else if (ice === 'failed') {
         void this.syncFromBackend()
       }
     }
+
+    return pc
   }
 
   /** Send the current microphone track (once) over the peer connection, honouring mute & hold. */

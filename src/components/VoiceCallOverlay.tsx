@@ -56,19 +56,20 @@ export function VoiceCallOverlay({
     })
   }, [call, onEndCall])
 
-  // Call timer when connected
+  // Call timer linked directly to call.getDuration()
   useEffect(() => {
-    if (status !== 'connected') {
-      setDuration(0)
+    if (!call || (status !== 'connected' && status !== 'hold')) {
+      if (status !== 'connected' && status !== 'hold') setDuration(0)
       return
     }
 
+    setDuration(call.getDuration())
     const interval = window.setInterval(() => {
-      setDuration((d) => d + 1)
+      setDuration(call.getDuration())
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [status])
+  }, [call, status])
 
   if (!call || status === 'idle' || status === 'ended') return null
 
@@ -85,6 +86,11 @@ export function VoiceCallOverlay({
   }
 
   const handleAccept = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen().catch(() => {})
+      }
+    } catch {}
     let stream: MediaStream | undefined
     try {
       stream = await requestMicrophoneStream()
@@ -187,20 +193,25 @@ export function VoiceCallOverlay({
         </div>
       )}
 
-      {/* ================= 2. CONNECTED ACTIVE CALL FLOATING BAR (Black & White with Crimson) ================= */}
-      {status === 'connected' && !isOnCallPage && (
+      {/* ================= 2. ACTIVE CALL FLOATING BAR (Minimal Dark UI) ================= */}
+      {status !== 'incoming' && !isOnCallPage && (
         <motion.div
           initial={{ opacity: 0, y: -20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           onClick={() => navigate('/call')}
-          className="fixed top-18 sm:top-20 inset-x-3 sm:inset-x-auto sm:right-6 z-[160] sm:w-96 rounded-3xl border border-zinc-800 bg-zinc-950/95 p-3.5 shadow-2xl shadow-black backdrop-blur-2xl ring-1 ring-white/10 cursor-pointer transition hover:border-zinc-700"
+          className="fixed top-18 sm:top-20 inset-x-3 sm:inset-x-auto sm:right-6 z-[160] sm:w-96 rounded-2xl border border-zinc-800 bg-zinc-950/95 p-3 shadow-2xl shadow-black backdrop-blur-2xl ring-1 ring-white/10 cursor-pointer transition hover:border-zinc-700"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="relative shrink-0">
-                <Avatar size={38} name={call.partner.displayName} src={call.partner.avatar} />
-                <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-accent ring-2 ring-zinc-950 animate-pulse" />
+                <Avatar size={36} name={call.partner.displayName} src={call.partner.avatar} />
+                <span
+                  className={cn(
+                    'absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-zinc-950',
+                    status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'
+                  )}
+                />
               </div>
 
               <div className="min-w-0">
@@ -208,12 +219,18 @@ export function VoiceCallOverlay({
                   <span className="truncate text-xs font-bold text-white">
                     {call.partner.displayName}
                   </span>
-                  <span className="rounded-full border border-zinc-700 bg-zinc-900 px-1.5 py-0.2 text-[9px] font-bold text-zinc-300">
+                  <span className="rounded-full border border-zinc-800 bg-zinc-900 px-1.5 py-0.2 text-[9px] font-semibold text-zinc-400">
                     Voice
                   </span>
                 </div>
                 <p className="text-[11px] font-mono font-semibold text-zinc-300">
-                  {formatSeconds(duration)}
+                  {status === 'calling'
+                    ? 'Ringing…'
+                    : status === 'connecting'
+                    ? 'Connecting…'
+                    : status === 'hold'
+                    ? `Hold • ${formatSeconds(duration)}`
+                    : formatSeconds(duration)}
                 </p>
               </div>
             </div>
@@ -228,39 +245,39 @@ export function VoiceCallOverlay({
                   navigate('/call')
                 }}
                 title="Open full call page"
-                className="grid size-9 place-items-center rounded-2xl border border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white transition active:scale-90"
+                className="grid size-8 place-items-center rounded-xl border border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white transition active:scale-90"
               >
-                <Maximize2 className="size-4" />
+                <Maximize2 className="size-3.5" />
               </button>
 
-              {/* Mic Mute/Unmute */}
+              {/* Mic Mute/Unmute - Dark UI */}
               <button
                 type="button"
                 onClick={handleToggleMute}
                 title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
                 className={cn(
-                  'grid size-9 place-items-center rounded-2xl border transition active:scale-90',
+                  'grid size-8 place-items-center rounded-xl border transition active:scale-90',
                   isMuted
-                    ? 'border-rose-500/60 bg-rose-500/15 text-rose-400'
-                    : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white'
+                    ? 'border-zinc-700 bg-zinc-800 text-white'
+                    : 'border-zinc-800 bg-zinc-900/90 text-zinc-400 hover:border-zinc-700 hover:text-white'
                 )}
               >
-                {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+                {isMuted ? <MicOff className="size-3.5" /> : <Mic className="size-3.5" />}
               </button>
 
-              {/* Deafen Mute Speaker */}
+              {/* Deafen Mute Speaker - Dark UI */}
               <button
                 type="button"
                 onClick={handleToggleDeafen}
                 title={isDeafened ? 'Undeafen' : 'Deafen'}
                 className={cn(
-                  'grid size-9 place-items-center rounded-2xl border transition active:scale-90',
+                  'grid size-8 place-items-center rounded-xl border transition active:scale-90',
                   isDeafened
-                    ? 'border-rose-500/60 bg-rose-500/15 text-rose-400'
-                    : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white'
+                    ? 'border-zinc-700 bg-zinc-800 text-white'
+                    : 'border-zinc-800 bg-zinc-900/90 text-zinc-400 hover:border-zinc-700 hover:text-white'
                 )}
               >
-                {isDeafened ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+                {isDeafened ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
               </button>
 
               {/* End Call */}
@@ -272,9 +289,9 @@ export function VoiceCallOverlay({
                   onEndCall()
                 }}
                 title="End Call"
-                className="grid size-9 place-items-center rounded-2xl bg-[#e8294c] hover:bg-[#ff2d55] text-white shadow-md shadow-rose-950/50 transition hover:brightness-110 active:scale-90"
+                className="grid size-8 place-items-center rounded-xl bg-[#e8294c] hover:bg-[#ff2d55] text-white shadow-md shadow-rose-950/50 transition active:scale-90"
               >
-                <PhoneOff className="size-4" />
+                <PhoneOff className="size-3.5" />
               </button>
             </div>
           </div>
