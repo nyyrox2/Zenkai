@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { requestMicrophoneStream } from './microphone'
-import { allowSendingAudio, sendAudioTrack, silenceAudio } from './rtcAudio'
+import { allowSendingAudio, sendAudioTrack } from './rtcAudio'
 import { playConnected, playHangup, playMicOff, playMicOn, startRinging, stopRinging } from './sounds'
 
 const RTC_CONFIG: RTCConfiguration = {
@@ -20,7 +20,7 @@ export interface CallUserInfo {
   avatar: string | null
 }
 
-export type CallStatus = 'idle' | 'calling' | 'incoming' | 'connected' | 'ended'
+export type CallStatus = 'idle' | 'calling' | 'incoming' | 'connecting' | 'connected' | 'hold' | 'ended'
 
 export class DirectVoiceCall {
   public callId: string
@@ -30,6 +30,8 @@ export class DirectVoiceCall {
   public status: CallStatus = 'idle'
   public isMuted: boolean = false
   public isDeafened: boolean = false
+  public isOnHold: boolean = false
+  public isRemoteOnHold: boolean = false
   public connectedAt?: number
   public duration: number = 0
   public micPermissionDenied: boolean = false
@@ -63,6 +65,35 @@ export class DirectVoiceCall {
     this.isCaller = options.isCaller
     this.status = options.isCaller ? 'calling' : 'incoming'
     this.syncRinging()
+    this.ensureRemoteAudio()
+  }
+
+  /** Continuous elapsed call duration (seconds) that persists across page navigations */
+  public getDuration(): number {
+    if (!this.connectedAt) return 0
+    return Math.max(0, Math.floor((Date.now() - this.connectedAt) / 1000))
+  }
+
+  /** Attach persistent audio element to the document body to prevent throttling / garbage collection */
+  private ensureRemoteAudio(): HTMLAudioElement | null {
+    if (typeof document === 'undefined') return null
+    if (!this.remoteAudio) {
+      let el = document.getElementById('zk-voice-remote-audio') as HTMLAudioElement | null
+      if (!el) {
+        el = document.createElement('audio')
+        el.id = 'zk-voice-remote-audio'
+        el.autoplay = true
+        ;(el as any).playsInline = true
+        el.style.display = 'none'
+        document.body.appendChild(el)
+      }
+      this.remoteAudio = el
+    }
+    if (this.remoteStream) {
+      this.remoteAudio.srcObject = this.remoteStream
+    }
+    this.remoteAudio.muted = this.isDeafened || this.isOnHold
+    return this.remoteAudio
   }
 
   /** Ringtone while a call comes in, soft ringback while we are calling, silence otherwise. */
@@ -107,7 +138,7 @@ export class DirectVoiceCall {
     try {
       await this.pc.addIceCandidate(new RTCIceCandidate(candidate))
     } catch {
-      // ignore duplicated candidate
+      // ignore duplicate candidate
     }
   }
 
@@ -130,14 +161,28 @@ export class DirectVoiceCall {
         .maybeSingle()
       if (!data) return
 
+      if (this.isCaller && (data.status === 'accepted' || data.status === 'connecting') && !this.handledOffer) {
+        await this.startPeerConnectionAsCaller()
+      }
+
       if (!this.isCaller && data.offer && !this.handledOffer) {
         await this.handleOffer(data.offer)
       } else if (this.isCaller && data.answer && !this.handledAnswer && this.pc) {
         try {
           await this.pc.setRemoteDescription(new RTCSessionDescription(data.answer))
           this.handledAnswer = true
-          this.updateStatus('connected')
-        } catch {}
+          this.updateStatus('connecting')
+        } catch (e) {
+          console.warn('[VoiceCall] Apply answer from DB error:', e)
+        }
+      }
+
+      if (data.status === 'hold') {
+        this.isRemoteOnHold = true
+        if (this.status !== 'hold') this.updateStatus('hold')
+      } else if (data.status === 'connected' && this.isRemoteOnHold) {
+        this.isRemoteOnHold = false
+        if (!this.isOnHold) this.updateStatus('connected')
       }
 
       if (data.status === 'declined' && this.status !== 'ended') {
@@ -176,7 +221,7 @@ export class DirectVoiceCall {
         )
     }
 
-    // Subscribe to Postgres database realtime updates for call_sessions
+    // Realtime Postgres database updates for call_sessions
     this.signalChannel.on(
       'postgres_changes',
       {
@@ -189,16 +234,28 @@ export class DirectVoiceCall {
         const row = payload.new as any
         if (!row) return
 
+        if (this.isCaller && (row.status === 'accepted' || row.status === 'connecting') && !this.handledOffer) {
+          await this.startPeerConnectionAsCaller()
+        }
+
         if (!this.isCaller && row.offer && !this.handledOffer) {
           await this.handleOffer(row.offer)
         } else if (this.isCaller && row.answer && !this.handledAnswer && this.pc) {
           try {
             await this.pc.setRemoteDescription(new RTCSessionDescription(row.answer))
             this.handledAnswer = true
-            this.updateStatus('connected')
+            this.updateStatus('connecting')
           } catch (e) {
             console.warn('[VoiceCall] Apply answer from DB error:', e)
           }
+        }
+
+        if (row.status === 'hold') {
+          this.isRemoteOnHold = true
+          if (this.status !== 'hold') this.updateStatus('hold')
+        } else if (row.status === 'connected' && this.isRemoteOnHold) {
+          this.isRemoteOnHold = false
+          if (!this.isOnHold) this.updateStatus('connected')
         }
 
         if (row.status === 'declined' && this.status !== 'ended') {
@@ -213,7 +270,8 @@ export class DirectVoiceCall {
 
     this.signalChannel
       .on('broadcast', { event: 'call:accepted' }, async () => {
-        if (this.isCaller && this.status === 'calling') {
+        if (this.isCaller) {
+          this.updateStatus('connecting')
           await this.startPeerConnectionAsCaller()
         }
       })
@@ -222,6 +280,14 @@ export class DirectVoiceCall {
       })
       .on('broadcast', { event: 'call:ended' }, () => {
         this.endCall(false, this.status === 'incoming' ? 'missed' : undefined)
+      })
+      .on('broadcast', { event: 'call:hold' }, () => {
+        this.isRemoteOnHold = true
+        if (this.status !== 'hold') this.updateStatus('hold')
+      })
+      .on('broadcast', { event: 'call:resume' }, () => {
+        this.isRemoteOnHold = false
+        if (!this.isOnHold) this.updateStatus('connected')
       })
       .on('broadcast', { event: 'signal:offer' }, async ({ payload }) => {
         if (!this.isCaller && payload.sdp && !this.handledOffer) {
@@ -233,7 +299,7 @@ export class DirectVoiceCall {
           try {
             await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
             this.handledAnswer = true
-            this.updateStatus('connected')
+            this.updateStatus('connecting')
           } catch (e) {
             console.warn('[VoiceCall] Remote answer error:', e)
           }
@@ -255,8 +321,10 @@ export class DirectVoiceCall {
   }
 
   /** Caller initiates WebRTC offer */
-  private async startPeerConnectionAsCaller() {
+  public async startPeerConnectionAsCaller() {
+    if (this.handledOffer && this.pc) return
     try {
+      this.updateStatus('connecting')
       this.createPeerConnection()
 
       try {
@@ -275,15 +343,18 @@ export class DirectVoiceCall {
           } catch {}
         }
 
-        const offer = await this.pc.createOffer()
+        const offer = await this.pc.createOffer({
+          offerToReceiveAudio: true,
+        })
         await this.pc.setLocalDescription(offer)
+        this.handledOffer = true
 
         // Persist offer in Supabase backend
         void supabase
           .from('call_sessions')
           .update({
             offer: offer,
-            status: 'calling',
+            status: 'connecting',
             updated_at: new Date().toISOString(),
           })
           .eq('call_id', this.callId)
@@ -304,7 +375,7 @@ export class DirectVoiceCall {
   /** Callee accepts incoming call */
   public async acceptCall(preacquiredStream?: MediaStream) {
     try {
-      this.updateStatus('calling')
+      this.updateStatus('connecting')
       this.createPeerConnection()
 
       try {
@@ -321,11 +392,11 @@ export class DirectVoiceCall {
         }
       }
 
-      // Update backend status to accepted
+      // Update backend status to accepted / connecting
       void supabase
         .from('call_sessions')
         .update({
-          status: 'accepted',
+          status: 'connecting',
           updated_at: new Date().toISOString(),
         })
         .eq('call_id', this.callId)
@@ -337,7 +408,13 @@ export class DirectVoiceCall {
         payload: { acceptedBy: this.myUser.id },
       })
 
-      // Immediately sync with backend in case offer was already generated
+      // Ensure remote audio element is created and unlocked
+      this.ensureRemoteAudio()
+      if (this.remoteAudio) {
+        this.remoteAudio.play().catch(() => {})
+      }
+
+      // Immediately sync with backend to retrieve offer
       void this.syncFromBackend()
     } catch (err) {
       console.warn('[VoiceCall] acceptCall error:', err)
@@ -347,23 +424,25 @@ export class DirectVoiceCall {
 
   /** Callee receives offer from Caller and generates answer */
   private async handleOffer(sdp: RTCSessionDescriptionInit) {
-    if (this.handledOffer) return
+    if (this.handledAnswer) return
     if (!this.pc) this.createPeerConnection()
     try {
       if (this.pc) {
         this.handledOffer = true
+        this.updateStatus('connecting')
         await this.pc.setRemoteDescription(new RTCSessionDescription(sdp))
         allowSendingAudio(this.pc)
         await this.attachLocalAudio()
         const answer = await this.pc.createAnswer()
         await this.pc.setLocalDescription(answer)
+        this.handledAnswer = true
 
         // Persist answer in backend
         void supabase
           .from('call_sessions')
           .update({
             answer: answer,
-            status: 'connected',
+            status: 'connecting',
             updated_at: new Date().toISOString(),
           })
           .eq('call_id', this.callId)
@@ -375,7 +454,7 @@ export class DirectVoiceCall {
           payload: { sdp: answer },
         })
 
-        this.updateStatus('connected')
+        // Apply any caller ICE candidates that arrived early
         void this.syncFromBackend()
       }
     } catch (err) {
@@ -410,13 +489,12 @@ export class DirectVoiceCall {
       const incoming = e.streams && e.streams[0] ? e.streams[0] : e.track ? new MediaStream([e.track]) : null
       if (incoming) {
         this.remoteStream = incoming
-        if (!this.remoteAudio) {
-          this.remoteAudio = new Audio()
-          this.remoteAudio.autoplay = true
+        this.ensureRemoteAudio()
+        if (this.remoteAudio) {
+          this.remoteAudio.srcObject = this.remoteStream
+          this.remoteAudio.muted = this.isDeafened || this.isOnHold
+          this.remoteAudio.play().catch(() => {})
         }
-        this.remoteAudio.srcObject = this.remoteStream
-        this.remoteAudio.muted = this.isDeafened
-        this.remoteAudio.play().catch(() => {})
       }
     }
 
@@ -425,22 +503,27 @@ export class DirectVoiceCall {
       if (state === 'connected') {
         this.updateStatus('connected')
       } else if (state === 'disconnected') {
-        // Try recovering via backend sync before hanging up
-        void this.syncFromBackend()
-      } else if (state === 'failed' || state === 'closed') {
+        // Do not drop immediately: put in reconnecting/connecting state
         if (this.status === 'connected') {
+          this.updateStatus('connecting')
+          void this.syncFromBackend()
+        }
+      } else if (state === 'failed') {
+        void this.syncFromBackend()
+      } else if (state === 'closed') {
+        if (this.status !== 'ended') {
           this.endCall(false)
         }
       }
     }
   }
 
-  /** Send the current microphone track (once) over the peer connection, honouring mute. */
+  /** Send the current microphone track (once) over the peer connection, honouring mute & hold. */
   private async attachLocalAudio() {
     if (!this.pc || !this.localStream) return
     const track = this.localStream.getAudioTracks()[0]
     if (!track) return
-    track.enabled = !this.isMuted
+    track.enabled = !this.isMuted && !this.isOnHold
     await sendAudioTrack(this.pc, track, this.localStream)
   }
 
@@ -471,7 +554,7 @@ export class DirectVoiceCall {
   public async toggleMute(): Promise<boolean> {
     if (!this.localStream || !this.localStream.active || this.localStream.getAudioTracks().every((t) => t.readyState === 'ended')) {
       try {
-        this.isMuted = false // acquireMicrophone enables the new track based on this flag
+        this.isMuted = false
         await this.acquireMicrophone()
         playMicOn()
         return false
@@ -481,21 +564,59 @@ export class DirectVoiceCall {
       }
     }
 
-    // Muting stops the tracks so the browser releases the microphone (its "in use" indicator goes off);
-    // unmuting re-acquires it above.
-    this.isMuted = true
-    if (this.pc) silenceAudio(this.pc)
-    for (const track of this.localStream.getTracks()) track.stop()
-    this.localStream = null
-    playMicOff()
+    this.isMuted = !this.isMuted
+    const track = this.localStream.getAudioTracks()[0]
+    if (track) {
+      track.enabled = !this.isMuted && !this.isOnHold
+    }
+
+    if (this.isMuted) playMicOff()
+    else playMicOn()
+
     return this.isMuted
+  }
+
+  /** Toggle call on hold */
+  public async toggleHold(): Promise<boolean> {
+    this.isOnHold = !this.isOnHold
+
+    if (this.localStream) {
+      const track = this.localStream.getAudioTracks()[0]
+      if (track) track.enabled = !this.isMuted && !this.isOnHold
+    }
+
+    if (this.remoteAudio) {
+      this.remoteAudio.muted = this.isDeafened || this.isOnHold
+    }
+
+    const nextStatus: CallStatus = this.isOnHold ? 'hold' : (this.connectedAt ? 'connected' : 'connecting')
+    this.updateStatus(nextStatus)
+
+    // Notify partner of hold status
+    if (this.signalChannel) {
+      void this.signalChannel.send({
+        type: 'broadcast',
+        event: this.isOnHold ? 'call:hold' : 'call:resume',
+        payload: { by: this.myUser.id },
+      })
+    }
+
+    void supabase
+      .from('call_sessions')
+      .update({
+        status: nextStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('call_id', this.callId)
+
+    return this.isOnHold
   }
 
   /** Toggle deafen (mute incoming remote audio) */
   public toggleDeafen(): boolean {
     this.isDeafened = !this.isDeafened
     if (this.remoteAudio) {
-      this.remoteAudio.muted = this.isDeafened
+      this.remoteAudio.muted = this.isDeafened || this.isOnHold
     }
     return this.isDeafened
   }
@@ -521,7 +642,7 @@ export class DirectVoiceCall {
     const prev = this.status
     this.status = newStatus
     this.syncRinging()
-    if (newStatus === 'connected' && prev !== 'connected') playConnected()
+    if (newStatus === 'connected' && prev !== 'connected' && prev !== 'hold') playConnected()
     else if (newStatus === 'ended' && prev !== 'ended') playHangup()
     this.onStatusChange?.(newStatus)
   }
@@ -531,7 +652,7 @@ export class DirectVoiceCall {
     let finalStatus: 'ended' | 'missed' | 'declined' = reason || 'ended'
 
     if (!reason) {
-      if (this.status === 'connected') {
+      if (this.status === 'connected' || this.status === 'hold' || this.connectedAt) {
         finalStatus = 'ended'
       } else if (this.status === 'incoming') {
         finalStatus = 'declined'

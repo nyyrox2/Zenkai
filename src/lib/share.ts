@@ -25,10 +25,13 @@ export const mangaShareUrl = (id: string, title: string, cover: string, source: 
  * Watch-party invite link. Host name and title ride along so the preview card
  * ("<name> is inviting you to watch <title>") works for crawlers without any database lookup.
  */
-export const partyShareUrl = (animeId: number, ep: number, room: string, host: string, title: string) =>
-  `${window.location.origin}/watch/${animeId}?${new URLSearchParams({ ep: String(ep), room, host: host.slice(0, 40), t: title.slice(0, 120) })}`
+export const partyShareUrl = (animeId: number, ep: number, room: string, host: string, title: string, pfp?: string | null) => {
+  const params = new URLSearchParams({ ep: String(ep), room, host: host.slice(0, 40), t: title.slice(0, 120) })
+  if (pfp && /^https?:\/\//i.test(pfp)) params.set('pfp', pfp)
+  return `${window.location.origin}/watch/${animeId}?${params.toString()}`
+}
 
-/** Anime / movie / manga share: native sheet with the generated card image + link. */
+/** Anime / movie / manga share: native sheet with clean URL and title. */
 export async function shareMedia(o: { url: string; title: string; image?: string | null; poster?: string | null; label: string; subtitle?: string }) {
   const { shareCard } = await import('./shareCard')
   await shareCard(

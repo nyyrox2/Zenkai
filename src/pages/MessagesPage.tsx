@@ -71,7 +71,7 @@ export default function MessagesPage() {
   const { partnerHandle } = useParams<{ partnerHandle?: string }>()
   const navigate = useNavigate()
   const { user, signInWithGoogle } = useAuth()
-  const { startCall } = useVoiceCall()
+  const { startCall, activeCall } = useVoiceCall()
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [loadingConvs, setLoadingConvs] = useState(true)
@@ -605,27 +605,45 @@ export default function MessagesPage() {
                             const isStarted = callData.status === 'started'
                             const isEnded = callData.status === 'ended'
                             const isDeclined = callData.status === 'declined'
-                            const isOldStarted = isStarted && (Date.now() - new Date(m.created_at).getTime() > 120_000)
-                            const isPositive = isEnded || (isStarted && !isOldStarted)
-                            const isMissedIn = (!isMe && !isEnded && !isDeclined) || (!isMe && isOldStarted)
+                            const isMissed = callData.status === 'missed'
+                            const isCurrentlyActive = Boolean(
+                              activeCall &&
+                              activeCall.status !== 'ended' &&
+                              activePartner &&
+                              activeCall.partner.id === activePartner.id
+                            )
 
                             let cardTitle = 'Audio Call'
                             let cardSubtitle = `${timeLabel(m.created_at)}`
-                            if (isStarted && !isOldStarted) {
-                              cardTitle = isMe ? 'Outgoing Audio Call' : 'Incoming Audio Call'
-                              cardSubtitle = `Started · ${timeLabel(m.created_at)}`
-                            } else if (isEnded) {
+                            let isPositive = false
+
+                            if (isEnded) {
+                              isPositive = true
                               cardTitle = 'Audio Call'
                               cardSubtitle = callData.duration && callData.duration > 0
                                 ? `Call ended • ${formatCallDuration(callData.duration)} · ${timeLabel(m.created_at)}`
                                 : `Call ended · ${timeLabel(m.created_at)}`
                             } else if (isDeclined) {
+                              isPositive = false
                               cardTitle = isMe ? 'Call Declined' : 'Declined Audio Call'
                               cardSubtitle = `Call declined · ${timeLabel(m.created_at)}`
-                            } else {
+                            } else if (isMissed) {
+                              isPositive = false
                               cardTitle = isMe ? 'Unanswered Call' : 'Missed Audio Call'
                               cardSubtitle = `No answer · ${timeLabel(m.created_at)}`
+                            } else if (isStarted) {
+                              if (isCurrentlyActive) {
+                                isPositive = true
+                                cardTitle = isMe ? 'Outgoing Audio Call' : 'Incoming Audio Call'
+                                cardSubtitle = `In progress · ${timeLabel(m.created_at)}`
+                              } else {
+                                isPositive = false
+                                cardTitle = isMe ? 'Unanswered Call' : 'Missed Audio Call'
+                                cardSubtitle = `No answer · ${timeLabel(m.created_at)}`
+                              }
                             }
+
+                            const isMissedIn = !isPositive && !isMe
 
                             return (
                               <div className="my-2.5 flex w-full justify-center">

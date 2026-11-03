@@ -80,7 +80,7 @@ export function WatchTogetherModal({
 
   const me = room ? peers.find((p) => p.peerId === room.peerId) : undefined
   const selfName = me?.displayName || 'A friend'
-  const inviteUrl = room ? partyShareUrl(animeId, episode, room.roomId, selfName, animeTitle) : ''
+  const inviteUrl = room ? partyShareUrl(animeId, episode, room.roomId, selfName, animeTitle, me?.avatar) : ''
   const card: ShareCardOpts | null = room
     ? {
         kind: 'party',

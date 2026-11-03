@@ -41,7 +41,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
         const myUser: CallUserInfo = {
           id: user.id,
-          username: username || user.email?.split('@')[0] || 'User',
+          username: username,
           displayName: me.name || user.user_metadata?.full_name || 'Otaku',
           avatar: me.avatar,
         }
@@ -101,7 +101,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
     const myUser: CallUserInfo = {
       id: user.id,
-      username: username || user.email?.split('@')[0] || 'User',
+      username: username,
       displayName: me.name || user.user_metadata?.full_name || 'Otaku',
       avatar: me.avatar,
     }
@@ -115,16 +115,27 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       isCaller: true,
     })
 
+    let startedMsgId: string | null = null
+
     // Caller logs the final resolution (ended duration, missed, or declined)
     outgoing.addCallEndedListener(async (summary) => {
       if (outgoing.isCaller) {
         try {
+          const duration = outgoing.getDuration() || summary.duration || 0
           const content =
-            summary.status === 'ended'
-              ? `[CALL:ended:${summary.duration || 0}]`
+            summary.status === 'ended' || duration > 0
+              ? `[CALL:ended:${duration}]`
               : summary.status === 'declined'
               ? `[CALL:declined]`
               : `[CALL:missed]`
+
+          if (startedMsgId) {
+            const { error } = await supabase
+              .from('direct_messages')
+              .update({ content })
+              .eq('id', startedMsgId)
+            if (!error) return
+          }
           await sendDirectMessage(user.id, partner.id, content)
         } catch (err) {
           console.warn('[VoiceCall] Failed to log call direct message:', err)
@@ -139,6 +150,9 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     await outgoing.initSignaling()
     setActiveCall(outgoing)
 
+    // Pre-generate WebRTC offer so it is immediately waiting in the backend for callee
+    void outgoing.startPeerConnectionAsCaller()
+
     window.setTimeout(() => {
       if (outgoing.status === 'calling') outgoing.endCall(true, 'missed')
     }, 45_000)
@@ -151,7 +165,8 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
     // Send call started message to Supabase direct messages
     try {
-      await sendDirectMessage(user.id, partner.id, `[CALL:started:${Date.now()}]`)
+      const dm = await sendDirectMessage(user.id, partner.id, `[CALL:started:${Date.now()}]`)
+      if (dm?.id) startedMsgId = dm.id
     } catch (err) {
       console.warn('[VoiceCall] Failed to send call started message:', err)
     }

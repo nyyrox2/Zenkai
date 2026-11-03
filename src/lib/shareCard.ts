@@ -325,32 +325,26 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
  * Without file sharing support (desktop) the image is downloaded and the link is copied.
  */
 export async function shareCard(o: ShareCardOpts, url: string, text: string) {
-  let blob: Blob
-  try {
-    blob = await safeRenderShareCard(o)
-  } catch {
-    toast('Could not create the share image', 'error')
-    return
-  }
-  const file = new File([blob], `zenkai-${slug(o.title)}.png`, { type: 'image/png' })
-  try {
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: o.title, text: `${text}\n${url}`, url })
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: o.title,
+        text: text,
+        url: url,
+      })
       return
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return
     }
-  } catch (e: any) {
-    if (e?.name === 'AbortError') return // sheet dismissed
   }
-  downloadBlob(blob, file.name)
   try {
     await navigator.clipboard.writeText(url)
-    toast('Image saved & link copied')
+    toast('Link copied to clipboard')
   } catch {
-    toast('Image saved')
+    toast('Failed to copy link', 'error')
   }
 }
 
-/** Save only the image. */
 export async function saveShareCard(o: ShareCardOpts) {
   try {
     const blob = await safeRenderShareCard(o)
