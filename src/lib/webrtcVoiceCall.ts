@@ -31,6 +31,9 @@ export class DirectVoiceCall {
   public isMuted: boolean = false
   public isDeafened: boolean = false
   public isOnHold: boolean = false
+  public localOffer?: RTCSessionDescriptionInit
+  public localAnswer?: RTCSessionDescriptionInit
+  private connectingPollTimer?: number
   public isRemoteOnHold: boolean = false
   public connectedAt?: number
   public duration: number = 0
@@ -206,19 +209,19 @@ export class DirectVoiceCall {
 
     // Upsert call session in backend database
     if (this.isCaller) {
-      void supabase
-        .from('call_sessions')
-        .upsert({
-          call_id: this.callId,
-          caller_id: this.myUser.id,
-          callee_id: this.partner.id,
-          status: 'calling',
-          updated_at: new Date().toISOString(),
-        })
-        .then(
-          () => {},
-          (err: any) => console.warn('[VoiceCall] DB init session error:', err)
-        )
+      try {
+        await supabase
+          .from('call_sessions')
+          .upsert({
+            call_id: this.callId,
+            caller_id: this.myUser.id,
+            callee_id: this.partner.id,
+            status: 'calling',
+            updated_at: new Date().toISOString(),
+          })
+      } catch (err: any) {
+        console.warn('[VoiceCall] DB init session error:', err)
+      }
     }
 
     // Realtime Postgres database updates for call_sessions
@@ -289,6 +292,15 @@ export class DirectVoiceCall {
         this.isRemoteOnHold = false
         if (!this.isOnHold) this.updateStatus('connected')
       })
+      .on('broadcast', { event: 'signal:request_offer' }, () => {
+        if (this.isCaller && this.localOffer) {
+          void this.signalChannel?.send({
+            type: 'broadcast',
+            event: 'signal:offer',
+            payload: { sdp: this.localOffer },
+          })
+        }
+      })
       .on('broadcast', { event: 'signal:offer' }, async ({ payload }) => {
         if (!this.isCaller && payload.sdp && !this.handledOffer) {
           await this.handleOffer(payload.sdp)
@@ -322,7 +334,24 @@ export class DirectVoiceCall {
 
   /** Caller initiates WebRTC offer */
   public async startPeerConnectionAsCaller() {
-    if (this.handledOffer && this.pc) return
+    if (this.handledOffer && this.localOffer) {
+      void this.signalChannel?.send({
+        type: 'broadcast',
+        event: 'signal:offer',
+        payload: { sdp: this.localOffer },
+      })
+      void supabase
+        .from('call_sessions')
+        .upsert({
+          call_id: this.callId,
+          caller_id: this.myUser.id,
+          callee_id: this.partner.id,
+          offer: this.localOffer,
+          status: 'connecting',
+          updated_at: new Date().toISOString(),
+        })
+      return
+    }
     try {
       this.updateStatus('connecting')
       this.createPeerConnection()
@@ -348,16 +377,19 @@ export class DirectVoiceCall {
         })
         await this.pc.setLocalDescription(offer)
         this.handledOffer = true
+        this.localOffer = offer
 
         // Persist offer in Supabase backend
         void supabase
           .from('call_sessions')
-          .update({
+          .upsert({
+            call_id: this.callId,
+            caller_id: this.myUser.id,
+            callee_id: this.partner.id,
             offer: offer,
             status: 'connecting',
             updated_at: new Date().toISOString(),
           })
-          .eq('call_id', this.callId)
 
         // Broadcast offer for ultra-low latency
         void this.signalChannel?.send({
@@ -408,6 +440,13 @@ export class DirectVoiceCall {
         payload: { acceptedBy: this.myUser.id },
       })
 
+      // Prompt caller to send offer immediately
+      void this.signalChannel?.send({
+        type: 'broadcast',
+        event: 'signal:request_offer',
+        payload: { requestedBy: this.myUser.id },
+      })
+
       // Ensure remote audio element is created and unlocked
       this.ensureRemoteAudio()
       if (this.remoteAudio) {
@@ -436,6 +475,7 @@ export class DirectVoiceCall {
         const answer = await this.pc.createAnswer()
         await this.pc.setLocalDescription(answer)
         this.handledAnswer = true
+        this.localAnswer = answer
 
         // Persist answer in backend
         void supabase
@@ -495,6 +535,9 @@ export class DirectVoiceCall {
           this.remoteAudio.muted = this.isDeafened || this.isOnHold
           this.remoteAudio.play().catch(() => {})
         }
+        if (this.status === 'connecting' || this.status === 'calling') {
+          this.updateStatus('connected')
+        }
       }
     }
 
@@ -503,7 +546,6 @@ export class DirectVoiceCall {
       if (state === 'connected') {
         this.updateStatus('connected')
       } else if (state === 'disconnected') {
-        // Do not drop immediately: put in reconnecting/connecting state
         if (this.status === 'connected') {
           this.updateStatus('connecting')
           void this.syncFromBackend()
@@ -514,6 +556,15 @@ export class DirectVoiceCall {
         if (this.status !== 'ended') {
           this.endCall(false)
         }
+      }
+    }
+
+    this.pc.oniceconnectionstatechange = () => {
+      const ice = this.pc?.iceConnectionState
+      if (ice === 'connected' || ice === 'completed') {
+        this.updateStatus('connected')
+      } else if (ice === 'failed') {
+        void this.syncFromBackend()
       }
     }
   }
@@ -635,6 +686,35 @@ export class DirectVoiceCall {
     }
   }
 
+  private startConnectingPoll() {
+    if (this.connectingPollTimer) return
+    let tick = 0
+    this.connectingPollTimer = window.setInterval(() => {
+      tick++
+      if (this.status !== 'connecting' || tick > 25) {
+        if (this.connectingPollTimer) {
+          clearInterval(this.connectingPollTimer)
+          this.connectingPollTimer = undefined
+        }
+        return
+      }
+      void this.syncFromBackend()
+      if (this.isCaller && this.localOffer) {
+        void this.signalChannel?.send({
+          type: 'broadcast',
+          event: 'signal:offer',
+          payload: { sdp: this.localOffer },
+        })
+      } else if (!this.isCaller && !this.handledOffer) {
+        void this.signalChannel?.send({
+          type: 'broadcast',
+          event: 'signal:request_offer',
+          payload: { requestedBy: this.myUser.id },
+        })
+      }
+    }, 1200)
+  }
+
   private updateStatus(newStatus: CallStatus) {
     if (newStatus === 'connected' && !this.connectedAt) {
       this.connectedAt = Date.now()
@@ -642,6 +722,14 @@ export class DirectVoiceCall {
     const prev = this.status
     this.status = newStatus
     this.syncRinging()
+
+    if (newStatus === 'connecting') {
+      this.startConnectingPoll()
+    } else if (this.connectingPollTimer && (newStatus === 'connected' || newStatus === 'ended')) {
+      clearInterval(this.connectingPollTimer)
+      this.connectingPollTimer = undefined
+    }
+
     if (newStatus === 'connected' && prev !== 'connected' && prev !== 'hold') playConnected()
     else if (newStatus === 'ended' && prev !== 'ended') playHangup()
     this.onStatusChange?.(newStatus)
@@ -649,6 +737,10 @@ export class DirectVoiceCall {
 
   /** Reject or end call */
   public endCall(sendBroadcast = true, reason?: 'ended' | 'missed' | 'declined') {
+    if (this.connectingPollTimer) {
+      clearInterval(this.connectingPollTimer)
+      this.connectingPollTimer = undefined
+    }
     let finalStatus: 'ended' | 'missed' | 'declined' = reason || 'ended'
 
     if (!reason) {

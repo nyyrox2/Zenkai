@@ -249,7 +249,7 @@ export default function CallPage() {
           {status === 'connecting' && (
             <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/90 px-4 py-1.5 text-xs font-semibold text-zinc-200">
               <Loader2 className="size-3.5 text-zinc-300 animate-spin" />
-              <span>Connecting • Exchanging secure code…</span>
+              <span>Connecting…</span>
             </div>
           )}
 
