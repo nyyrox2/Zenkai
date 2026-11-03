@@ -1,14 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { DirectVoiceCall, sendIncomingCallAlert, type CallUserInfo } from '../lib/webrtcVoiceCall'
+import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { useProfile } from '../lib/profile'
-import { supabase } from '../lib/supabase'
-import {
-  DirectVoiceCall,
-  sendIncomingCallAlert,
-  type CallUserInfo,
-} from '../lib/webrtcVoiceCall'
-import { sendDirectMessage } from '../lib/messages'
 import { VoiceCallOverlay } from '../components/VoiceCallOverlay'
+import { sendDirectMessage } from '../lib/messages'
 import { toast } from '../lib/toast'
 
 interface VoiceCallContextType {
@@ -22,23 +18,23 @@ interface VoiceCallContextType {
 const VoiceCallContext = createContext<VoiceCallContextType | null>(null)
 
 export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
-  const { user, username } = useAuth()
+  const { user } = useAuth()
   const me = useProfile()
+  const username = user?.user_metadata?.username || me.name || user?.email?.split('@')[0] || 'User'
   const [activeCall, setActiveCall] = useState<DirectVoiceCall | null>(null)
   const [returnPath, setReturnPath] = useState<string | null>(null)
 
-  // Listen for incoming call invites via Realtime broadcast
+  // Listen for global incoming call invitations targeted at current logged in user
   useEffect(() => {
     if (!user?.id) return
 
-    const myChannelName = `call_invite_user_${user.id}`
-    const channel = supabase.channel(myChannelName)
+    const channel = supabase.channel(`call_invite_user_${user.id}`)
 
     channel
       .on('broadcast', { event: 'incoming_call_invite' }, async ({ payload }) => {
-        if (!payload || !payload.callId || !payload.caller) return
+        if (!payload || !payload.caller) return
 
-        // If already in a call, ignore
+        // If already in an ongoing call, decline automatically
         if (activeCall && activeCall.status !== 'ended') {
           return
         }
@@ -60,22 +56,14 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
         // Save current location as return path when receiving call
         setReturnPath(window.location.pathname + window.location.search)
 
-        incoming.setCallbacks({
-          onCallEnded: async (summary) => {
-            if (summary.status === 'declined') {
-              try {
-                await sendDirectMessage(user.id, payload.caller.id, '[CALL:declined]')
-              } catch {
-                // ignore
-              }
-            } else if (summary.status === 'missed') {
-              const name = payload.caller.displayName || payload.caller.username
-              toast(`Missed call from ${name}`, 'info')
-              if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-                new Notification('Missed call', { body: `${name} tried to call you`, icon: '/favicon.ico' })
-              }
+        incoming.addCallEndedListener(async (summary) => {
+          if (summary.status === 'missed') {
+            const name = payload.caller.displayName || payload.caller.username
+            toast(`Missed call from ${name}`, 'info')
+            if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+              new Notification('Missed call', { body: `${name} tried to call you`, icon: '/favicon.ico' })
             }
-          },
+          }
         })
 
         if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
@@ -127,19 +115,21 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       isCaller: true,
     })
 
-    outgoing.setCallbacks({
-      onCallEnded: async (summary) => {
-        // The callee logs their own decline; the caller logs only ended / missed.
-        if (outgoing.isCaller && summary.status !== 'declined') {
-          try {
-            const content =
-              summary.status === 'ended' ? `[CALL:ended:${summary.duration}]` : `[CALL:missed]`
-            await sendDirectMessage(user.id, partner.id, content)
-          } catch (err) {
-            console.warn('[VoiceCall] Failed to log call direct message:', err)
-          }
+    // Caller logs the final resolution (ended duration, missed, or declined)
+    outgoing.addCallEndedListener(async (summary) => {
+      if (outgoing.isCaller) {
+        try {
+          const content =
+            summary.status === 'ended'
+              ? `[CALL:ended:${summary.duration || 0}]`
+              : summary.status === 'declined'
+              ? `[CALL:declined]`
+              : `[CALL:missed]`
+          await sendDirectMessage(user.id, partner.id, content)
+        } catch (err) {
+          console.warn('[VoiceCall] Failed to log call direct message:', err)
         }
-      },
+      }
     })
 
     if (preacquiredStream) {
@@ -148,6 +138,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
     await outgoing.initSignaling()
     setActiveCall(outgoing)
+
     window.setTimeout(() => {
       if (outgoing.status === 'calling') outgoing.endCall(true, 'missed')
     }, 45_000)

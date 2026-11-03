@@ -40,14 +40,17 @@ export function formatCallDuration(seconds?: number): string {
   return `${m}m ${s < 10 ? '0' : ''}${s}s`
 }
 
-export function formatCallSummary(content: string): string {
+export function formatCallSummary(content: string, createdAt?: string): string {
   const parsed = parseCallMessage(content)
   if (!parsed.isCall) return content
   if (parsed.status === 'started') {
-    return '📞 Outgoing audio call'
+    const isOld = createdAt ? Date.now() - new Date(createdAt).getTime() > 120_000 : false
+    return isOld ? '📞 Audio call' : '📞 Outgoing audio call'
   }
   if (parsed.status === 'ended') {
-    return `📞 Audio call (${formatCallDuration(parsed.duration)})`
+    return parsed.duration && parsed.duration > 0
+      ? `📞 Audio call (${formatCallDuration(parsed.duration)})`
+      : '📞 Audio call'
   }
   if (parsed.status === 'missed') {
     return '📞 Missed audio call'
@@ -187,7 +190,7 @@ export async function fetchConversations(myUserId: string): Promise<Conversation
         partnerDisplayName: displayName,
         partnerAvatar: p?.avatar_url || null,
         partnerFrame: p?.frame || null,
-        lastMessage: formatCallSummary(info.lastMsg.content),
+        lastMessage: formatCallSummary(info.lastMsg.content, info.lastMsg.created_at),
         lastMessageAt: info.lastMsg.created_at,
         unreadCount: info.unread,
       })

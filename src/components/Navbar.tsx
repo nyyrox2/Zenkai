@@ -42,7 +42,7 @@ export function Navbar() {
       <nav
         aria-label="Main"
         className={cn(
-          'mx-auto flex h-14 max-w-7xl items-center justify-between rounded-full border px-3 transition-all duration-300 sm:px-4',
+          'mx-auto flex h-14 max-w-7xl 2xl:max-w-screen-2xl items-center justify-between rounded-full border px-3 transition-all duration-300 sm:px-4 gap-2',
           scrolled ? 'border-border bg-glass shadow-xl shadow-black/10 md:backdrop-blur-xl' : 'border-transparent bg-transparent',
         )}
       >
@@ -60,9 +60,9 @@ export function Navbar() {
         </div>
 
         {links && (
-        <ul className="hidden items-center md:flex shrink min-w-0 gap-0.5" onMouseLeave={() => setHovered(null)}>
+        <ul className="hidden items-center md:flex shrink min-w-0 gap-0.5 overflow-hidden" onMouseLeave={() => setHovered(null)}>
           {links.map((l, idx) => {
-            const hideOnSmall = idx >= 4 ? 'hidden xl:block' : 'block'
+            const hideOnSmall = idx >= 6 ? 'hidden 2xl:block' : idx >= 4 ? 'hidden xl:block' : 'block'
             return (
               <li key={l.to} className={cn('relative shrink-0', hideOnSmall)} onMouseEnter={() => setHovered(l.to)}>
                 {hovered === l.to && (

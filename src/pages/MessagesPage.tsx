@@ -579,7 +579,10 @@ export default function MessagesPage() {
                     if (
                       cm.isCall &&
                       cm.status === 'started' &&
-                      messages.slice(idx + 1).some((n) => n.sender_id === m.sender_id && parseCallMessage(n.content).isCall && parseCallMessage(n.content).status !== 'started')
+                      messages.slice(idx + 1).some((n) => {
+                        const nextCm = parseCallMessage(n.content)
+                        return nextCm.isCall && nextCm.status !== 'started'
+                      })
                     )
                       return null
                     const showDay =
@@ -602,8 +605,27 @@ export default function MessagesPage() {
                             const isStarted = callData.status === 'started'
                             const isEnded = callData.status === 'ended'
                             const isDeclined = callData.status === 'declined'
-                            const isPositive = isEnded || isStarted
-                            const isMissedIn = !isMe && !isEnded && !isStarted && !isDeclined
+                            const isOldStarted = isStarted && (Date.now() - new Date(m.created_at).getTime() > 120_000)
+                            const isPositive = isEnded || (isStarted && !isOldStarted)
+                            const isMissedIn = (!isMe && !isEnded && !isDeclined) || (!isMe && isOldStarted)
+
+                            let cardTitle = 'Audio Call'
+                            let cardSubtitle = `${timeLabel(m.created_at)}`
+                            if (isStarted && !isOldStarted) {
+                              cardTitle = isMe ? 'Outgoing Audio Call' : 'Incoming Audio Call'
+                              cardSubtitle = `Started · ${timeLabel(m.created_at)}`
+                            } else if (isEnded) {
+                              cardTitle = 'Audio Call'
+                              cardSubtitle = callData.duration && callData.duration > 0
+                                ? `Call ended • ${formatCallDuration(callData.duration)} · ${timeLabel(m.created_at)}`
+                                : `Call ended · ${timeLabel(m.created_at)}`
+                            } else if (isDeclined) {
+                              cardTitle = isMe ? 'Call Declined' : 'Declined Audio Call'
+                              cardSubtitle = `Call declined · ${timeLabel(m.created_at)}`
+                            } else {
+                              cardTitle = isMe ? 'Unanswered Call' : 'Missed Audio Call'
+                              cardSubtitle = `No answer · ${timeLabel(m.created_at)}`
+                            }
 
                             return (
                               <div className="my-2.5 flex w-full justify-center">
@@ -625,22 +647,10 @@ export default function MessagesPage() {
 
                                   <div className="min-w-0 flex-1">
                                     <h4 className="text-xs font-bold text-foreground">
-                                      {isStarted
-                                        ? (isMe ? 'Outgoing Audio Call' : 'Incoming Audio Call')
-                                        : isEnded
-                                        ? 'Audio Call'
-                                        : isDeclined
-                                        ? (isMe ? 'Call Declined' : 'Declined Audio Call')
-                                        : (isMe ? 'Unanswered Call' : 'Missed Audio Call')}
+                                      {cardTitle}
                                     </h4>
                                     <p className="text-[10px] sm:text-[11px] text-muted truncate">
-                                      {isStarted
-                                        ? `Started · ${timeLabel(m.created_at)}`
-                                        : isEnded && callData.duration
-                                        ? `Call ended • ${formatCallDuration(callData.duration)} · ${timeLabel(m.created_at)}`
-                                        : isDeclined
-                                        ? `Call declined · ${timeLabel(m.created_at)}`
-                                        : `No answer · ${timeLabel(m.created_at)}`}
+                                      {cardSubtitle}
                                     </p>
                                   </div>
 

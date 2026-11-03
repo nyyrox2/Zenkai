@@ -129,10 +129,10 @@ export default function CallPage() {
   }
 
   return (
-    <div className="relative min-h-screen w-full bg-background text-foreground flex flex-col justify-between overflow-hidden select-none">
+    <div className="relative min-h-screen w-full bg-[#070709] text-white flex flex-col justify-between overflow-hidden select-none">
       {/* Dynamic ambient backdrop blur circles */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 size-80 rounded-full bg-accent/8 blur-[120px]" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 size-96 rounded-full bg-accent/10 blur-[140px]" />
       </div>
 
       {/* Top Navigation Bar */}
@@ -140,7 +140,7 @@ export default function CallPage() {
         <button
           type="button"
           onClick={handleMinimize}
-          className="inline-flex items-center gap-2 rounded-2xl border border-border/60 bg-card/60 px-3.5 py-2 text-xs font-bold text-foreground backdrop-blur-md transition hover:border-accent hover:text-accent active:scale-95 shadow-sm"
+          className="inline-flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-900/70 px-3.5 py-2 text-xs font-bold text-zinc-300 backdrop-blur-md transition hover:border-zinc-700 hover:text-white active:scale-95 shadow-sm"
         >
           <ArrowLeft className="size-4" />
           <span>Minimize</span>
@@ -155,23 +155,23 @@ export default function CallPage() {
           {status === 'connected' && !isDeafened && (
             <>
               <motion.div
-                animate={{ scale: [1, 1.45, 1], opacity: [0.35, 0.05, 0.35] }}
+                animate={{ scale: [1, 1.45, 1], opacity: [0.25, 0.05, 0.25] }}
                 transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute -inset-8 rounded-full bg-emerald-500/20"
+                className="absolute -inset-8 rounded-full border border-white/10 bg-white/[0.04]"
               />
               <motion.div
-                animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0.15, 0.5] }}
+                animate={{ scale: [1, 1.25, 1], opacity: [0.4, 0.1, 0.4] }}
                 transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute -inset-4 rounded-full bg-emerald-500/30"
+                className="absolute -inset-4 rounded-full border border-white/20 bg-white/[0.08]"
               />
             </>
           )}
 
           {status === 'calling' && (
-            <div className="absolute -inset-5 rounded-full bg-accent/25 animate-ping opacity-60" />
+            <div className="absolute -inset-5 rounded-full bg-accent/20 animate-ping opacity-60" />
           )}
 
-          <div className="relative rounded-full ring-4 ring-card-2/80 shadow-2xl shadow-black/80">
+          <div className="relative rounded-full ring-2 ring-zinc-800 shadow-2xl shadow-black">
             <Avatar
               size={108}
               name={activeCall.partner.displayName}
@@ -182,27 +182,27 @@ export default function CallPage() {
         </div>
 
         {/* Partner Info */}
-        <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+        <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
           {activeCall.partner.displayName}
         </h1>
-        <p className="mt-1 text-sm font-semibold text-muted">@{activeCall.partner.username}</p>
+        <p className="mt-1 text-sm font-semibold text-zinc-400">@{activeCall.partner.username}</p>
 
         {/* Status indicator / Live Timer */}
         <div className="mt-4 flex flex-col items-center gap-2">
           {status === 'calling' && (
-            <div className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-1.5 text-xs font-semibold text-muted">
-              <Radio className="size-3.5 animate-pulse" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/80 px-4 py-1.5 text-xs font-semibold text-zinc-300">
+              <Radio className="size-3.5 text-accent animate-pulse" />
               <span>Ringing…</span>
             </div>
           )}
 
           {status === 'connected' && (
             <div className="space-y-2">
-              <span className="font-mono text-2xl font-bold tracking-wider text-foreground">
+              <span className="font-mono text-3xl font-extrabold tracking-widest text-white">
                 {formatSeconds(duration)}
               </span>
 
-              {/* Real-time Oscillating Visualizer Wave Bars */}
+              {/* Real-time Oscillating Visualizer Wave Bars (Monochrome White/Zinc) */}
               <div className="flex items-center justify-center gap-1 h-5">
                 {[0.4, 0.7, 1.0, 0.6, 0.9, 0.5, 0.8, 0.3].map((height, i) => (
                   <motion.span
@@ -217,7 +217,7 @@ export default function CallPage() {
                     }}
                     className={cn(
                       'w-1 rounded-full',
-                      isDeafened ? 'bg-zinc-700 h-2' : 'bg-emerald-400 h-4'
+                      isDeafened ? 'bg-zinc-800 h-2' : 'bg-white h-4'
                     )}
                   />
                 ))}
@@ -233,27 +233,27 @@ export default function CallPage() {
           )}
         </div>
 
-        {/* Microphone Permission Warning / Action Banner */}
+        {/* Microphone Permission Warning / Action Banner (Dark Zinc & Crimson Red, No Yellow) */}
         <AnimatePresence>
           {micBlocked && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
-              className="mt-6 max-w-sm rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-200 text-center shadow-lg backdrop-blur-md space-y-2"
+              className="mt-6 max-w-sm rounded-2xl border border-rose-500/40 bg-zinc-950/90 p-3.5 text-xs text-zinc-200 text-center shadow-2xl backdrop-blur-md space-y-2.5"
             >
-              <div className="flex items-center justify-center gap-2 font-bold text-amber-300">
+              <div className="flex items-center justify-center gap-2 font-bold text-rose-400">
                 <AlertTriangle className="size-4 shrink-0" />
                 <span>Microphone Access Blocked</span>
               </div>
-              <p className="text-[11px] text-amber-200/80 leading-relaxed">
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
                 Your browser blocked microphone access. Tap below or allow microphone in your address bar to speak.
               </p>
               <button
                 type="button"
                 onClick={handleRetryMic}
                 disabled={retryingMic}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 px-3.5 py-1.5 text-xs font-bold text-black transition hover:bg-amber-300 active:scale-95 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-1.5 text-xs font-bold text-white transition hover:brightness-110 active:scale-95 disabled:opacity-50 shadow-md"
               >
                 <Mic className="size-3.5" />
                 <span>{retryingMic ? 'Requesting…' : 'Allow Microphone'}</span>
@@ -263,9 +263,9 @@ export default function CallPage() {
         </AnimatePresence>
       </main>
 
-      {/* Bottom Control Bar Dock */}
+      {/* Bottom Control Bar Dock (Black, White, Subtle Grey & Crimson Red) */}
       <footer className="relative z-10 flex flex-col items-center pb-8 pt-4 px-4 sm:pb-12">
-        <div className="flex items-center justify-center gap-5 sm:gap-8 rounded-3xl border border-border/70 bg-card/85 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl ring-1 ring-white/5">
+        <div className="flex items-center justify-center gap-5 sm:gap-8 rounded-3xl border border-zinc-800/80 bg-zinc-950/85 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl ring-1 ring-white/5">
           {/* Mute Mic Button */}
           <div className="flex flex-col items-center gap-1.5">
             <button
@@ -275,13 +275,18 @@ export default function CallPage() {
               className={cn(
                 'grid size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
                 isMuted
-                  ? 'border-amber-500/50 bg-amber-500/20 text-amber-300 ring-2 ring-amber-500/20'
-                  : 'border-border bg-card-2 text-foreground hover:border-accent hover:text-accent'
+                  ? 'border-rose-500/60 bg-rose-500/15 text-rose-400 ring-2 ring-rose-500/20'
+                  : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white'
               )}
             >
               {isMuted ? <MicOff className="size-6" /> : <Mic className="size-6" />}
             </button>
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
+            <span
+              className={cn(
+                'text-[10px] font-bold uppercase tracking-wider',
+                isMuted ? 'text-rose-400' : 'text-zinc-400'
+              )}
+            >
               {isMuted ? 'Muted' : 'Mute'}
             </span>
           </div>
@@ -292,7 +297,7 @@ export default function CallPage() {
               type="button"
               onClick={handleHangUp}
               title="End call"
-              className="grid size-16 place-items-center rounded-full bg-rose-600 text-white shadow-xl shadow-rose-600/35 transition hover:scale-105 active:scale-95 hover:brightness-110"
+              className="grid size-16 place-items-center rounded-full bg-[#e8294c] hover:bg-[#ff2d55] text-white shadow-xl shadow-rose-950/60 transition hover:scale-105 active:scale-95"
             >
               <PhoneOff className="size-7" />
             </button>
@@ -310,13 +315,18 @@ export default function CallPage() {
               className={cn(
                 'grid size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
                 isDeafened
-                  ? 'border-amber-500/50 bg-amber-500/20 text-amber-300 ring-2 ring-amber-500/20'
-                  : 'border-border bg-card-2 text-foreground hover:border-accent hover:text-accent'
+                  ? 'border-rose-500/60 bg-rose-500/15 text-rose-400 ring-2 ring-rose-500/20'
+                  : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white'
               )}
             >
               {isDeafened ? <VolumeX className="size-6" /> : <Volume2 className="size-6" />}
             </button>
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
+            <span
+              className={cn(
+                'text-[10px] font-bold uppercase tracking-wider',
+                isDeafened ? 'text-rose-400' : 'text-zinc-400'
+              )}
+            >
               {isDeafened ? 'Deafened' : 'Speaker'}
             </span>
           </div>

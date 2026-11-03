@@ -106,13 +106,13 @@ export function VoiceCallOverlay({
 
   return (
     <AnimatePresence>
-      {/* ================= 1. MOBILE-OPTIMIZED FULL-SCREEN INCOMING CALL SHEET ================= */}
+      {/* ================= 1. MOBILE-OPTIMIZED FULL-SCREEN INCOMING CALL SHEET (Monochrome & Crimson) ================= */}
       {status === 'incoming' && (
-        <div className="fixed inset-0 z-[300] flex flex-col justify-between bg-background/95 p-6 sm:p-10 backdrop-blur-xl text-center select-none">
+        <div className="fixed inset-0 z-[300] flex flex-col justify-between bg-[#070709]/95 text-white p-6 sm:p-10 backdrop-blur-2xl text-center select-none">
           {/* Top Header */}
           <div className="flex flex-col items-center pt-4 sm:pt-6">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-bold text-emerald-400 shadow-sm animate-pulse">
-              <Radio className="size-3.5" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3.5 py-1 text-xs font-bold text-rose-300 shadow-sm animate-pulse">
+              <Radio className="size-3.5 text-accent" />
               <span>Incoming Voice Call</span>
             </span>
           </div>
@@ -121,16 +121,16 @@ export function VoiceCallOverlay({
           <div className="flex flex-col items-center my-auto">
             <div className="relative mb-6">
               <motion.div
-                animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0.05, 0.4] }}
+                animate={{ scale: [1, 1.4, 1], opacity: [0.25, 0.05, 0.25] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute -inset-8 rounded-full bg-accent/25"
+                className="absolute -inset-8 rounded-full border border-white/10 bg-white/[0.04]"
               />
               <motion.div
-                animate={{ scale: [1, 1.2, 1], opacity: [0.6, 0.15, 0.6] }}
+                animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.1, 0.4] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute -inset-4 rounded-full bg-accent/35"
+                className="absolute -inset-4 rounded-full border border-rose-500/30 bg-rose-500/10"
               />
-              <div className="relative rounded-full ring-4 ring-card-2/80 shadow-2xl shadow-black/80">
+              <div className="relative rounded-full ring-2 ring-zinc-800 shadow-2xl shadow-black">
                 <Avatar
                   size={96}
                   name={call.partner.displayName}
@@ -140,29 +140,30 @@ export function VoiceCallOverlay({
               </div>
             </div>
 
-            <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+            <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               {call.partner.displayName}
             </h2>
-            <p className="mt-1 text-sm font-semibold text-muted">@{call.partner.username}</p>
-            <p className="mt-3 text-xs font-semibold text-emerald-400 animate-pulse">
-              Zenkai Audio Call Ringing…
+            <p className="mt-1 text-sm font-semibold text-zinc-400">@{call.partner.username}</p>
+            <p className="mt-3 text-xs font-semibold text-zinc-400 flex items-center justify-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-accent animate-ping" />
+              <span>Zenkai Audio Call Ringing…</span>
             </p>
           </div>
 
-          {/* Bottom Action Controls (Large touch targets for mobile) */}
+          {/* Bottom Action Controls */}
           <div className="flex items-center justify-around max-w-sm mx-auto w-full pb-8 sm:pb-12">
             {/* Decline button */}
             <div className="flex flex-col items-center gap-2">
               <button
                 type="button"
                 onClick={handleDecline}
-                className="flex size-16 sm:size-18 items-center justify-center rounded-full bg-rose-600 text-white shadow-xl shadow-rose-600/40 transition hover:scale-105 active:scale-95"
+                className="flex size-16 sm:size-18 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-300 shadow-xl transition hover:border-zinc-700 hover:text-white active:scale-95"
                 title="Decline Call"
                 aria-label="Decline Call"
               >
-                <PhoneOff className="size-7 sm:size-8" />
+                <PhoneOff className="size-7 sm:size-8 text-rose-400" />
               </button>
-              <span className="text-xs font-bold text-rose-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
                 Decline
               </span>
             </div>
@@ -172,13 +173,13 @@ export function VoiceCallOverlay({
               <button
                 type="button"
                 onClick={handleAccept}
-                className="flex size-16 sm:size-18 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xl shadow-emerald-500/40 transition hover:scale-105 active:scale-95 animate-bounce"
+                className="flex size-16 sm:size-18 items-center justify-center rounded-full bg-[#e8294c] hover:bg-[#ff2d55] text-white shadow-xl shadow-rose-950/60 transition hover:scale-105 active:scale-95 animate-pulse"
                 title="Accept Call"
                 aria-label="Accept Call"
               >
                 <PhoneCall className="size-7 sm:size-8" />
               </button>
-              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-rose-400 uppercase tracking-wider">
                 Accept
               </span>
             </div>
@@ -186,32 +187,32 @@ export function VoiceCallOverlay({
         </div>
       )}
 
-      {/* ================= 2. CONNECTED ACTIVE CALL FLOATING BAR (WHEN NOT ON /call PAGE) ================= */}
+      {/* ================= 2. CONNECTED ACTIVE CALL FLOATING BAR (Black & White with Crimson) ================= */}
       {status === 'connected' && !isOnCallPage && (
         <motion.div
           initial={{ opacity: 0, y: -20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           onClick={() => navigate('/call')}
-          className="fixed top-18 sm:top-20 inset-x-3 sm:inset-x-auto sm:right-6 z-[160] sm:w-96 rounded-3xl border border-emerald-500/40 bg-card/95 p-3.5 shadow-2xl shadow-black/80 backdrop-blur-2xl ring-2 ring-emerald-500/20 cursor-pointer transition hover:border-emerald-400/60"
+          className="fixed top-18 sm:top-20 inset-x-3 sm:inset-x-auto sm:right-6 z-[160] sm:w-96 rounded-3xl border border-zinc-800 bg-zinc-950/95 p-3.5 shadow-2xl shadow-black backdrop-blur-2xl ring-1 ring-white/10 cursor-pointer transition hover:border-zinc-700"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="relative shrink-0">
                 <Avatar size={38} name={call.partner.displayName} src={call.partner.avatar} />
-                <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-500 ring-2 ring-card animate-pulse" />
+                <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-accent ring-2 ring-zinc-950 animate-pulse" />
               </div>
 
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="truncate text-xs font-bold text-foreground">
+                  <span className="truncate text-xs font-bold text-white">
                     {call.partner.displayName}
                   </span>
-                  <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.2 text-[9px] font-bold text-emerald-400">
+                  <span className="rounded-full border border-zinc-700 bg-zinc-900 px-1.5 py-0.2 text-[9px] font-bold text-zinc-300">
                     Voice
                   </span>
                 </div>
-                <p className="text-[11px] font-mono font-semibold text-emerald-400">
+                <p className="text-[11px] font-mono font-semibold text-zinc-300">
                   {formatSeconds(duration)}
                 </p>
               </div>
@@ -227,7 +228,7 @@ export function VoiceCallOverlay({
                   navigate('/call')
                 }}
                 title="Open full call page"
-                className="grid size-9 place-items-center rounded-2xl border border-border bg-card-2 text-foreground hover:border-accent hover:text-accent transition active:scale-90"
+                className="grid size-9 place-items-center rounded-2xl border border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white transition active:scale-90"
               >
                 <Maximize2 className="size-4" />
               </button>
@@ -240,8 +241,8 @@ export function VoiceCallOverlay({
                 className={cn(
                   'grid size-9 place-items-center rounded-2xl border transition active:scale-90',
                   isMuted
-                    ? 'border-amber-500/40 bg-amber-500/20 text-amber-300'
-                    : 'border-border bg-card-2 text-foreground hover:border-accent'
+                    ? 'border-rose-500/60 bg-rose-500/15 text-rose-400'
+                    : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white'
                 )}
               >
                 {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
@@ -255,8 +256,8 @@ export function VoiceCallOverlay({
                 className={cn(
                   'grid size-9 place-items-center rounded-2xl border transition active:scale-90',
                   isDeafened
-                    ? 'border-amber-500/40 bg-amber-500/20 text-amber-300'
-                    : 'border-border bg-card-2 text-foreground hover:border-accent'
+                    ? 'border-rose-500/60 bg-rose-500/15 text-rose-400'
+                    : 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:border-zinc-700 hover:text-white'
                 )}
               >
                 {isDeafened ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
@@ -271,7 +272,7 @@ export function VoiceCallOverlay({
                   onEndCall()
                 }}
                 title="End Call"
-                className="grid size-9 place-items-center rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/30 transition hover:brightness-110 active:scale-90"
+                className="grid size-9 place-items-center rounded-2xl bg-[#e8294c] hover:bg-[#ff2d55] text-white shadow-md shadow-rose-950/50 transition hover:brightness-110 active:scale-90"
               >
                 <PhoneOff className="size-4" />
               </button>

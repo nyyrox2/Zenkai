@@ -40,7 +40,12 @@ export class DirectVoiceCall {
   private remoteAudio: HTMLAudioElement | null = null
   private signalChannel: ReturnType<typeof supabase.channel> | null = null
 
-  // Listeners
+  // Listeners & signaling tracking
+  private onCallEndedListeners: Array<(summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void> = []
+  private handledOffer = false
+  private handledAnswer = false
+  private processedCandidates = new Set<string>()
+
   private onStatusChange?: (status: CallStatus) => void
   private onRemoteSpeakingChange?: (speaking: boolean) => void
   private onCallEnded?: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void
@@ -73,10 +78,78 @@ export class DirectVoiceCall {
     onCallEnded?: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void
     onMicPermissionError?: (error: any) => void
   }) {
-    this.onStatusChange = cbs.onStatusChange
-    this.onRemoteSpeakingChange = cbs.onRemoteSpeakingChange
-    this.onCallEnded = cbs.onCallEnded
-    this.onMicPermissionError = cbs.onMicPermissionError
+    if (cbs.onStatusChange !== undefined) this.onStatusChange = cbs.onStatusChange
+    if (cbs.onRemoteSpeakingChange !== undefined) this.onRemoteSpeakingChange = cbs.onRemoteSpeakingChange
+    if (cbs.onCallEnded !== undefined) {
+      this.onCallEndedListeners.push(cbs.onCallEnded)
+      this.onCallEnded = cbs.onCallEnded
+    }
+    if (cbs.onMicPermissionError !== undefined) this.onMicPermissionError = cbs.onMicPermissionError
+  }
+
+  public addCallEndedListener(fn: (summary: { status: 'ended' | 'missed' | 'declined'; duration: number }) => void) {
+    this.onCallEndedListeners.push(fn)
+    return () => {
+      this.onCallEndedListeners = this.onCallEndedListeners.filter((l) => l !== fn)
+    }
+  }
+
+  /** Safely add candidate without dropping if remote description is still preparing */
+  private async addIceCandidateSafe(candidate: RTCIceCandidateInit) {
+    if (!candidate || !this.pc) return
+    const key = `${candidate.candidate}-${candidate.sdpMid}-${candidate.sdpMLineIndex}`
+    if (this.processedCandidates.has(key)) return
+    if (!this.pc.remoteDescription) {
+      setTimeout(() => void this.addIceCandidateSafe(candidate), 350)
+      return
+    }
+    this.processedCandidates.add(key)
+    try {
+      await this.pc.addIceCandidate(new RTCIceCandidate(candidate))
+    } catch {
+      // ignore duplicated candidate
+    }
+  }
+
+  private applyDbCandidates(row: any) {
+    const candidates = this.isCaller ? row.callee_candidates : row.caller_candidates
+    if (Array.isArray(candidates)) {
+      for (const cand of candidates) {
+        void this.addIceCandidateSafe(cand)
+      }
+    }
+  }
+
+  /** Read latest offer, answer, and ICE candidates persisted in backend */
+  public async syncFromBackend() {
+    try {
+      const { data } = await supabase
+        .from('call_sessions')
+        .select('*')
+        .eq('call_id', this.callId)
+        .maybeSingle()
+      if (!data) return
+
+      if (!this.isCaller && data.offer && !this.handledOffer) {
+        await this.handleOffer(data.offer)
+      } else if (this.isCaller && data.answer && !this.handledAnswer && this.pc) {
+        try {
+          await this.pc.setRemoteDescription(new RTCSessionDescription(data.answer))
+          this.handledAnswer = true
+          this.updateStatus('connected')
+        } catch {}
+      }
+
+      if (data.status === 'declined' && this.status !== 'ended') {
+        this.endCall(false, 'declined')
+      } else if (data.status === 'ended' && this.status !== 'ended') {
+        this.endCall(false, 'ended')
+      }
+
+      this.applyDbCandidates(data)
+    } catch (err) {
+      console.warn('[VoiceCall] syncFromBackend error:', err)
+    }
   }
 
   /** Initialize signaling channel for this call session */
@@ -85,6 +158,58 @@ export class DirectVoiceCall {
     this.signalChannel = supabase.channel(channelName, {
       config: { broadcast: { self: false } },
     })
+
+    // Upsert call session in backend database
+    if (this.isCaller) {
+      void supabase
+        .from('call_sessions')
+        .upsert({
+          call_id: this.callId,
+          caller_id: this.myUser.id,
+          callee_id: this.partner.id,
+          status: 'calling',
+          updated_at: new Date().toISOString(),
+        })
+        .then(
+          () => {},
+          (err: any) => console.warn('[VoiceCall] DB init session error:', err)
+        )
+    }
+
+    // Subscribe to Postgres database realtime updates for call_sessions
+    this.signalChannel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'call_sessions',
+        filter: `call_id=eq.${this.callId}`,
+      },
+      async (payload) => {
+        const row = payload.new as any
+        if (!row) return
+
+        if (!this.isCaller && row.offer && !this.handledOffer) {
+          await this.handleOffer(row.offer)
+        } else if (this.isCaller && row.answer && !this.handledAnswer && this.pc) {
+          try {
+            await this.pc.setRemoteDescription(new RTCSessionDescription(row.answer))
+            this.handledAnswer = true
+            this.updateStatus('connected')
+          } catch (e) {
+            console.warn('[VoiceCall] Apply answer from DB error:', e)
+          }
+        }
+
+        if (row.status === 'declined' && this.status !== 'ended') {
+          this.endCall(false, 'declined')
+        } else if (row.status === 'ended' && this.status !== 'ended') {
+          this.endCall(false, 'ended')
+        }
+
+        this.applyDbCandidates(row)
+      }
+    )
 
     this.signalChannel
       .on('broadcast', { event: 'call:accepted' }, async () => {
@@ -99,23 +224,24 @@ export class DirectVoiceCall {
         this.endCall(false, this.status === 'incoming' ? 'missed' : undefined)
       })
       .on('broadcast', { event: 'signal:offer' }, async ({ payload }) => {
-        if (!this.isCaller && payload.sdp) {
+        if (!this.isCaller && payload.sdp && !this.handledOffer) {
           await this.handleOffer(payload.sdp)
         }
       })
       .on('broadcast', { event: 'signal:answer' }, async ({ payload }) => {
-        if (this.isCaller && payload.sdp && this.pc) {
-          await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-          this.updateStatus('connected')
+        if (this.isCaller && payload.sdp && this.pc && !this.handledAnswer) {
+          try {
+            await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+            this.handledAnswer = true
+            this.updateStatus('connected')
+          } catch (e) {
+            console.warn('[VoiceCall] Remote answer error:', e)
+          }
         }
       })
       .on('broadcast', { event: 'signal:ice' }, async ({ payload }) => {
-        if (payload.candidate && this.pc) {
-          try {
-            await this.pc.addIceCandidate(new RTCIceCandidate(payload.candidate))
-          } catch {
-            // ignore
-          }
+        if (payload.candidate) {
+          await this.addIceCandidateSafe(payload.candidate)
         }
       })
       .on('broadcast', { event: 'call:speaking' }, ({ payload }) => {
@@ -123,6 +249,9 @@ export class DirectVoiceCall {
       })
 
     await this.signalChannel.subscribe()
+
+    // Immediately sync with backend in case of reload/reconnect
+    void this.syncFromBackend()
   }
 
   /** Caller initiates WebRTC offer */
@@ -149,6 +278,17 @@ export class DirectVoiceCall {
         const offer = await this.pc.createOffer()
         await this.pc.setLocalDescription(offer)
 
+        // Persist offer in Supabase backend
+        void supabase
+          .from('call_sessions')
+          .update({
+            offer: offer,
+            status: 'calling',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('call_id', this.callId)
+
+        // Broadcast offer for ultra-low latency
         void this.signalChannel?.send({
           type: 'broadcast',
           event: 'signal:offer',
@@ -181,12 +321,24 @@ export class DirectVoiceCall {
         }
       }
 
+      // Update backend status to accepted
+      void supabase
+        .from('call_sessions')
+        .update({
+          status: 'accepted',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('call_id', this.callId)
+
       // Inform caller that call is accepted
       void this.signalChannel?.send({
         type: 'broadcast',
         event: 'call:accepted',
         payload: { acceptedBy: this.myUser.id },
       })
+
+      // Immediately sync with backend in case offer was already generated
+      void this.syncFromBackend()
     } catch (err) {
       console.warn('[VoiceCall] acceptCall error:', err)
       this.endCall(true, 'declined')
@@ -195,15 +347,28 @@ export class DirectVoiceCall {
 
   /** Callee receives offer from Caller and generates answer */
   private async handleOffer(sdp: RTCSessionDescriptionInit) {
+    if (this.handledOffer) return
     if (!this.pc) this.createPeerConnection()
     try {
       if (this.pc) {
+        this.handledOffer = true
         await this.pc.setRemoteDescription(new RTCSessionDescription(sdp))
         allowSendingAudio(this.pc)
         await this.attachLocalAudio()
         const answer = await this.pc.createAnswer()
         await this.pc.setLocalDescription(answer)
 
+        // Persist answer in backend
+        void supabase
+          .from('call_sessions')
+          .update({
+            answer: answer,
+            status: 'connected',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('call_id', this.callId)
+
+        // Fast broadcast
         void this.signalChannel?.send({
           type: 'broadcast',
           event: 'signal:answer',
@@ -211,6 +376,7 @@ export class DirectVoiceCall {
         })
 
         this.updateStatus('connected')
+        void this.syncFromBackend()
       }
     } catch (err) {
       console.warn('[VoiceCall] handleOffer error:', err)
@@ -224,10 +390,18 @@ export class DirectVoiceCall {
 
     this.pc.onicecandidate = (e) => {
       if (e.candidate) {
+        // Fast broadcast
         void this.signalChannel?.send({
           type: 'broadcast',
           event: 'signal:ice',
           payload: { candidate: e.candidate },
+        })
+
+        // Backend persistence in Supabase
+        void supabase.rpc('append_call_candidate', {
+          p_call_id: this.callId,
+          p_is_caller: this.isCaller,
+          p_candidate: e.candidate.toJSON(),
         })
       }
     }
@@ -250,7 +424,10 @@ export class DirectVoiceCall {
       const state = this.pc?.connectionState
       if (state === 'connected') {
         this.updateStatus('connected')
-      } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+      } else if (state === 'disconnected') {
+        // Try recovering via backend sync before hanging up
+        void this.syncFromBackend()
+      } else if (state === 'failed' || state === 'closed') {
         if (this.status === 'connected') {
           this.endCall(false)
         }
@@ -367,6 +544,20 @@ export class DirectVoiceCall {
       this.duration = Math.max(0, Math.floor((Date.now() - this.connectedAt) / 1000))
     }
 
+    // Persist final call status in Supabase backend
+    void supabase
+      .from('call_sessions')
+      .update({
+        status: finalStatus,
+        ended_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('call_id', this.callId)
+      .then(
+        () => {},
+        () => {}
+      )
+
     if (sendBroadcast && this.signalChannel) {
       void this.signalChannel.send({
         type: 'broadcast',
@@ -403,7 +594,16 @@ export class DirectVoiceCall {
     }
 
     this.updateStatus('ended')
-    this.onCallEnded?.({ status: finalStatus, duration: this.duration })
+
+    const summary = { status: finalStatus, duration: this.duration }
+    this.onCallEnded?.(summary)
+    for (const listener of this.onCallEndedListeners) {
+      try {
+        listener(summary)
+      } catch (err) {
+        console.error('[VoiceCall] onCallEndedListener error:', err)
+      }
+    }
   }
 }
 
