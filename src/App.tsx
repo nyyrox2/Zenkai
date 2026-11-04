@@ -50,6 +50,7 @@ const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
 const CommunityPage = lazy(() => import('./pages/CommunityPage'))
 const AniListCallbackPage = lazy(() => import('./pages/AniListCallbackPage'))
+const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage'))
 const FindPage = lazy(() => import('./pages/FindPage'))
 const BustedPage = lazy(() => import('./pages/BustedPage'))
 const EmbedPage = lazy(() => import('./pages/EmbedPage'))
@@ -75,7 +76,8 @@ export default function App() {
   const isMessages = pathname.startsWith('/messages')
   const inChat = /^\/messages\/[^/]+$/.test(pathname)
   const isCall = pathname === '/call'
-  const bare = gate || pathname === '/busted' || isEmbed || reader || isWatchPath(pathname) || isCall || isMessages
+  const isAuth = pathname.startsWith('/auth/') || pathname === '/login'
+  const bare = gate || pathname === '/busted' || isEmbed || reader || isWatchPath(pathname) || isCall || isMessages || isAuth
   const section = sectionOf(pathname)
 
   useTrackHistory()
@@ -119,6 +121,9 @@ export default function App() {
           <Route path="/call" element={<CallPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/auth/anilist" element={<AniListCallbackPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <Route path="/auth/login" element={<AuthCallbackPage />} />
+          <Route path="/login" element={<AuthCallbackPage />} />
           {/* Novels */}
           <Route path="/novel" element={<NovelHomePage />} />
           <Route path="/novel/find" element={<FindPage />} />
