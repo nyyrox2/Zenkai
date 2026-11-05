@@ -51,6 +51,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
 const CommunityPage = lazy(() => import('./pages/CommunityPage'))
+const WatchPartyPage = lazy(() => import('./pages/WatchPartyPage'))
 const AniListCallbackPage = lazy(() => import('./pages/AniListCallbackPage'))
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage'))
 const FindPage = lazy(() => import('./pages/FindPage'))
@@ -169,6 +170,8 @@ export default function App() {
               <Route path="/messages/:partnerHandle" element={<MessagesPage />} />
               <Route path="/call" element={<CallPage />} />
               <Route path="/community" element={<CommunityPage />} />
+              <Route path="/watchparty" element={<WatchPartyPage />} />
+              <Route path="/watchtogether" element={<WatchPartyPage />} />
               <Route path="/auth/anilist" element={<AniListCallbackPage />} />
               <Route path="/auth/callback" element={<AuthCallbackPage />} />
               <Route path="/auth/login" element={<AuthCallbackPage />} />

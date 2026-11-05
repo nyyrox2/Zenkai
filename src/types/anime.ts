@@ -128,7 +128,7 @@ export interface AniMediaDetails extends AniMedia {
 /** Lightweight media used by rows, grids and the schedule (no description / trailer / airing data). */
 export type AniCardMedia = Pick<
   AniMedia,
-  'id' | 'idMal' | 'title' | 'coverImage' | 'genres' | 'averageScore' | 'episodes' | 'format' | 'status' | 'seasonYear'
+  'id' | 'idMal' | 'title' | 'coverImage' | 'bannerImage' | 'genres' | 'averageScore' | 'episodes' | 'format' | 'status' | 'season' | 'seasonYear'
 >
 
 export interface HomeData {
@@ -226,5 +226,8 @@ export interface CardItem {
   episodes?: number | null
   year?: number | null
   genres?: string[]
+  bannerImage?: string | null
+  season?: string | null
   caption?: string
+  jpTitle?: string | null
 }

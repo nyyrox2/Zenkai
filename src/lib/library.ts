@@ -1,3 +1,4 @@
+import { autoSyncWatchlist } from './sync'
 import { useSyncExternalStore } from 'react'
 import type { CardItem } from '../types/anime'
 
@@ -25,7 +26,19 @@ export interface ListItem extends Meta {
   updatedAt?: number
   /** episodes watched (kept in step with AniList when connected) */
   progress?: number
+  /** Whether marked as favorite */
+  favorite?: boolean
+  /** Custom list IDs this item belongs to */
+  customLists?: string[]
 }
+
+export interface CustomListDef {
+  id: string
+  name: string
+  createdAt: number
+}
+export const customLists = cell<CustomListDef[]>('zk:custom_lists', [])
+export const useCustomLists = () => useSyncExternalStore(customLists.subscribe, customLists.get)
 export interface Prefs {
   server?: string
   audio?: Audio
@@ -249,11 +262,13 @@ export function addToList(m: Meta, status: ListStatus = 'planning') {
   const now = Date.now()
   list.set([{ ...meta(m), id: mid, status, addedAt: now, updatedAt: now }, ...items()])
   syncHooks.push?.(mid, { status, progress: 0 })
+  autoSyncWatchlist()
 }
 export function removeFromList(id: number) {
   const mid = Number(id)
   list.set(items().filter((i) => Number(i.id) !== mid))
   syncHooks.remove?.(mid)
+  autoSyncWatchlist()
 }
 export function setStatus(id: number, status: ListStatus) {
   const mid = Number(id)
@@ -263,6 +278,7 @@ export function setStatus(id: number, status: ListStatus) {
   const rest = items().filter((i) => Number(i.id) !== mid)
   list.set([{ ...li, id: mid, status, progress, updatedAt: Date.now() }, ...rest])
   syncHooks.push?.(mid, { status, progress })
+  autoSyncWatchlist()
 }
 
 /* ---------- AniList pull (no hooks, so nothing is pushed back) ---------- */
@@ -339,4 +355,73 @@ export function toggleList(m: Meta) {
   const mid = Number(m.id)
   if (items().some((i) => Number(i.id) === mid)) removeFromList(mid)
   else addToList(m)
+}
+
+/* ---------- Favorites & Custom Lists ---------- */
+export function toggleFavorite(m: Meta | number) {
+  const mid = typeof m === 'number' ? m : Number(m.id)
+  const cur = items()
+  const li = cur.find((i) => Number(i.id) === mid)
+  const now = Date.now()
+  if (!li) {
+    if (typeof m !== 'number') {
+      list.set([{ ...meta(m), id: mid, status: 'planning', favorite: true, addedAt: now, updatedAt: now }, ...cur])
+    }
+  } else {
+    const nextFav = !li.favorite
+    list.set(cur.map((i) => Number(i.id) === mid ? { ...i, favorite: nextFav, updatedAt: now } : i))
+  }
+  autoSyncWatchlist()
+}
+
+export function isFavorite(id: number): boolean {
+  const nid = Number(id)
+  return !!items().find((i) => Number(i.id) === nid)?.favorite
+}
+
+export function toggleAnimeInCustomList(animeId: number, listId: string, m?: Meta) {
+  const mid = Number(animeId)
+  const cur = items()
+  const li = cur.find((i) => Number(i.id) === mid)
+  const now = Date.now()
+  if (!li) {
+    if (m) {
+      list.set([{ ...meta(m), id: mid, status: 'planning', customLists: [listId], addedAt: now, updatedAt: now }, ...cur])
+    }
+  } else {
+    const currentLists = li.customLists || []
+    const nextLists = currentLists.includes(listId)
+      ? currentLists.filter((id) => id !== listId)
+      : [...currentLists, listId]
+    list.set(cur.map((i) => Number(i.id) === mid ? { ...i, customLists: nextLists, updatedAt: now } : i))
+  }
+  autoSyncWatchlist()
+}
+
+export function createCustomList(name: string): CustomListDef {
+  const trimmed = name.trim()
+  const id = 'list_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6)
+  const newDef: CustomListDef = { id, name: trimmed, createdAt: Date.now() }
+  const existing = customLists.get() || []
+  customLists.set([...existing, newDef])
+  autoSyncWatchlist()
+  return newDef
+}
+
+export function deleteCustomList(listId: string) {
+  const existing = customLists.get() || []
+  customLists.set(existing.filter((cl) => cl.id !== listId))
+  // Clean from anime items
+  const cur = items()
+  list.set(cur.map((i) => ({
+    ...i,
+    customLists: (i.customLists || []).filter((id) => id !== listId),
+  })))
+  autoSyncWatchlist()
+}
+
+export function renameCustomList(listId: string, newName: string) {
+  const existing = customLists.get() || []
+  customLists.set(existing.map((cl) => cl.id === listId ? { ...cl, name: newName.trim() } : cl))
+  autoSyncWatchlist()
 }

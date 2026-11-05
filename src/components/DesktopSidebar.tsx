@@ -10,6 +10,7 @@ import {
   Book,
   Search,
   PanelLeft,
+  Tv,
   Users,
   MessageSquare,
   type LucideIcon,
@@ -39,6 +40,7 @@ const MAIN: Item[] = [
 ]
 
 const MORE: Item[] = [
+  { label: 'WatchParty', to: '/watchparty', icon: Tv, match: (p) => p.startsWith('/watchparty') || p.startsWith('/watchtogether') },
   { label: 'Community', to: '/community', icon: Users, match: (p) => p.startsWith('/community') },
   { label: 'Messages', to: '/messages', icon: MessageSquare, match: (p) => p.startsWith('/messages') },
 ]

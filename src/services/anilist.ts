@@ -65,6 +65,8 @@ const MEDIA_FIELDS = /* GraphQL */ `
     title { romaji english native }
     coverImage { extraLarge large color }
     bannerImage
+    season
+    bannerImage
     description(asHtml: false)
     genres
     averageScore
@@ -86,6 +88,8 @@ const CARD_FIELDS = /* GraphQL */ `
     idMal
     title { romaji english native }
     coverImage { extraLarge large color }
+    bannerImage
+    season
     genres
     averageScore
     episodes
@@ -101,7 +105,7 @@ async function homeAniList(): Promise<HomeData> {
   const { season, year } = getSeason()
   const query = /* GraphQL */ `
     query ($season: MediaSeason, $year: Int) {
-      trending: Page(perPage: 12) {
+      trending: Page(perPage: 20) {
         media(type: ANIME, sort: TRENDING_DESC, isAdult: false) { ...MediaFields }
       }
       season: Page(perPage: 18) {
@@ -289,6 +293,8 @@ async function airingAniList(from: number, to: number): Promise<AniAiringEntry[]
           id airingAt episode
           media {
             id idMal title { romaji english native } coverImage { extraLarge large color }
+    bannerImage
+    season
             genres averageScore episodes format status seasonYear isAdult countryOfOrigin popularity
           }
         }
@@ -401,4 +407,52 @@ export async function fetchWatchOrder(rootId: number): Promise<WatchOrderEntry[]
         relation: m.relation,
       }
     })
+}
+
+export interface LatestEpisodeItem {
+  id: number
+  airingAt: number
+  episode: number
+  media: {
+    id: number
+    title: { romaji?: string | null; english?: string | null; native?: string | null }
+    coverImage: { extraLarge?: string | null; large?: string | null; color?: string | null }
+    bannerImage?: string | null
+    format?: string | null
+    genres?: string[] | null
+    season?: string | null
+    seasonYear?: number | null
+    averageScore?: number | null
+  }
+}
+
+export async function fetchLatestEpisodes(perPage = 20): Promise<LatestEpisodeItem[]> {
+  const query = /* GraphQL */ `
+    query ($perPage: Int) {
+      Page(page: 1, perPage: $perPage) {
+        airingSchedules(notYetAired: false, sort: TIME_DESC) {
+          id
+          airingAt
+          episode
+          media {
+            id
+            title { english romaji native }
+            coverImage { extraLarge large color }
+            bannerImage
+            format
+            genres
+            season
+            seasonYear
+            averageScore
+          }
+        }
+      }
+    }
+  `
+  try {
+    const res = await gql<{ Page: { airingSchedules: LatestEpisodeItem[] } }>(query, { perPage })
+    return res.Page.airingSchedules || []
+  } catch {
+    return []
+  }
 }

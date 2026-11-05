@@ -60,11 +60,12 @@ export async function pushWatchHistory(userId: string): Promise<{ success: boole
 
     const history = readStorage<HistoryItem[]>('zk:history', [])
     const watchlist = readStorage<ListItem[]>('zk:list', [])
+    const custom_lists = readStorage<any[]>('zk:custom_lists', [])
     const reading = readStorage<ReadingItem[]>('zk:reading:v1', [])
     const profile = getProfile()
 
     const { error } = await supabase.from('user_sync').upsert(
-      { user_id: userId, history, watchlist, reading, profile, updated_at: new Date().toISOString() },
+      { user_id: userId, history, watchlist, custom_lists, reading, profile, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
     )
 
@@ -94,7 +95,7 @@ export async function pullWatchHistory(userId: string): Promise<{ success: boole
 
     const { data, error } = await supabase
       .from('user_sync')
-      .select('history, watchlist, reading, profile, updated_at')
+      .select('history, watchlist, custom_lists, reading, profile, updated_at')
       .eq('user_id', userId)
       .maybeSingle()
 
@@ -117,6 +118,16 @@ export async function pullWatchHistory(userId: string): Promise<{ success: boole
     const remoteHistory = Array.isArray(data.history) ? (data.history as HistoryItem[]) : []
     const remoteList = Array.isArray(data.watchlist) ? (data.watchlist as ListItem[]) : []
     const remoteReading = Array.isArray(data.reading) ? (data.reading as ReadingItem[]) : []
+    const remoteCustomLists = Array.isArray(data.custom_lists) ? data.custom_lists : []
+
+    // 0. Merge Custom Lists
+    if (remoteCustomLists.length > 0) {
+      const localCl = readStorage<any[]>('zk:custom_lists', [])
+      const clMap = new Map<string, any>()
+      for (const cl of localCl) if (cl?.id) clMap.set(cl.id, cl)
+      for (const rcl of remoteCustomLists) if (rcl?.id && !clMap.has(rcl.id)) clMap.set(rcl.id, rcl)
+      localStorage.setItem('zk:custom_lists', JSON.stringify(Array.from(clMap.values())))
+    }
 
     // 1. Merge History (Continue Watching)
     const localHistory = readStorage<HistoryItem[]>('zk:history', [])
@@ -221,4 +232,19 @@ export async function checkDailySync(userId?: string): Promise<boolean> {
   }
 
   return (await syncNow(userId)).success
+}
+
+let autoSyncTimeout: any = null
+export function autoSyncWatchlist() {
+  clearTimeout(autoSyncTimeout)
+  autoSyncTimeout = setTimeout(async () => {
+    try {
+      const { data } = await supabase.auth.getUser()
+      if (data?.user?.id) {
+        await pushWatchHistory(data.user.id)
+      }
+    } catch (err) {
+      console.warn('[Sync] Auto-sync background error:', err)
+    }
+  }, 600)
 }
