@@ -52,11 +52,6 @@ export function Footer() {
               </Link>
             </li>
             <li>
-              <Link to="/" className="transition-colors hover:text-accent">
-                Switch section
-              </Link>
-            </li>
-            <li>
               <button type="button" onClick={openChangelog} className="transition-colors hover:text-accent">
                 What&apos;s new (v{release.version})
               </button>
@@ -135,11 +130,6 @@ function ReaderFooter({ kind }: { kind: 'novel' | 'manga' }) {
               API &amp; Player Embed
             </Link>
           </li>
-          <li>
-            <Link to="/" className="transition-colors hover:text-accent">
-              Switch section
-            </Link>
-          </li>
         </ul>
       </div>
       <p className="relative mx-auto mt-12 max-w-7xl px-4 text-xs text-muted sm:px-6">
@@ -165,7 +155,6 @@ function MoviesFooter() {
           <li><Link to="/movies/browse?type=tv" className="transition-colors hover:text-accent">TV Shows</Link></li>
           <li><Link to="/api" className="transition-colors hover:text-accent">API &amp; Player Embed</Link></li>
           <li><a href="https://www.themoviedb.org" target="_blank" rel="noreferrer noopener" className="transition-colors hover:text-accent">TMDB</a></li>
-          <li><Link to="/" className="transition-colors hover:text-accent">Switch section</Link></li>
         </ul>
       </div>
       <p className="relative mx-auto mt-12 max-w-7xl px-4 text-xs text-muted sm:px-6">

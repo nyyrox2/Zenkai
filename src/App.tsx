@@ -1,10 +1,12 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState, useCallback } from 'react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AniListDownBanner } from './components/AniListDownBanner'
 import { Footer } from './components/Footer'
 import { MobileDock } from './components/MobileDock'
-import { Navbar } from './components/Navbar'
+import { DesktopSidebar } from './components/DesktopSidebar'
+import { MobileHeader } from './components/MobileHeader'
+import { NavDrawer } from './components/NavDrawer'
 import { ScrollProgress } from './components/ScrollProgress'
 import { ScrollToTop } from './components/ScrollToTop'
 import { TopLoader } from './components/TopLoader'
@@ -24,9 +26,9 @@ import { useSpatialNav } from './lib/spatial'
 import { isDetailsPath, isReaderPath, isWatchPath, sectionOf } from './lib/sections'
 import { useAuth } from './context/AuthContext'
 import { checkDailySync } from './lib/sync'
-import LandingPage from './pages/LandingPage'
+import { cn } from './lib/utils'
 
-// Only the opening page is eager; everything else is split out; hls.js only ships with the player page.
+// Split out lazy pages
 const HomePage = lazy(() => import('./pages/HomePage'))
 const DetailsPage = lazy(() => import('./pages/DetailsPage'))
 const CatalogPage = lazy(() => import('./pages/CatalogPage'))
@@ -59,9 +61,30 @@ const CallPage = lazy(() => import('./pages/CallPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 export default function App() {
-  // The opening page is a clean full-screen picker: no navbar, dock, footer or search.
   const { pathname } = useLocation()
   const navigate = useNavigate()
+
+  // Sidebar collapse state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('zk_sidebar_collapsed') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('zk_sidebar_collapsed', String(next))
+      } catch {}
+      return next
+    })
+  }, [])
+
+  // Mobile navigation drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Redirect OAuth callbacks landing at root back to /profile
   useEffect(() => {
@@ -69,16 +92,18 @@ export default function App() {
       navigate('/profile' + window.location.search + window.location.hash, { replace: true })
     }
   }, [pathname, navigate])
-  const gate = pathname === '/'
-  const reader = isReaderPath(pathname) // Novel / manga readers are full-screen too
+
+  const reader = isReaderPath(pathname) // Novel / manga readers are full-screen
   const isEmbed = pathname === '/embed' || pathname.startsWith('/embed/')
   const isApi = pathname === '/api' || pathname.startsWith('/api') || pathname === '/docs'
   const isMessages = pathname.startsWith('/messages')
   const inChat = /^\/messages\/[^/]+$/.test(pathname)
   const isCall = pathname === '/call'
   const isAuth = pathname.startsWith('/auth/') || pathname === '/login'
-  const bare = gate || pathname === '/busted' || isEmbed || reader || isWatchPath(pathname) || isCall || isMessages || isAuth
+  const bare = pathname === '/busted' || isEmbed || reader || isWatchPath(pathname) || isCall || isMessages || isAuth
   const section = sectionOf(pathname)
+
+  const showNav = !bare && !isDetailsPath(pathname) && !isApi
 
   useTrackHistory()
   useApplyTvMode()
@@ -89,81 +114,107 @@ export default function App() {
     if (user?.id) void checkDailySync(user.id)
   }, [user?.id])
 
-  // Each section has its own colour identity (see index.css).
   useEffect(() => {
     document.documentElement.dataset.section = section ?? 'hub'
   }, [section])
 
   return (
-    <>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
       <TopLoader />
       {!bare && !isApi && <ScrollProgress />}
       <ScrollToTop />
       {!bare && !isApi && <AniListDownBanner />}
-      {!bare && !isDetailsPath(pathname) && !isApi && <Navbar />}
-      <ErrorBoundary resetKey={pathname}>
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/home" element={<HomePage />} />
-          <Route path="/trending" element={<CatalogPage preset="trending" />} />
-          <Route path="/popular" element={<CatalogPage preset="popular" />} />
-          <Route path="/top" element={<CatalogPage preset="top" />} />
-          <Route path="/browse" element={<CatalogPage preset="browse" />} />
-          <Route path="/list" element={<ListPage />} />
-          <Route path="/schedule" element={<SchedulePage />} />
-          <Route path="/app" element={<AppPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/u/:username" element={<PublicProfilePage />} />
-          <Route path="/user/:username" element={<PublicProfilePage />} />
-          <Route path="/messages" element={<MessagesPage />} />
-          <Route path="/messages/:partnerHandle" element={<MessagesPage />} />
-          <Route path="/call" element={<CallPage />} />
-          <Route path="/community" element={<CommunityPage />} />
-          <Route path="/auth/anilist" element={<AniListCallbackPage />} />
-          <Route path="/auth/callback" element={<AuthCallbackPage />} />
-          <Route path="/auth/login" element={<AuthCallbackPage />} />
-          <Route path="/login" element={<AuthCallbackPage />} />
-          {/* Novels */}
-          <Route path="/novel" element={<NovelHomePage />} />
-          <Route path="/novel/find" element={<FindPage />} />
-          <Route path="/manga/find" element={<FindPage />} />
-          <Route path="/novel/:source/:slug" element={<NovelDetailsPage />} />
-          <Route path="/novel/:source/:slug/read/:chapter" element={<NovelReaderPage />} />
-          {/* Manga */}
-          <Route path="/manga" element={<MangaHomePage />} />
-          <Route path="/manga/browse" element={<MangaBrowsePage />} />
-          <Route path="/manga/:id" element={<MangaDetailsPage />} />
-          <Route path="/manga/:id/read/:chapterId" element={<MangaReaderPage />} />
-          {/* Movies & TV */}
-          <Route path="/movies" element={<MoviesHomePage />} />
-          <Route path="/movies/browse" element={<MoviesBrowsePage />} />
-          <Route path="/movies/watch/:type/:id" element={<MovieWatchPage />} />
-          <Route path="/movies/:type/:id" element={<MovieDetailsPage />} />
-          <Route path="/watch/:id" element={<WatchPage />} />
-          <Route path="/anime/:id" element={<DetailsPage />} />
-          <Route path="/mal/:id" element={<DetailsPage />} />
-          <Route path="/embed" element={<EmbedPage />} />
-          <Route path="/embed/:id" element={<EmbedPage />} />
-          <Route path="/embed/:id/:ep" element={<EmbedPage />} />
-          <Route path="/api" element={<DocsPage />} />
-          <Route path="/api/docs" element={<DocsPage />} />
-          <Route path="/docs" element={<DocsPage />} />
-          <Route path="/busted" element={<BustedPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Suspense>
-      </ErrorBoundary>
-      {!bare && !isApi && !isMessages && <Footer />}
-      {!bare && !isApi && !inChat && <MobileDock />}
-      {!bare && !isApi && section === 'anime' && <SearchModal />}
-      {!bare && !isApi && section === 'movies' && <MovieSearchModal />}
+
+      {/* Desktop Left Collapsible Sidebar */}
+      {showNav && (
+        <DesktopSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+      )}
+
+      {/* Mobile Top Header */}
+      {showNav && (
+        <MobileHeader onOpenDrawer={() => setDrawerOpen(true)} />
+      )}
+
+      {/* Mobile Navigation Drawer (off-canvas sidebar for mobile devices) */}
+      <NavDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {/* Main Content Area with Left Padding for Desktop Sidebar & Top Padding for Mobile Header */}
+      <div
+        className={cn(
+          'transition-[padding-left] duration-200 ease-out flex-1 flex flex-col min-w-0',
+          showNav
+            ? cn(
+                sidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-56',
+                'pt-14 md:pt-0'
+              )
+            : 'pl-0 pt-0'
+        )}
+      >
+        <ErrorBoundary resetKey={pathname}>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/home" element={<HomePage />} />
+              <Route path="/trending" element={<CatalogPage preset="trending" />} />
+              <Route path="/popular" element={<CatalogPage preset="popular" />} />
+              <Route path="/top" element={<CatalogPage preset="top" />} />
+              <Route path="/browse" element={<CatalogPage preset="browse" />} />
+              <Route path="/list" element={<ListPage />} />
+              <Route path="/schedule" element={<SchedulePage />} />
+              <Route path="/app" element={<AppPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/u/:username" element={<PublicProfilePage />} />
+              <Route path="/user/:username" element={<PublicProfilePage />} />
+              <Route path="/messages" element={<MessagesPage />} />
+              <Route path="/messages/:partnerHandle" element={<MessagesPage />} />
+              <Route path="/call" element={<CallPage />} />
+              <Route path="/community" element={<CommunityPage />} />
+              <Route path="/auth/anilist" element={<AniListCallbackPage />} />
+              <Route path="/auth/callback" element={<AuthCallbackPage />} />
+              <Route path="/auth/login" element={<AuthCallbackPage />} />
+              <Route path="/login" element={<AuthCallbackPage />} />
+              {/* Novels */}
+              <Route path="/novel" element={<NovelHomePage />} />
+              <Route path="/novel/find" element={<FindPage />} />
+              <Route path="/manga/find" element={<FindPage />} />
+              <Route path="/novel/:source/:slug" element={<NovelDetailsPage />} />
+              <Route path="/novel/:source/:slug/read/:chapter" element={<NovelReaderPage />} />
+              {/* Manga */}
+              <Route path="/manga" element={<MangaHomePage />} />
+              <Route path="/manga/browse" element={<MangaBrowsePage />} />
+              <Route path="/manga/:id" element={<MangaDetailsPage />} />
+              <Route path="/manga/:id/read/:chapterId" element={<MangaReaderPage />} />
+              {/* Movies & TV */}
+              <Route path="/movies" element={<MoviesHomePage />} />
+              <Route path="/movies/browse" element={<MoviesBrowsePage />} />
+              <Route path="/movies/watch/:type/:id" element={<MovieWatchPage />} />
+              <Route path="/movies/:type/:id" element={<MovieDetailsPage />} />
+              <Route path="/watch/:id" element={<WatchPage />} />
+              <Route path="/anime/:id" element={<DetailsPage />} />
+              <Route path="/mal/:id" element={<DetailsPage />} />
+              <Route path="/embed" element={<EmbedPage />} />
+              <Route path="/embed/:id" element={<EmbedPage />} />
+              <Route path="/embed/:id/:ep" element={<EmbedPage />} />
+              <Route path="/api" element={<DocsPage />} />
+              <Route path="/api/docs" element={<DocsPage />} />
+              <Route path="/docs" element={<DocsPage />} />
+              <Route path="/busted" element={<BustedPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
+
+        {!bare && !isApi && !isMessages && <Footer />}
+      </div>
+
+      {!bare && !isApi && !inChat && <MobileDock onOpenDrawer={() => setDrawerOpen(true)} />}
+      {!bare && !isApi && section === 'movies' ? <MovieSearchModal /> : <SearchModal />}
       <Toaster />
       <ShortcutsHelp />
       <ShieldGate />
       <ChangelogModal />
       <ChooseUsernameModal />
       {!isApi && !isEmbed && !reader && !isWatchPath(pathname) && pathname !== '/busted' && <ApiIntro />}
-    </>
+    </div>
   )
 }
