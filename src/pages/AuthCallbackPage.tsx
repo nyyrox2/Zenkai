@@ -13,6 +13,10 @@ export default function AuthCallbackPage() {
   const [exchangeError, setExchangeError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(true)
 
+  const [activeAccessToken, setActiveAccessToken] = useState('')
+  const [activeRefreshToken, setActiveRefreshToken] = useState('')
+  const [activePayload, setActivePayload] = useState('')
+
   // Parse parameters from hash and search
   const authParams = useMemo(() => {
     const params = new URLSearchParams()
@@ -35,69 +39,37 @@ export default function AuthCallbackPage() {
     return params
   }, [hash, search])
 
-  const accessToken = authParams.get('access_token')
-  const refreshToken = authParams.get('refresh_token')
+  const initialAccessToken = authParams.get('access_token')
+  const initialRefreshToken = authParams.get('refresh_token')
   const code = authParams.get('code')
   const errorDescription = authParams.get('error_description') || authParams.get('error')
 
-  const [activeAccessToken, setActiveAccessToken] = useState(accessToken || '')
-  const [activeRefreshToken, setActiveRefreshToken] = useState(refreshToken || '')
-  const [activePayload, setActivePayload] = useState('')
-
-  // Construct target deep link payload
-  const rawPayloadString = useMemo(() => {
-    if (hash && hash.length > 1) return hash.slice(1)
-    if (search && search.length > 1) return search.slice(1)
-    return ''
-  }, [hash, search])
-
-  const effectivePayload = useMemo(() => {
+  // Calculate final payload string
+  const resolvedPayload = useMemo(() => {
     if (activePayload) return activePayload
-    if (activeAccessToken) return `access_token=${activeAccessToken}&refresh_token=${activeRefreshToken || ''}&token_type=bearer`
-    if (accessToken) return `access_token=${accessToken}&refresh_token=${refreshToken || ''}&token_type=bearer`
-    return rawPayloadString
-  }, [activePayload, activeAccessToken, activeRefreshToken, accessToken, refreshToken, rawPayloadString])
+    if (activeAccessToken) {
+      return `access_token=${activeAccessToken}&refresh_token=${activeRefreshToken}&token_type=bearer`
+    }
+    if (initialAccessToken) {
+      return `access_token=${initialAccessToken}&refresh_token=${initialRefreshToken || ''}&token_type=bearer`
+    }
+    return ''
+  }, [activePayload, activeAccessToken, activeRefreshToken, initialAccessToken, initialRefreshToken])
 
-  const customSchemeUrl = `zenkai://auth/callback#${effectivePayload}`
-  const androidIntentUrl = `intent://auth/callback#${effectivePayload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
+  const customSchemeUrl = resolvedPayload ? `zenkai://auth/callback#${resolvedPayload}` : 'zenkai://auth/callback'
+  const androidIntentUrl = resolvedPayload
+    ? `intent://auth/callback#${resolvedPayload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
+    : 'intent://auth/callback#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;'
 
   useEffect(() => {
-    const handleAuth = async () => {
-      // 1. If we have code but no tokens, exchange code for real session tokens
-      if (code && !accessToken) {
-        try {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-          if (error) {
-            setExchangeError(error.message)
-          } else if (data.session) {
-            // Updated session with real tokens!
-            const newPayload = `access_token=${data.session.access_token}&refresh_token=${data.session.refresh_token}&token_type=bearer&expires_in=${data.session.expires_in}`
-            setActiveAccessToken(data.session.access_token)
-            setActiveRefreshToken(data.session.refresh_token)
-            setActivePayload(newPayload)
-            triggerAppRedirect(newPayload)
-            setProcessing(false)
-            return
-          }
-        } catch (e: any) {
-          setExchangeError(e?.message || 'Code exchange failed')
-        }
-      }
-
-      // 2. If we already have access token or raw payload, trigger app deep-link
-      if (effectivePayload && (accessToken || activeAccessToken || rawPayloadString)) {
-        triggerAppRedirect(effectivePayload)
-      }
-
-      setProcessing(false)
-    }
+    let unmounted = false
 
     const triggerAppRedirect = (payload: string) => {
+      if (!payload) return
       setRedirectAttempted(true)
       const customUrl = `zenkai://auth/callback#${payload}`
       const intentUrl = `intent://auth/callback#${payload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
 
-      // Try Android Intent first on Android user agent, else custom scheme
       const isAndroid = /android/i.test(navigator.userAgent)
       if (isAndroid) {
         window.location.href = intentUrl
@@ -106,13 +78,80 @@ export default function AuthCallbackPage() {
       }
     }
 
-    void handleAuth()
-  }, [code, accessToken, effectivePayload])
+    const checkAndForwardSession = async () => {
+      // 1. If tokens are in URL hash directly:
+      if (initialAccessToken) {
+        const payload = `access_token=${initialAccessToken}&refresh_token=${initialRefreshToken || ''}&token_type=bearer`
+        setActiveAccessToken(initialAccessToken)
+        setActiveRefreshToken(initialRefreshToken || '')
+        setActivePayload(payload)
+        triggerAppRedirect(payload)
+        setProcessing(false)
+        return
+      }
+
+      // 2. If Supabase client has already parsed and established the session:
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token && !unmounted) {
+          const payload = `access_token=${session.access_token}&refresh_token=${session.refresh_token || ''}&token_type=bearer`
+          setActiveAccessToken(session.access_token)
+          setActiveRefreshToken(session.refresh_token || '')
+          setActivePayload(payload)
+          triggerAppRedirect(payload)
+          setProcessing(false)
+          return
+        }
+      } catch (e: any) {
+        console.warn('[AuthCallback] getSession error:', e)
+      }
+
+      // 3. If there is a PKCE authorization code in query params:
+      if (code) {
+        try {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          if (error) {
+            if (!unmounted) setExchangeError(error.message)
+          } else if (data.session && !unmounted) {
+            const payload = `access_token=${data.session.access_token}&refresh_token=${data.session.refresh_token || ''}&token_type=bearer`
+            setActiveAccessToken(data.session.access_token)
+            setActiveRefreshToken(data.session.refresh_token || '')
+            setActivePayload(payload)
+            triggerAppRedirect(payload)
+            setProcessing(false)
+            return
+          }
+        } catch (e: any) {
+          if (!unmounted) setExchangeError(e?.message || 'Code exchange failed')
+        }
+      }
+
+      if (!unmounted) setProcessing(false)
+    }
+
+    // 4. Also listen to onAuthStateChange in case session is processing in background
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.access_token && !unmounted) {
+        const payload = `access_token=${session.access_token}&refresh_token=${session.refresh_token || ''}&token_type=bearer`
+        setActiveAccessToken(session.access_token)
+        setActiveRefreshToken(session.refresh_token || '')
+        setActivePayload(payload)
+        triggerAppRedirect(payload)
+        setProcessing(false)
+      }
+    })
+
+    void checkAndForwardSession()
+
+    return () => {
+      unmounted = true
+      subscription.unsubscribe()
+    }
+  }, [initialAccessToken, initialRefreshToken, code])
 
   const copyToClipboard = () => {
-    const copyData = effectivePayload
-
-    navigator.clipboard.writeText(copyData).then(() => {
+    if (!resolvedPayload) return
+    navigator.clipboard.writeText(resolvedPayload).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     })
@@ -132,7 +171,7 @@ export default function AuthCallbackPage() {
     }
   }
 
-  const hasTokens = Boolean(accessToken || code || activeAccessToken || effectivePayload || rawPayloadString)
+  const hasTokens = Boolean(resolvedPayload || activeAccessToken || initialAccessToken)
 
   return (
     <div className="min-h-screen bg-[#07090e] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
