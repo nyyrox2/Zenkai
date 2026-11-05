@@ -40,27 +40,41 @@ export default function AuthCallbackPage() {
   const code = authParams.get('code')
   const errorDescription = authParams.get('error_description') || authParams.get('error')
 
+  const [activeAccessToken, setActiveAccessToken] = useState(accessToken || '')
+  const [activeRefreshToken, setActiveRefreshToken] = useState(refreshToken || '')
+  const [activePayload, setActivePayload] = useState('')
+
   // Construct target deep link payload
-  const payloadString = useMemo(() => {
+  const rawPayloadString = useMemo(() => {
     if (hash && hash.length > 1) return hash.slice(1)
     if (search && search.length > 1) return search.slice(1)
     return ''
   }, [hash, search])
 
-  const customSchemeUrl = `zenkai://auth/callback#${payloadString}`
-  const androidIntentUrl = `intent://auth/callback#${payloadString}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
+  const effectivePayload = useMemo(() => {
+    if (activePayload) return activePayload
+    if (activeAccessToken) return `access_token=${activeAccessToken}&refresh_token=${activeRefreshToken || ''}&token_type=bearer`
+    if (accessToken) return `access_token=${accessToken}&refresh_token=${refreshToken || ''}&token_type=bearer`
+    return rawPayloadString
+  }, [activePayload, activeAccessToken, activeRefreshToken, accessToken, refreshToken, rawPayloadString])
+
+  const customSchemeUrl = `zenkai://auth/callback#${effectivePayload}`
+  const androidIntentUrl = `intent://auth/callback#${effectivePayload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
 
   useEffect(() => {
     const handleAuth = async () => {
-      // 1. If we have code but no tokens, try exchanging it on the web client too so session is also valid on web
+      // 1. If we have code but no tokens, exchange code for real session tokens
       if (code && !accessToken) {
         try {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code)
           if (error) {
             setExchangeError(error.message)
           } else if (data.session) {
-            // Updated session with tokens!
+            // Updated session with real tokens!
             const newPayload = `access_token=${data.session.access_token}&refresh_token=${data.session.refresh_token}&token_type=bearer&expires_in=${data.session.expires_in}`
+            setActiveAccessToken(data.session.access_token)
+            setActiveRefreshToken(data.session.refresh_token)
+            setActivePayload(newPayload)
             triggerAppRedirect(newPayload)
             setProcessing(false)
             return
@@ -71,8 +85,8 @@ export default function AuthCallbackPage() {
       }
 
       // 2. If we already have access token or raw payload, trigger app deep-link
-      if (payloadString && (accessToken || refreshToken || code)) {
-        triggerAppRedirect(payloadString)
+      if (effectivePayload && (accessToken || activeAccessToken || rawPayloadString)) {
+        triggerAppRedirect(effectivePayload)
       }
 
       setProcessing(false)
@@ -93,15 +107,10 @@ export default function AuthCallbackPage() {
     }
 
     void handleAuth()
-  }, [code, accessToken, refreshToken, payloadString])
+  }, [code, accessToken, effectivePayload])
 
   const copyToClipboard = () => {
-    const copyData = accessToken
-      ? JSON.stringify({
-          access_token: accessToken,
-          refresh_token: refreshToken || '',
-        })
-      : payloadString
+    const copyData = effectivePayload
 
     navigator.clipboard.writeText(copyData).then(() => {
       setCopied(true)
@@ -123,7 +132,7 @@ export default function AuthCallbackPage() {
     }
   }
 
-  const hasTokens = Boolean(accessToken || code || payloadString)
+  const hasTokens = Boolean(accessToken || code || activeAccessToken || effectivePayload || rawPayloadString)
 
   return (
     <div className="min-h-screen bg-[#07090e] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
