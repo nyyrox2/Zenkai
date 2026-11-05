@@ -56,9 +56,9 @@ export default function AuthCallbackPage() {
     return ''
   }, [activePayload, activeAccessToken, activeRefreshToken, initialAccessToken, initialRefreshToken])
 
-  const customSchemeUrl = resolvedPayload ? `zenkai://auth/callback#${resolvedPayload}` : 'zenkai://auth/callback'
+  const customSchemeUrl = resolvedPayload ? `zenkai://auth/callback?${resolvedPayload}#${resolvedPayload}` : 'zenkai://auth/callback'
   const androidIntentUrl = resolvedPayload
-    ? `intent://auth/callback#${resolvedPayload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
+    ? `intent://auth/callback?${resolvedPayload}#${resolvedPayload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
     : 'intent://auth/callback#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;'
 
   useEffect(() => {
@@ -67,8 +67,8 @@ export default function AuthCallbackPage() {
     const triggerAppRedirect = (payload: string) => {
       if (!payload) return
       setRedirectAttempted(true)
-      const customUrl = `zenkai://auth/callback#${payload}`
-      const intentUrl = `intent://auth/callback#${payload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
+      const customUrl = `zenkai://auth/callback?${payload}#${payload}`
+      const intentUrl = `intent://auth/callback?${payload}#${payload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
 
       const isAndroid = /android/i.test(navigator.userAgent)
       if (isAndroid) {
