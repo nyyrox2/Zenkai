@@ -138,14 +138,9 @@ export async function deleteCommunityPost(id: string): Promise<boolean> {
 
 export async function likeCommunityPost(id: string, currentLikes: number): Promise<number> {
   try {
-    const newLikes = currentLikes + 1
-    const { error } = await supabase
-      .from('community_posts')
-      .update({ likes: newLikes })
-      .eq('id', id)
-
+    const { data, error } = await supabase.rpc('like_community_post', { target_post_id: id })
     if (error) throw error
-    return newLikes
+    return typeof data === 'number' ? data : currentLikes + 1
   } catch (err) {
     console.error('[Supabase] Error liking post:', err)
     return currentLikes

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -7,10 +6,8 @@ import {
   Camera,
   Check,
   Crop,
-  ExternalLink,
   FileText,
   Frame,
-  Globe,
   ImagePlus,
   Images,
   Palette,
@@ -145,18 +142,8 @@ export function ProfileHero({
           </div>
         </div>
 
-        {/* Action Buttons: Public Profile & Edit */}
+        {/* Action Button: Edit Profile */}
         <div className="flex shrink-0 items-center gap-2 pt-2 sm:pt-0">
-          {authUsername && (
-            <Link
-              to={`/u/${authUsername}`}
-              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-card-2/80 px-4 text-xs font-semibold text-foreground transition hover:border-accent hover:text-accent active:scale-95"
-            >
-              <Globe className="size-3.5 text-accent" />
-              <span>Public View</span>
-              <ExternalLink className="size-3 text-muted" />
-            </Link>
-          )}
           <motion.button
             type="button"
             onClick={() => onEdit()}
@@ -165,7 +152,7 @@ export function ProfileHero({
             className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-accent to-accent/80 px-5 text-sm font-bold text-accent-fg shadow-lg shadow-accent/25 transition"
           >
             <Palette className="size-4" />
-            <span>Edit Profile</span>
+            <span>Customize Profile</span>
           </motion.button>
         </div>
       </div>
@@ -456,7 +443,7 @@ export function ProfileEditor({
         </button>
 
         <div className="text-center sm:text-left">
-          <h1 className="font-display text-lg font-bold">Edit Profile & Persona</h1>
+          <h1 className="font-display text-lg font-bold">Customize Profile</h1>
         </div>
 
         <button
@@ -467,6 +454,56 @@ export function ProfileEditor({
           <Check className="size-4" />
           <span>Done</span>
         </button>
+      </div>
+
+      {/* Live Profile Card Preview */}
+      <div className="overflow-hidden rounded-3xl border border-border bg-card/60 shadow-xl">
+        <div className="relative h-36 sm:h-48 overflow-hidden bg-card-2">
+          {me.banner ? (
+            <img
+              src={me.banner}
+              alt=""
+              className="size-full object-cover"
+            />
+          ) : (
+            <div className="size-full bg-gradient-to-br from-accent/20 via-card-2 to-card" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/30 to-black/30" />
+          
+          <div className="absolute left-4 bottom-3 sm:left-6 sm:bottom-4 flex items-end gap-3.5">
+            <Avatar
+              size={72}
+              src={me.avatar}
+              frame={me.frame}
+              name={name || me.name}
+              className="ring-4 ring-card shadow-2xl"
+            />
+            <div className="pb-1">
+              <h2 className="font-display text-lg sm:text-xl font-black text-foreground">
+                {name || me.name || 'Otaku'}
+              </h2>
+              {authUsername && (
+                <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-bold text-accent">
+                  @{authUsername}
+                </span>
+              )}
+            </div>
+          </div>
+          <span className="absolute right-3.5 top-3.5 rounded-full bg-black/60 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-md border border-white/10">
+            Live Preview
+          </span>
+        </div>
+        {bio ? (
+          <div className="border-t border-border/60 bg-card-2/40 px-5 py-3 sm:px-6">
+            <p className="text-xs sm:text-sm italic text-foreground/90 leading-relaxed">
+              “{bio}”
+            </p>
+          </div>
+        ) : (
+          <div className="border-t border-border/60 bg-card-2/20 px-5 py-2.5 sm:px-6">
+            <p className="text-xs italic text-muted">No bio yet. Add your personal quote or introduction below!</p>
+          </div>
+        )}
       </div>
 
       {/* Tabs Navigation */}
@@ -510,10 +547,9 @@ export function ProfileEditor({
                   <input
                     value={name}
                     maxLength={24}
-                    onChange={(e) => setName(e.target.value)}
-                    onBlur={() => {
-                      saveProfile({ name })
-                      toast('Display name saved')
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      saveProfile({ name: e.target.value })
                     }}
                     placeholder="e.g. Shadow Otaku"
                     className="h-11 w-full rounded-2xl border border-border bg-card/80 px-4 text-sm font-medium outline-none transition focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent"
@@ -527,30 +563,74 @@ export function ProfileEditor({
 
             {/* Bio Editor */}
             <div className="border-t border-border pt-6">
-              <h2 className="font-display text-lg font-bold flex items-center gap-2">
-                <FileText className="size-5 text-accent" />
-                <span>Bio / About</span>
-              </h2>
-              <p className="mt-1 text-xs text-muted">
-                Your personal anime bio or quote, visible on your public profile and lounge.
-              </p>
-              <div className="mt-3 max-w-md">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-display text-lg font-bold flex items-center gap-2">
+                    <FileText className="size-5 text-accent" />
+                    <span>Bio / About Me</span>
+                  </h2>
+                  <p className="mt-1 text-xs text-muted">
+                    Your personal anime quote or introduction, visible on your profile and community lounge.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveProfile({ bio: bio.trim() })
+                    toast('Bio saved successfully!', 'success')
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-bold text-accent-fg shadow-md shadow-accent/20 transition hover:brightness-110 active:scale-95"
+                >
+                  <Save className="size-3.5" />
+                  <span>Save Bio</span>
+                </button>
+              </div>
+
+              <div className="mt-3.5 max-w-xl space-y-3">
                 <div className="relative">
                   <textarea
                     value={bio}
                     maxLength={180}
                     rows={3}
-                    onChange={(e) => setBio(e.target.value)}
-                    onBlur={() => {
-                      saveProfile({ bio: bio.trim() })
-                      toast('Bio saved')
+                    onChange={(e) => {
+                      setBio(e.target.value)
+                      saveProfile({ bio: e.target.value })
                     }}
                     placeholder="Tell other otakus what you're watching or your all-time favorite anime quote..."
                     className="w-full rounded-2xl border border-border bg-card/80 p-3.5 text-sm font-medium outline-none transition resize-none focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent"
                   />
                   <div className="flex justify-between items-center mt-1 px-1">
-                    <span className="text-[11px] text-muted">Auto-saves on blur</span>
-                    <span className="text-xs text-muted">{bio.length}/180</span>
+                    <span className="text-[11px] text-muted">Auto-saves as you type • or click Save Bio</span>
+                    <span className="text-xs font-semibold text-muted">{bio.length}/180</span>
+                  </div>
+                </div>
+
+                {/* Preset Suggestions */}
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">
+                    Quick quote ideas (tap to use):
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      'Watching the best seasonal anime 🍿',
+                      'Shonen fan forever ⚔️',
+                      'Binge watching is my cardio ⚡',
+                      'Living in my own anime universe 🌸',
+                      'Top tier anime lists & chill 🎌',
+                    ].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          setBio(preset)
+                          saveProfile({ bio: preset })
+                          toast('Preset bio applied and saved!')
+                        }}
+                        className="rounded-full border border-border bg-card-2/60 px-3 py-1 text-xs font-medium text-foreground/85 transition hover:border-accent hover:text-accent active:scale-95"
+                      >
+                        {preset}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -771,12 +851,12 @@ export function ProfileEditor({
                         )}
                       </span>
                       <img
+                        key={f.id}
                         src={frameUrl(f)}
                         alt=""
-                        loading="lazy"
-                        decoding="async"
                         draggable={false}
-                        className="relative size-full object-contain"
+                        decoding="sync"
+                        className="relative size-full object-contain pointer-events-none"
                       />
                       {on && (
                         <div className="absolute right-1 top-1 grid size-4 place-items-center rounded-full bg-accent text-accent-fg shadow">

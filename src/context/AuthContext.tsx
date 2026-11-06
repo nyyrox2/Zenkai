@@ -87,7 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth
       .getSession()
       .then(({ data: { session: s }, error }) => {
-        if (!error && s) {
+        if (error) {
+          // If stored refresh token was revoked or invalid, cleanly purge local storage
+          if (error.message?.includes('Refresh Token') || (error as any).status === 400) {
+            void supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+          }
+        } else if (s) {
           setSession(s)
           setUser(s.user)
           void syncProfile(s.user)
