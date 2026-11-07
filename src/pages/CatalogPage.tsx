@@ -8,7 +8,6 @@ import { mediaToCard } from '../lib/mappers'
 import { humanize } from '../lib/utils'
 import { AnimeCard } from '../components/AnimeCard'
 import { ErrorState } from '../components/ErrorState'
-import { GradientText } from '../components/GradientText'
 import { CustomSelect, type Option } from '../components/CustomSelect'
 import { Skeleton } from '../components/Skeleton'
 
@@ -136,16 +135,16 @@ export default function CatalogPage({ preset }: { preset: Preset }) {
   const ranked = preset !== 'browse' && !filtered
 
   return (
-    <main className="mx-auto max-w-7xl px-4 pb-24 pt-28 sm:px-6">
+    <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pb-16 md:pt-10">
       <header>
         <p className="mb-2 eyebrow text-accent">{copy.eyebrow}</p>
         <h1 className="font-display text-4xl font-black tracking-tight">
-          <GradientText>{copy.title}</GradientText>
+          {copy.title}
         </h1>
         <p className="mt-3 max-w-xl text-muted">{copy.sub}</p>
       </header>
 
-      <div className="sticky top-[4.5rem] z-30 -mx-4 mt-8 border-y border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
+      <div className="sticky top-14 z-30 md:top-0 -mx-4 mt-8 border-y border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
         <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
           {preset === 'browse' && (
             <label className="relative shrink-0">

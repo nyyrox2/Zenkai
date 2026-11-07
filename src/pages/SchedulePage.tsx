@@ -7,7 +7,6 @@ import { useAsync } from '../hooks/useAsync'
 import { cn, formatLabel, pickTitle, toScore10 } from '../lib/utils'
 import type { AniAiringEntry } from '../types/anime'
 import { ErrorState } from '../components/ErrorState'
-import { GradientText } from '../components/GradientText'
 import { Skeleton } from '../components/Skeleton'
 
 const DAY = 86400
@@ -93,7 +92,10 @@ export default function SchedulePage() {
   const data = useAsync(() => fetchAiring(from - 1, from + DAY), [from])
 
   useEffect(() => {
-    strip.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+    // scroll only the day strip; scrollIntoView would also drag the whole page sideways on phones
+    const box = strip.current
+    const on = box?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (box && on) box.scrollTo({ left: on.offsetLeft - (box.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' })
   }, [sel])
 
   const groups = useMemo(() => {
@@ -111,17 +113,17 @@ export default function SchedulePage() {
   const tz = new Intl.DateTimeFormat([], { timeZoneName: 'short' }).formatToParts(new Date()).find((p) => p.type === 'timeZoneName')?.value
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pb-24 pt-28 sm:px-6">
+    <main className="mx-auto max-w-4xl overflow-x-clip px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pb-16 md:pt-10">
       <header>
         <p className="mb-2 eyebrow text-accent">Release calendar</p>
         <h1 className="font-display text-4xl font-black tracking-tight">
-          <GradientText>Schedule</GradientText>
+          Schedule
         </h1>
         <p className="mt-3 text-muted">Episodes airing each day, in your local time{tz ? ` (${tz})` : ''}.</p>
       </header>
 
-      <div className="sticky top-[4.5rem] z-30 -mx-4 mt-8 border-y border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
-        <div ref={strip} role="tablist" aria-label="Day" className="no-scrollbar flex gap-2 overflow-x-auto">
+      <div className="sticky top-14 z-30 md:top-0 -mx-4 mt-8 border-y border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
+        <div ref={strip} role="tablist" aria-label="Day" className="no-scrollbar relative flex gap-2 overflow-x-auto">
           {days.map((d, i) => {
             const on = i === sel
             const isToday = i === BEFORE

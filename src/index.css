@@ -4,7 +4,7 @@
 
 /* ---------- Theme tokens ---------- */
 :root {
-  --background: #f6f6f8;
+  --background: #ffffff;
   --foreground: #0b0b0e;
   --card: #ffffff;
   --card-2: #ececf1;
@@ -12,34 +12,30 @@
   --muted: rgba(11, 11, 14, 0.62);
   --accent: #dc143c;
   --accent-fg: #ffffff;
-  --glow: rgba(220, 20, 60, 0.16);
+  --glow: transparent;
   --glass: rgba(255, 255, 255, 0.72);
   color-scheme: light;
 }
 
 .dark {
-  --background: #050506;
+  --background: #000000;
   --foreground: #f5f5f7;
-  --card: #0d0d10;
-  --card-2: #17171b;
+  --card: #09090b;
+  --card-2: #121215;
   --border: rgba(255, 255, 255, 0.09);
   --muted: rgba(245, 245, 247, 0.6);
   --accent: #e8294c;
   --accent-fg: #ffffff;
-  --glow: rgba(232, 41, 76, 0.2);
+  --glow: transparent;
   --glass: rgba(8, 8, 10, 0.68);
   color-scheme: dark;
 }
 
-/* Per-section identity: Anime stays red, Novels amber, Manga indigo. */
-:root[data-section="novel"] { --accent: #b45f06; --glow: rgba(180, 95, 6, 0.16); }
-.dark[data-section="novel"] { --accent: #f0a63a; --accent-fg: #1a1205; --glow: rgba(240, 166, 58, 0.2); }
-:root[data-section="manga"] { --accent: #4f46e5; --glow: rgba(79, 70, 229, 0.16); }
-.dark[data-section="manga"] { --accent: #8b83ff; --accent-fg: #0b0a1f; --glow: rgba(139, 131, 255, 0.22); }
+/* Anime, Manga and Novels share one theme: black & white with the crimson accent. Only Movies is pure monochrome. */
 
 /* Movies: plain black & white. Pure black in dark, pure white in light, ink / paper accent. */
-:root[data-section="movies"] { --background: #ffffff; --card: #fafafa; --card-2: #efefef; --accent: #0b0b0e; --accent-fg: #ffffff; --glow: rgba(11, 11, 14, 0.1); --glass: rgba(255, 255, 255, 0.78); }
-.dark[data-section="movies"] { --background: #000000; --card: #0a0a0a; --card-2: #151515; --accent: #f5f5f7; --accent-fg: #0b0b0e; --glow: rgba(255, 255, 255, 0.14); --glass: rgba(0, 0, 0, 0.7); }
+:root[data-section="movies"] { --background: #ffffff; --card: #fafafa; --card-2: #efefef; --accent: #0b0b0e; --accent-fg: #ffffff; --glow: transparent; --glass: rgba(255, 255, 255, 0.78); }
+.dark[data-section="movies"] { --background: #000000; --card: #0a0a0a; --card-2: #151515; --accent: #f5f5f7; --accent-fg: #0b0b0e; --glow: transparent; --glass: rgba(0, 0, 0, 0.7); }
 
 @theme inline {
   --color-background: var(--background);
@@ -245,21 +241,6 @@ section[id] {
 }
 .animate-card-in {
   animation: card-in 0.45s ease-out both;
-}
-
-/* React Bits "Gradient Text" */
-@keyframes gradient-pan {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-.gradient-text {
-  background-image: linear-gradient(110deg, var(--foreground) 0%, var(--accent) 35%, color-mix(in srgb, var(--accent) 60%, white) 60%, var(--foreground) 100%);
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: gradient-pan 8s ease-in-out infinite;
 }
 
 @keyframes hero-progress {

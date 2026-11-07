@@ -7,9 +7,8 @@ export const SECTIONS: { id: Section; label: string; to: string; kanji: string }
   { id: 'movies', label: 'Movies', to: '/movies', kanji: '映画' },
 ]
 
-/** Which part of the site a pathname belongs to (null on the opening page). */
-export function sectionOf(pathname: string): Section | null {
-  if (pathname === '/') return null
+/** Which part of the site a pathname belongs to. */
+export function sectionOf(pathname: string): Section {
   if (pathname.startsWith('/novel')) return 'novel'
   if (pathname.startsWith('/manga')) return 'manga'
   if (pathname.startsWith('/movies')) return 'movies'

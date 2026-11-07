@@ -182,14 +182,33 @@ export async function shareCard({ request, env, kind, id, type, party = false })
   const name = c.plainTitle || c.title;
   let title = `${c.title} — ${cfg.suffix}`;
   let desc = c.desc || cfg.fallback(name);
+
+  // Default image is the TMDB or AniList high-resolution artwork directly
+  let ogImage = c.image;
+
   // Watch-party invite: /watch/:id?room=zk-xxxxxx&host=Name&ep=6
   const room = (reqUrl.searchParams.get("room") || "").toLowerCase();
-  if (party && /^zk-[a-z0-9]{3,12}$/.test(room)) {
+  const isParty = party && /^zk-[a-z0-9]{3,12}$/.test(room);
+
+  if (isParty) {
     const host = clip(plain(reqUrl.searchParams.get("host") || ""), 40);
     const ep = /^\d{1,4}$/.test(reqUrl.searchParams.get("ep") || "") ? reqUrl.searchParams.get("ep") : "";
     title = `${host || "A friend"} is inviting you to watch ${name} together`;
     desc = `Join the Zenkai watch party${ep ? ` · Episode ${ep}` : ""} · Code ${room.toUpperCase()} — everyone stays in sync. Tap to join.`;
+
+    // Watch together custom user card with banner in background, host profile avatar, and room code
+    const cardUrl = `https://wcvazatblggnbnrguopj.supabase.co/storage/v1/object/public/share-cards/${room}.png`;
+    try {
+      const head = await fetch(cardUrl, { method: "HEAD", signal: AbortSignal.timeout(1000) });
+      if (head.ok) {
+        ogImage = cardUrl;
+      }
+    } catch {
+      // If card storage is still processing, use the direct TMDB/AniList artwork
+      ogImage = c.image;
+    }
   }
+
   const set = (value) => ({ element: (e) => e.setAttribute("content", value) });
   const rw = new HTMLRewriter()
     .on("title", { element: (e) => e.setInnerContent(title) })
@@ -199,10 +218,19 @@ export async function shareCard({ request, env, kind, id, type, party = false })
     .on('meta[property="og:title"], meta[name="twitter:title"]', set(title))
     .on('meta[name="description"], meta[property="og:description"], meta[name="twitter:description"]', set(desc))
     .on('meta[property="og:image:alt"], meta[name="twitter:image:alt"]', set(name));
-  if (c.image) {
-    rw.on('meta[property="og:image"], meta[property="og:image:secure_url"], meta[name="twitter:image"]', set(c.image))
+
+  if (ogImage) {
+    rw.on('meta[property="og:image"], meta[property="og:image:secure_url"], meta[name="twitter:image"]', set(ogImage))
       .on('meta[property="og:image:type"]', { element: (e) => e.remove() })
       .on('meta[property="og:image:width"], meta[property="og:image:height"]', { element: (e) => e.remove() });
   }
-  return new Response(rw.transform(asset).body, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600", "X-Share": c.image ? "ok" : "ok-noimage" } });
+
+  return new Response(rw.transform(asset).body, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "public, max-age=3600",
+      "X-Share": ogImage ? "ok" : "ok-noimage",
+    },
+  });
 }

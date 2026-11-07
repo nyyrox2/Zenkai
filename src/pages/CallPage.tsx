@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -10,6 +10,11 @@ import {
   ArrowLeft,
   Radio,
   AlertTriangle,
+  Pause,
+  Play,
+  Maximize2,
+  Minimize2,
+  Loader2,
 } from 'lucide-react'
 import { useVoiceCall } from '../context/VoiceCallContext'
 import { Avatar } from '../components/Avatar'
@@ -26,19 +31,48 @@ export default function CallPage() {
   const { activeCall, endCall, returnPath } = useVoiceCall()
   const navigate = useNavigate()
 
-  const [duration, setDuration] = useState(0)
+  // Real continuous call duration that persists across page navigations & minimizes
+  const [duration, setDuration] = useState(() => (activeCall ? activeCall.getDuration() : 0))
   const [isMuted, setIsMuted] = useState(activeCall?.isMuted || false)
+  const [isRemoteMuted, setIsRemoteMuted] = useState(activeCall?.isRemoteMuted || false)
   const [isDeafened, setIsDeafened] = useState(activeCall?.isDeafened || false)
+  const [isOnHold, setIsOnHold] = useState(activeCall?.isOnHold || false)
+  const [isRemoteOnHold, setIsRemoteOnHold] = useState(activeCall?.isRemoteOnHold || false)
   const [status, setStatus] = useState(activeCall?.status || 'idle')
   const [micBlocked, setMicBlocked] = useState(activeCall?.micPermissionDenied || false)
   const [retryingMic, setRetryingMic] = useState(false)
+  const [disconnectSecs, setDisconnectSecs] = useState(activeCall?.partnerDisconnectSecondsLeft || 60)
+  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement))
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Attach remote stream directly to page audio element
+  useEffect(() => {
+    if (!activeCall) return
+
+    const attach = (stream: MediaStream) => {
+      if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== stream) {
+        remoteAudioRef.current.srcObject = stream
+        remoteAudioRef.current.muted = activeCall.isDeafened || activeCall.isOnHold
+        remoteAudioRef.current.volume = 1.0
+        remoteAudioRef.current.play().catch(() => {})
+      }
+    }
+
+    const currentStream = activeCall.getRemoteStream()
+    if (currentStream) attach(currentStream)
+
+    activeCall.setCallbacks({
+      onRemoteStreamChange: (stream) => {
+        attach(stream)
+      },
+    })
+  }, [activeCall])
 
   // Redirect if no active call
   useEffect(() => {
     if (!activeCall) {
       navigate(returnPath || '/messages', { replace: true })
     } else {
-      // Ensure microphone permission is requested if not already acquired
       void activeCall.acquireMicrophone().catch((err) => {
         console.warn('[CallPage] acquireMicrophone prompt:', err)
         setMicBlocked(true)
@@ -46,43 +80,62 @@ export default function CallPage() {
     }
   }, [activeCall, navigate, returnPath])
 
+  // Track fullscreen changes
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onFsChange)
+    return () => document.removeEventListener('fullscreenchange', onFsChange)
+  }, [])
+
   // Listen to call events
   useEffect(() => {
     if (!activeCall) return
 
     setStatus(activeCall.status)
     setIsMuted(activeCall.isMuted)
+    setIsRemoteMuted(activeCall.isRemoteMuted)
     setIsDeafened(activeCall.isDeafened)
+    setIsOnHold(activeCall.isOnHold)
+    setIsRemoteOnHold(activeCall.isRemoteOnHold)
     setMicBlocked(activeCall.micPermissionDenied)
 
     activeCall.setCallbacks({
       onStatusChange: (newStatus) => {
         setStatus(newStatus)
+        setIsOnHold(activeCall.isOnHold)
+        setIsRemoteOnHold(activeCall.isRemoteOnHold)
+        setIsRemoteMuted(activeCall.isRemoteMuted)
         if (newStatus === 'ended') {
           setTimeout(() => {
             navigate(returnPath || '/messages', { replace: true })
           }, 1200)
         }
       },
+      onRemoteMuteChange: (muted) => {
+        setIsRemoteMuted(muted)
+      },
       onMicPermissionError: () => {
         setMicBlocked(true)
+      },
+      onPartnerDisconnectTick: (sec) => {
+        setDisconnectSecs(sec)
       },
     })
   }, [activeCall, navigate, returnPath])
 
-  // Duration timer
+  // Continuous timer linked to activeCall.getDuration()
   useEffect(() => {
-    if (status !== 'connected') {
-      setDuration(0)
+    if (!activeCall || (status !== 'connected' && status !== 'hold')) {
       return
     }
 
+    setDuration(activeCall.getDuration())
     const interval = window.setInterval(() => {
-      setDuration((d) => d + 1)
+      setDuration(activeCall.getDuration())
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [status])
+  }, [activeCall, status])
 
   if (!activeCall) return null
 
@@ -101,7 +154,29 @@ export default function CallPage() {
   const handleToggleDeafen = () => {
     const next = activeCall.toggleDeafen()
     setIsDeafened(next)
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = next || isOnHold
+    }
     toast(next ? 'Speaker deafened' : 'Speaker undeafened', 'info')
+  }
+
+  const handleToggleHold = async () => {
+    const held = await activeCall.toggleHold()
+    setIsOnHold(held)
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = isDeafened || held
+    }
+    toast(held ? 'Call put on hold' : 'Call resumed', 'info')
+  }
+
+  const handleToggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen()
+      } else {
+        await document.exitFullscreen()
+      }
+    } catch {}
   }
 
   const handleRetryMic = async () => {
@@ -128,11 +203,13 @@ export default function CallPage() {
     navigate(returnPath || '/messages')
   }
 
+  const isPaused = isOnHold || isRemoteOnHold
+
   return (
-    <div className="relative min-h-screen w-full bg-background text-foreground flex flex-col justify-between overflow-hidden select-none">
-      {/* Dynamic ambient backdrop blur circles */}
+    <div className="relative min-h-screen w-full bg-[#070709] text-white flex flex-col justify-between overflow-hidden select-none">
+      {/* Ambient backdrop glow */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 size-80 rounded-full bg-accent/8 blur-[120px]" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 size-96 rounded-full bg-accent/10 blur-[140px]" />
       </div>
 
       {/* Top Navigation Bar */}
@@ -140,88 +217,132 @@ export default function CallPage() {
         <button
           type="button"
           onClick={handleMinimize}
-          className="inline-flex items-center gap-2 rounded-2xl border border-border/60 bg-card/60 px-3.5 py-2 text-xs font-bold text-foreground backdrop-blur-md transition hover:border-accent hover:text-accent active:scale-95 shadow-sm"
+          className="inline-flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-900/70 px-3.5 py-2 text-xs font-bold text-zinc-300 backdrop-blur-md transition hover:border-zinc-700 hover:text-white active:scale-95 shadow-sm"
         >
           <ArrowLeft className="size-4" />
           <span>Minimize</span>
         </button>
-        <span />
+
+        <button
+          type="button"
+          onClick={handleToggleFullscreen}
+          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          className="inline-flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-900/70 px-3.5 py-2 text-xs font-bold text-zinc-300 backdrop-blur-md transition hover:border-zinc-700 hover:text-white active:scale-95 shadow-sm"
+        >
+          {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+          <span className="hidden sm:inline">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+        </button>
       </header>
 
       {/* Center Stage: Partner Profile & Audio Ripples */}
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-6 text-center">
         {/* Animated Avatar with audio ripple rings */}
         <div className="relative mb-6">
-          {status === 'connected' && !isDeafened && (
+          {status === 'connected' && !isDeafened && !isPaused && (
             <>
               <motion.div
-                animate={{ scale: [1, 1.45, 1], opacity: [0.35, 0.05, 0.35] }}
+                animate={{ scale: [1, 1.45, 1], opacity: [0.25, 0.05, 0.25] }}
                 transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute -inset-8 rounded-full bg-emerald-500/20"
+                className="absolute -inset-8 rounded-full border border-white/10 bg-white/[0.04]"
               />
               <motion.div
-                animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0.15, 0.5] }}
+                animate={{ scale: [1, 1.25, 1], opacity: [0.4, 0.1, 0.4] }}
                 transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute -inset-4 rounded-full bg-emerald-500/30"
+                className="absolute -inset-4 rounded-full border border-white/20 bg-white/[0.08]"
               />
             </>
           )}
 
           {status === 'calling' && (
-            <div className="absolute -inset-5 rounded-full bg-accent/25 animate-ping opacity-60" />
+            <div className="absolute -inset-5 rounded-full bg-accent/20 animate-ping opacity-60" />
           )}
 
-          <div className="relative rounded-full ring-4 ring-card-2/80 shadow-2xl shadow-black/80">
+          {status === 'connecting' && (
+            <div className="absolute -inset-5 rounded-full border border-zinc-700 bg-zinc-800/30 animate-pulse" />
+          )}
+
+          <div className="relative rounded-full ring-2 ring-zinc-800 shadow-2xl shadow-black">
             <Avatar
               size={108}
               name={activeCall.partner.displayName}
               src={activeCall.partner.avatar}
               animateFrame
             />
+            {isRemoteMuted && (
+              <div
+                title="Partner is muted"
+                className="absolute bottom-1 right-1 grid size-7 place-items-center rounded-full border border-rose-500/50 bg-zinc-950 text-rose-400 shadow-lg ring-2 ring-zinc-950"
+              >
+                <MicOff className="size-3.5" />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Partner Info */}
-        <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+        <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
           {activeCall.partner.displayName}
         </h1>
-        <p className="mt-1 text-sm font-semibold text-muted">@{activeCall.partner.username}</p>
+        <p className="mt-1 text-sm font-semibold text-zinc-400">@{activeCall.partner.username}</p>
 
         {/* Status indicator / Live Timer */}
         <div className="mt-4 flex flex-col items-center gap-2">
           {status === 'calling' && (
-            <div className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-1.5 text-xs font-semibold text-muted">
-              <Radio className="size-3.5 animate-pulse" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/80 px-4 py-1.5 text-xs font-semibold text-zinc-300">
+              <Radio className="size-3.5 text-accent animate-pulse" />
               <span>Ringing…</span>
             </div>
           )}
 
-          {status === 'connected' && (
+          {status === 'connecting' && (
+            <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/90 px-4 py-1.5 text-xs font-semibold text-zinc-200">
+              <Loader2 className="size-3.5 text-zinc-300 animate-spin" />
+              <span>
+                {activeCall.connectedAt
+                  ? `Waiting for ${activeCall.partner.displayName}… (${disconnectSecs}s)`
+                  : 'Connecting…'}
+              </span>
+            </div>
+          )}
+
+          {(status === 'connected' || status === 'hold') && (
             <div className="space-y-2">
-              <span className="font-mono text-2xl font-bold tracking-wider text-foreground">
+              <span className="font-mono text-3xl font-extrabold tracking-widest text-white">
                 {formatSeconds(duration)}
               </span>
 
-              {/* Real-time Oscillating Visualizer Wave Bars */}
-              <div className="flex items-center justify-center gap-1 h-5">
-                {[0.4, 0.7, 1.0, 0.6, 0.9, 0.5, 0.8, 0.3].map((height, i) => (
-                  <motion.span
-                    key={i}
-                    animate={{
-                      scaleY: isDeafened ? 0.2 : [height * 0.4, height * 1.2, height * 0.4],
-                    }}
-                    transition={{
-                      duration: 0.8 + (i % 3) * 0.2,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                    className={cn(
-                      'w-1 rounded-full',
-                      isDeafened ? 'bg-zinc-700 h-2' : 'bg-emerald-400 h-4'
-                    )}
-                  />
-                ))}
-              </div>
+              {/* Status or Visualizer */}
+              {isPaused ? (
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900/90 px-3.5 py-1 text-xs font-semibold text-zinc-300 shadow-sm">
+                  <Pause className="size-3.5 text-zinc-400" />
+                  <span>On hold</span>
+                </div>
+              ) : isRemoteMuted ? (
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3.5 py-1 text-xs font-semibold text-rose-300 shadow-sm">
+                  <MicOff className="size-3.5 text-rose-400" />
+                  <span>Muted</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-1 h-5">
+                  {[0.4, 0.7, 1.0, 0.6, 0.9, 0.5, 0.8, 0.3].map((height, i) => (
+                    <motion.span
+                      key={i}
+                      animate={{
+                        scaleY: isDeafened ? 0.2 : [height * 0.4, height * 1.2, height * 0.4],
+                      }}
+                      transition={{
+                        duration: 0.8 + (i % 3) * 0.2,
+                        repeat: Infinity,
+                        ease: 'easeInOut',
+                      }}
+                      className={cn(
+                        'w-1 rounded-full',
+                        isDeafened ? 'bg-zinc-800 h-2' : 'bg-white h-4'
+                      )}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -240,20 +361,20 @@ export default function CallPage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
-              className="mt-6 max-w-sm rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-200 text-center shadow-lg backdrop-blur-md space-y-2"
+              className="mt-6 max-w-sm rounded-2xl border border-rose-500/40 bg-zinc-950/90 p-3.5 text-xs text-zinc-200 text-center shadow-2xl backdrop-blur-md space-y-2.5"
             >
-              <div className="flex items-center justify-center gap-2 font-bold text-amber-300">
+              <div className="flex items-center justify-center gap-2 font-bold text-rose-400">
                 <AlertTriangle className="size-4 shrink-0" />
                 <span>Microphone Access Blocked</span>
               </div>
-              <p className="text-[11px] text-amber-200/80 leading-relaxed">
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
                 Your browser blocked microphone access. Tap below or allow microphone in your address bar to speak.
               </p>
               <button
                 type="button"
                 onClick={handleRetryMic}
                 disabled={retryingMic}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 px-3.5 py-1.5 text-xs font-bold text-black transition hover:bg-amber-300 active:scale-95 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-1.5 text-xs font-bold text-white transition hover:brightness-110 active:scale-95 disabled:opacity-50 shadow-md"
               >
                 <Mic className="size-3.5" />
                 <span>{retryingMic ? 'Requesting…' : 'Allow Microphone'}</span>
@@ -265,7 +386,7 @@ export default function CallPage() {
 
       {/* Bottom Control Bar Dock */}
       <footer className="relative z-10 flex flex-col items-center pb-8 pt-4 px-4 sm:pb-12">
-        <div className="flex items-center justify-center gap-5 sm:gap-8 rounded-3xl border border-border/70 bg-card/85 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl ring-1 ring-white/5">
+        <div className="flex items-center justify-center gap-4 sm:gap-7 rounded-3xl border border-zinc-800/80 bg-zinc-950/85 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl ring-1 ring-white/5">
           {/* Mute Mic Button */}
           <div className="flex flex-col items-center gap-1.5">
             <button
@@ -273,16 +394,46 @@ export default function CallPage() {
               onClick={handleToggleMute}
               title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
               className={cn(
-                'grid size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
+                'grid size-13 sm:size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
                 isMuted
-                  ? 'border-amber-500/50 bg-amber-500/20 text-amber-300 ring-2 ring-amber-500/20'
-                  : 'border-border bg-card-2 text-foreground hover:border-accent hover:text-accent'
+                  ? 'border-zinc-700 bg-zinc-800 text-white shadow-inner ring-1 ring-white/10'
+                  : 'border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:border-zinc-700 hover:text-white'
               )}
             >
-              {isMuted ? <MicOff className="size-6" /> : <Mic className="size-6" />}
+              {isMuted ? <MicOff className="size-5 sm:size-6" /> : <Mic className="size-5 sm:size-6" />}
             </button>
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
+            <span
+              className={cn(
+                'text-[10px] font-bold uppercase tracking-wider',
+                isMuted ? 'text-zinc-200' : 'text-zinc-500'
+              )}
+            >
               {isMuted ? 'Muted' : 'Mute'}
+            </span>
+          </div>
+
+          {/* Hold / Resume Button */}
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleToggleHold}
+              title={isOnHold ? 'Resume call' : 'Put call on hold'}
+              className={cn(
+                'grid size-13 sm:size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
+                isOnHold
+                  ? 'border-zinc-700 bg-zinc-800 text-white shadow-inner ring-1 ring-white/10'
+                  : 'border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:border-zinc-700 hover:text-white'
+              )}
+            >
+              {isOnHold ? <Play className="size-5 sm:size-6" /> : <Pause className="size-5 sm:size-6" />}
+            </button>
+            <span
+              className={cn(
+                'text-[10px] font-bold uppercase tracking-wider',
+                isOnHold ? 'text-zinc-200' : 'text-zinc-500'
+              )}
+            >
+              {isOnHold ? 'Resume' : 'Hold'}
             </span>
           </div>
 
@@ -292,9 +443,9 @@ export default function CallPage() {
               type="button"
               onClick={handleHangUp}
               title="End call"
-              className="grid size-16 place-items-center rounded-full bg-rose-600 text-white shadow-xl shadow-rose-600/35 transition hover:scale-105 active:scale-95 hover:brightness-110"
+              className="grid size-15 sm:size-16 place-items-center rounded-full bg-[#e8294c] hover:bg-[#ff2d55] text-white shadow-xl shadow-rose-950/60 transition hover:scale-105 active:scale-95"
             >
-              <PhoneOff className="size-7" />
+              <PhoneOff className="size-6 sm:size-7" />
             </button>
             <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">
               End
@@ -308,20 +459,33 @@ export default function CallPage() {
               onClick={handleToggleDeafen}
               title={isDeafened ? 'Undeafen speaker' : 'Deafen speaker'}
               className={cn(
-                'grid size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
+                'grid size-13 sm:size-14 place-items-center rounded-2xl border transition active:scale-90 shadow-md',
                 isDeafened
-                  ? 'border-amber-500/50 bg-amber-500/20 text-amber-300 ring-2 ring-amber-500/20'
-                  : 'border-border bg-card-2 text-foreground hover:border-accent hover:text-accent'
+                  ? 'border-zinc-700 bg-zinc-800 text-white shadow-inner ring-1 ring-white/10'
+                  : 'border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:border-zinc-700 hover:text-white'
               )}
             >
-              {isDeafened ? <VolumeX className="size-6" /> : <Volume2 className="size-6" />}
+              {isDeafened ? <VolumeX className="size-5 sm:size-6" /> : <Volume2 className="size-5 sm:size-6" />}
             </button>
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">
+            <span
+              className={cn(
+                'text-[10px] font-bold uppercase tracking-wider',
+                isDeafened ? 'text-zinc-200' : 'text-zinc-500'
+              )}
+            >
               {isDeafened ? 'Deafened' : 'Speaker'}
             </span>
           </div>
         </div>
       </footer>
+
+      {/* Hardware-routed direct audio element */}
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        className="fixed -bottom-10 -right-10 size-1 opacity-0 pointer-events-none"
+      />
     </div>
   )
 }

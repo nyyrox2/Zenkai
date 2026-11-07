@@ -55,8 +55,6 @@ export default function NovelHomePage() {
     return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([g]) => g)
   }, [all])
 
-  // the shelf's own covers, softened into an ambient wash behind the headline
-  const backdrop = useMemo(() => all.filter((n) => n.cover).slice(0, 24).map((n) => ({ src: n.cover, title: n.title })), [all])
   const filtered = useMemo(() => (genre ? all.filter((n) => n.genres?.includes(genre)) : null), [all, genre])
   const searching = term.length > 0
   const err = home.error?.message
@@ -76,12 +74,9 @@ export default function NovelHomePage() {
         title="Get lost in a"
         accent="story with no last page."
         subtitle="Web novels and illustrated light novels from four sources, searchable all at once, in a reader built for long sessions."
-        kanji="小説"
         query={query}
         onQuery={setQuery}
         placeholder="Search novels…"
-        backdrop={backdrop}
-        blurBackdrop
       >
         <Tabs tabs={[{ id: 'all' as NovelScope, label: 'All' }, ...NOVEL_SOURCES.map((s) => ({ id: s.id as NovelScope, label: s.label }))]} value={source} onChange={setSource} />
       </DiscoverHero>

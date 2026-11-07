@@ -5,7 +5,6 @@ import { useAniList } from '../lib/anilist'
 import { setStatus, STATUS_LABEL, useList, type ListStatus } from '../lib/library'
 import { AnimeCard } from '../components/AnimeCard'
 import { ContinueRow } from '../components/ContinueRow'
-import { GradientText } from '../components/GradientText'
 import { Tabs } from '../components/Tabs'
 
 type Filter = 'all' | ListStatus
@@ -25,11 +24,11 @@ export default function ListPage() {
   const shown = filter === 'all' ? list : list.filter((i) => i.status === filter)
 
   return (
-    <main className="pb-24 pt-28">
+    <main className="pb-28 pt-6 sm:pt-8 md:pb-16 md:pt-10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <p className="mb-2 eyebrow text-accent">{al?.user ? `Synced with AniList · ${al.user.name}` : 'Saved on this device'}</p>
         <h1 className="font-display text-4xl font-black tracking-tight">
-          <GradientText>My List</GradientText>
+          My List
         </h1>
       </div>
 

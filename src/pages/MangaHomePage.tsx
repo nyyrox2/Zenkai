@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Compass, Info } from 'lucide-react'
 import { useAsync } from '../hooks/useAsync'
 import { useDebounced } from '../hooks/useDebounced'
-import { useShowcase } from '../hooks/useShowcase'
 import { DEFAULT_MANGA_SOURCE, MANGA_SOURCES, isMangaSource, mangaHref, mangaSourceInfo, resolveMangaSource } from '../lib/mangaModels'
 import { fetchMangaHome, findOnServersHref, MANGA_KINDS, searchAniListManga, searchManga, type AniMangaHit, type MangaItem, type MangaKind, type MangaScope } from '../services/manga'
 import type { BookCardItem } from '../components/BookCard'
@@ -56,8 +55,6 @@ export default function MangaHomePage() {
   const [query, setQuery] = useState('')
   const term = useDebounced(query.trim(), 400)
   const home = useAsync(() => fetchMangaHome(source), [source])
-  const { manga: art } = useShowcase()
-  const backdrop = useMemo(() => art.filter((a) => a.wide), [art])
   const found = useAsync(() => (term ? searchManga(term, source) : Promise.resolve(null)), [term, source])
   const ani = useAsync(() => (term ? searchAniListManga(term) : Promise.resolve(null)), [term])
 
@@ -121,11 +118,9 @@ export default function MangaHomePage() {
         title="Binge the latest"
         accent="chapters, the moment they drop."
         subtitle="Manga, manhwa and manhua from five servers, or search them all at once. Webtoon scroll or paged reading, with your place saved automatically."
-        kanji="漫画"
         query={query}
         onQuery={setQuery}
         placeholder="Search manga…"
-        backdrop={backdrop}
       >
         <Tabs tabs={[{ id: 'all' as MangaScope, label: 'All' }, ...MANGA_SOURCES.map((x) => ({ id: x.id as MangaScope, label: x.displayName }))]} value={source} onChange={setSource} />
       </DiscoverHero>

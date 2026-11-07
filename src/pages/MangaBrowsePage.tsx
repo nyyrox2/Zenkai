@@ -7,7 +7,6 @@ import { fetchMangaCatalog, findOnServersHref, MANGA_KINDS, type AniMangaHit, ty
 import { BookCard, type BookCardItem } from '../components/BookCard'
 import { CustomSelect, type Option } from '../components/CustomSelect'
 import { ErrorState } from '../components/ErrorState'
-import { GradientText } from '../components/GradientText'
 import { Skeleton } from '../components/Skeleton'
 
 const FORMATS: Option[] = [
@@ -139,16 +138,16 @@ export default function MangaBrowsePage() {
   const filtered = ['kind', 'genre', 'tag', 'format', 'year', 'status', 'q', 'sort'].some((k) => get(k))
 
   return (
-    <main className="mx-auto max-w-7xl px-4 pb-24 pt-28 sm:px-6">
+    <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pb-16 md:pt-10">
       <header>
         <p className="mb-2 eyebrow text-accent">Find your next read</p>
         <h1 className="font-display text-4xl font-black tracking-tight">
-          <GradientText>Browse</GradientText>
+          Browse
         </h1>
         <p className="mt-3 max-w-xl text-muted">Filter manga, manhwa and manhua by genre, theme, year and status. Open a title and it is looked up on every server.</p>
       </header>
 
-      <div className="sticky top-[4.5rem] z-30 -mx-4 mt-8 border-y border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
+      <div className="sticky top-14 z-30 md:top-0 -mx-4 mt-8 border-y border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
         <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
           <label className="relative shrink-0">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />

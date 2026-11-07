@@ -80,7 +80,7 @@ export function WatchTogetherModal({
 
   const me = room ? peers.find((p) => p.peerId === room.peerId) : undefined
   const selfName = me?.displayName || 'A friend'
-  const inviteUrl = room ? partyShareUrl(animeId, episode, room.roomId, selfName, animeTitle) : ''
+  const inviteUrl = room ? partyShareUrl(animeId, episode, room.roomId, selfName, animeTitle, me?.avatar) : ''
   const card: ShareCardOpts | null = room
     ? {
         kind: 'party',
@@ -93,6 +93,29 @@ export function WatchTogetherModal({
         code: room.roomId,
       }
     : null
+
+  // Pre-render and sync the invite card image to Supabase public storage for rich social preview cards
+  useEffect(() => {
+    if (!room || !card) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const { safeRenderShareCard } = await import('../lib/shareCard')
+        const blob = await safeRenderShareCard(card)
+        if (cancelled) return
+        const { supabase } = await import('../lib/supabase')
+        await supabase.storage.from('share-cards').upload(`${room.roomId}.png`, blob, {
+          contentType: 'image/png',
+          upsert: true,
+        })
+      } catch (e) {
+        console.warn('[WatchTogether] Card upload deferred:', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [room?.roomId, animeTitle, episode, image, me?.avatar, selfName])
 
   const copy = async (what: 'code' | 'link') => {
     if (!room) return

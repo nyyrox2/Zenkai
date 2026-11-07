@@ -75,7 +75,7 @@ export const BookCard = memo(function BookCard({
               className={cn('h-full w-full object-cover transition-[opacity,transform] duration-500 group-hover:scale-105', loaded ? 'opacity-100' : 'opacity-0')}
             />
           ) : (
-            <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-card-2 to-card p-3 text-center">
+            <div className="absolute inset-0 grid place-items-center bg-card-2 p-3 text-center">
               <span className="line-clamp-4 font-display text-sm font-bold text-muted">{item.title}</span>
             </div>
           )}

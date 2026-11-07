@@ -495,7 +495,7 @@ export default function WatchPage() {
 
   const handleCopyInvite = async () => {
     if (!room) return
-    const url = partyShareUrl(id, ep, room.roomId, userProfile.displayName, title)
+    const url = partyShareUrl(id, ep, room.roomId, userProfile.displayName, title, userProfile.avatar)
     try {
       await navigator.clipboard.writeText(url)
       setCopiedInvite(true)

@@ -27,6 +27,7 @@ import {
   markConversationAsRead,
   parseCallMessage,
   formatCallDuration,
+  formatCallTimer,
   type ConversationSummary,
   type DirectMessage,
   type PartnerProfile,
@@ -71,7 +72,22 @@ export default function MessagesPage() {
   const { partnerHandle } = useParams<{ partnerHandle?: string }>()
   const navigate = useNavigate()
   const { user, signInWithGoogle } = useAuth()
-  const { startCall } = useVoiceCall()
+  const { startCall, activeCall } = useVoiceCall()
+  const [liveCallSeconds, setLiveCallSeconds] = useState(0)
+
+  useEffect(() => {
+    if (!activeCall || activeCall.status === 'ended' || activeCall.status === 'idle') {
+      setLiveCallSeconds(0)
+      return
+    }
+
+    setLiveCallSeconds(activeCall.getDuration())
+    const interval = window.setInterval(() => {
+      setLiveCallSeconds(activeCall.getDuration())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [activeCall, activeCall?.status])
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [loadingConvs, setLoadingConvs] = useState(true)
@@ -177,21 +193,31 @@ export default function MessagesPage() {
       .channel(`dm_messages_page:${user.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'direct_messages' },
+        { event: '*', schema: 'public', table: 'direct_messages' },
         (payload) => {
-          const newMsg = payload.new as DirectMessage
+          if (payload.eventType === 'INSERT') {
+            const newMsg = payload.new as DirectMessage
 
-          // If message belongs to current active conversation
-          if (
-            activePartner &&
-            (newMsg.sender_id === activePartner.id || newMsg.receiver_id === activePartner.id)
-          ) {
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev
-              return [...prev, newMsg]
-            })
-            setTimeout(() => scrollToBottom(true), 40)
-            if (user.id === newMsg.receiver_id) void markConversationAsRead(user.id, newMsg.sender_id)
+            // If message belongs to current active conversation
+            if (
+              activePartner &&
+              (newMsg.sender_id === activePartner.id || newMsg.receiver_id === activePartner.id)
+            ) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === newMsg.id)) return prev
+                return [...prev, newMsg]
+              })
+              setTimeout(() => scrollToBottom(true), 40)
+              if (user.id === newMsg.receiver_id) void markConversationAsRead(user.id, newMsg.sender_id)
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedMsg = payload.new as DirectMessage
+            if (
+              activePartner &&
+              (updatedMsg.sender_id === activePartner.id || updatedMsg.receiver_id === activePartner.id)
+            ) {
+              setMessages((prev) => prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m)))
+            }
           }
 
           // Refresh conversation list preview
@@ -570,8 +596,15 @@ export default function MessagesPage() {
                       Say hi, talk about anime, or recommend favorite series!
                     </p>
                   </div>
-                ) : (
-                  messages.map((m, idx) => {
+                ) : (() => {
+                  let lastCallIndex = -1
+                  for (let i = messages.length - 1; i >= 0; i--) {
+                    if (parseCallMessage(messages[i].content).isCall) {
+                      lastCallIndex = i
+                      break
+                    }
+                  }
+                  return messages.map((m, idx) => {
                     const isMe = m.sender_id === user.id
                     const isTemp = m.id.startsWith('temp-')
                     const prev = messages[idx - 1]
@@ -579,7 +612,10 @@ export default function MessagesPage() {
                     if (
                       cm.isCall &&
                       cm.status === 'started' &&
-                      messages.slice(idx + 1).some((n) => n.sender_id === m.sender_id && parseCallMessage(n.content).isCall && parseCallMessage(n.content).status !== 'started')
+                      messages.slice(idx + 1).some((n) => {
+                        const nextCm = parseCallMessage(n.content)
+                        return nextCm.isCall && nextCm.status !== 'started'
+                      })
                     )
                       return null
                     const showDay =
@@ -602,75 +638,124 @@ export default function MessagesPage() {
                             const isStarted = callData.status === 'started'
                             const isEnded = callData.status === 'ended'
                             const isDeclined = callData.status === 'declined'
-                            const isPositive = isEnded || isStarted
-                            const isMissedIn = !isMe && !isEnded && !isStarted && !isDeclined
+                            const isMissed = callData.status === 'missed'
+
+                            const isPartnerCall = Boolean(
+                              activeCall &&
+                              activeCall.status !== 'ended' &&
+                              activePartner &&
+                              activeCall.partner.id === activePartner.id
+                            )
+
+                            // ONLY the single latest call message can ever be the currently active call
+                            const isThisMessageTheActiveCall = Boolean(
+                              isPartnerCall &&
+                              idx === lastCallIndex &&
+                              (Date.now() - new Date(m.created_at).getTime() < 12 * 3600_000)
+                            )
+
+                            let cardTitle = 'Audio Call'
+                            let cardSubtitle = `${timeLabel(m.created_at)}`
+                            let isPositive = false
+
+                            if (isEnded) {
+                              isPositive = true
+                              cardTitle = 'Audio Call'
+                              cardSubtitle = callData.duration && callData.duration > 0
+                                ? `Ended • ${formatCallDuration(callData.duration)}`
+                                : `Call ended · ${timeLabel(m.created_at)}`
+                            } else if (isDeclined) {
+                              isPositive = false
+                              cardTitle = isMe ? 'Call Declined' : 'Declined Audio Call'
+                              cardSubtitle = `Declined · ${timeLabel(m.created_at)}`
+                            } else if (isMissed) {
+                              isPositive = false
+                              cardTitle = isMe ? 'Unanswered Call' : 'Missed Audio Call'
+                              cardSubtitle = `No answer · ${timeLabel(m.created_at)}`
+                            } else if (isStarted) {
+                              if (isThisMessageTheActiveCall && activeCall) {
+                                isPositive = true
+                                cardTitle = isMe ? 'Outgoing Audio Call' : 'Incoming Audio Call'
+                                if (activeCall.status === 'calling') {
+                                  cardSubtitle = 'Ringing…'
+                                } else if (activeCall.status === 'connecting') {
+                                  cardSubtitle = 'Connecting…'
+                                } else if (activeCall.status === 'hold') {
+                                  cardSubtitle = `On hold • ${formatCallTimer(liveCallSeconds)}`
+                                } else {
+                                  cardSubtitle = `In progress • ${formatCallTimer(liveCallSeconds)}`
+                                }
+                              } else {
+                                // All older / past calls default cleanly to No Answer
+                                isPositive = false
+                                cardTitle = isMe ? 'Unanswered Call' : 'Missed Audio Call'
+                                cardSubtitle = `No answer · ${timeLabel(m.created_at)}`
+                              }
+                            }
 
                             return (
-                              <div className="my-2.5 flex w-full justify-center">
-                                <div className={cn('flex items-center gap-3 rounded-2xl border bg-card/90 px-3.5 py-2.5 max-w-sm w-full', isMissedIn ? 'border-rose-500/40' : 'border-border/80')}>
-                                  <div
-                                    className={cn(
-                                      'grid size-10 place-items-center rounded-xl shrink-0',
-                                      isPositive
-                                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                        : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                                    )}
-                                  >
-                                    {isPositive ? (
-                                      <PhoneCall className="size-5" />
-                                    ) : (
-                                      <PhoneOff className="size-5" />
-                                    )}
-                                  </div>
+                              <div className="my-2 flex w-full justify-center">
+                                <div
+                                  className={cn(
+                                    'inline-flex items-center gap-2.5 rounded-full border px-4 py-1.5 text-xs font-medium backdrop-blur-md transition shadow-sm',
+                                    isThisMessageTheActiveCall
+                                      ? 'border-emerald-500/40 bg-zinc-950/80 text-emerald-400'
+                                      : isPositive
+                                      ? 'border-zinc-800/80 bg-zinc-900/60 text-zinc-300'
+                                      : 'border-zinc-800/80 bg-zinc-900/60 text-zinc-400'
+                                  )}
+                                >
+                                  {isThisMessageTheActiveCall ? (
+                                    <span className="relative flex size-2 shrink-0">
+                                      <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                                      <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                                    </span>
+                                  ) : isPositive ? (
+                                    <PhoneCall className="size-3.5 text-zinc-400 shrink-0" />
+                                  ) : (
+                                    <PhoneOff className="size-3.5 text-zinc-500 shrink-0" />
+                                  )}
 
-                                  <div className="min-w-0 flex-1">
-                                    <h4 className="text-xs font-bold text-foreground">
-                                      {isStarted
-                                        ? (isMe ? 'Outgoing Audio Call' : 'Incoming Audio Call')
-                                        : isEnded
-                                        ? 'Audio Call'
-                                        : isDeclined
-                                        ? (isMe ? 'Call Declined' : 'Declined Audio Call')
-                                        : (isMe ? 'Unanswered Call' : 'Missed Audio Call')}
-                                    </h4>
-                                    <p className="text-[10px] sm:text-[11px] text-muted truncate">
-                                      {isStarted
-                                        ? `Started · ${timeLabel(m.created_at)}`
-                                        : isEnded && callData.duration
-                                        ? `Call ended • ${formatCallDuration(callData.duration)} · ${timeLabel(m.created_at)}`
-                                        : isDeclined
-                                        ? `Call declined · ${timeLabel(m.created_at)}`
-                                        : `No answer · ${timeLabel(m.created_at)}`}
-                                    </p>
-                                  </div>
+                                  <span className="font-semibold text-zinc-200">{cardTitle}</span>
+                                  <span className="text-zinc-600">•</span>
+                                  <span className="text-[11px] text-zinc-400">{cardSubtitle}</span>
 
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      if (!activePartner) return
-                                      let stream: MediaStream | undefined
-                                      try {
-                                        stream = await requestMicrophoneStream()
-                                      } catch (err: any) {
-                                        const msg = err?.message || ''
-                                        if (msg.includes('HTTPS')) {
-                                          toast(msg, 'error')
-                                          return
+                                  {isThisMessageTheActiveCall ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => navigate('/call')}
+                                      className="ml-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300 hover:bg-emerald-500/25 active:scale-95 transition"
+                                    >
+                                      <span>Open call</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (!activePartner) return
+                                        let stream: MediaStream | undefined
+                                        try {
+                                          stream = await requestMicrophoneStream()
+                                        } catch (err: any) {
+                                          const msg = err?.message || ''
+                                          if (msg.includes('HTTPS')) {
+                                            toast(msg, 'error')
+                                            return
+                                          }
                                         }
-                                      }
-                                      await startCall({
-                                        id: activePartner.id,
-                                        username: activePartner.username,
-                                        displayName: activePartner.displayName,
-                                        avatar: activePartner.avatarUrl,
-                                      }, stream)
-                                      navigate('/call')
-                                    }}
-                                    className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-bold text-accent-fg hover:brightness-110 active:scale-95 transition shrink-0 shadow-sm"
-                                  >
-                                    <Phone className="size-3" />
-                                    <span>Call back</span>
-                                  </button>
+                                        await startCall({
+                                          id: activePartner.id,
+                                          username: activePartner.username,
+                                          displayName: activePartner.displayName,
+                                          avatar: activePartner.avatarUrl,
+                                        }, stream)
+                                        navigate('/call')
+                                      }}
+                                      className="ml-1 text-[11px] font-bold text-zinc-400 hover:text-white underline-offset-2 hover:underline transition"
+                                    >
+                                      Call back
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             )
@@ -720,7 +805,7 @@ export default function MessagesPage() {
                       </div>
                     )
                   })
-                )}
+                })()}
               </div>
 
               {/* Message Composer (pinned bottom, safe area on mobile) */}
