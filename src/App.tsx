@@ -142,7 +142,7 @@ export default function App() {
       {/* Main Content Area with Left Padding for Desktop Sidebar & Top Padding for Mobile Header */}
       <div
         className={cn(
-          'transition-[padding-left] duration-200 ease-out flex-1 flex flex-col w-full min-w-0 max-w-full overflow-x-clip',
+          'transition-[padding-left] duration-200 ease-out flex-1 flex flex-col w-full min-w-0 max-w-full overflow-x-clip [&>*]:w-full [&>*]:min-w-0',
           showNav
             ? cn(
                 sidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-56',
