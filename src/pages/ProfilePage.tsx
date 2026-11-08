@@ -182,7 +182,7 @@ export default function ProfilePage() {
   ]
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pt-10">
+    <main className="mx-auto w-full min-w-0 max-w-4xl space-y-6 px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pt-10">
       {editing ? (
         <ProfileEditor me={me} initialTab={editTab} onClose={() => setEditing(false)} />
       ) : (

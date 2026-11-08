@@ -55,6 +55,9 @@
 /* ---------- Base ---------- */
 html {
   -webkit-tap-highlight-color: transparent;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip; /* nothing may make the page wider than the screen */
 }
 
 body {
@@ -64,8 +67,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, color 0.3s ease;
-  overflow-x: hidden;
+  overflow-x: clip;
+  width: 100%;
+  max-width: 100%;
 }
+
+#root { width: 100%; max-width: 100%; min-width: 0; }
 
 ::selection {
   background: var(--accent);
@@ -350,7 +357,7 @@ html {
   text-size-adjust: 100%;
 }
 html[data-tv] { font-size: calc(var(--root-fs) * 1.125); }
-body { min-width: 320px; }
+body { min-width: 0; }
 input, select, textarea { font-size: max(16px, 1em); } /* stops iOS zooming into fields */
 
 @keyframes img-in {

@@ -120,7 +120,7 @@ export default function App() {
   }, [section])
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-clip bg-background text-foreground">
       <TopLoader />
       {!bare && !isApi && <ScrollProgress />}
       <ScrollToTop />
@@ -142,7 +142,7 @@ export default function App() {
       {/* Main Content Area with Left Padding for Desktop Sidebar & Top Padding for Mobile Header */}
       <div
         className={cn(
-          'transition-[padding-left] duration-200 ease-out flex-1 flex flex-col min-w-0',
+          'transition-[padding-left] duration-200 ease-out flex-1 flex flex-col w-full min-w-0 max-w-full overflow-x-clip',
           showNav
             ? cn(
                 sidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-56',
