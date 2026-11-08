@@ -29,6 +29,7 @@ import { checkDailySync } from './lib/sync'
 import { cn } from './lib/utils'
 
 // Split out lazy pages
+const LandingPage = lazy(() => import('./pages/LandingPage'))
 const HomePage = lazy(() => import('./pages/HomePage'))
 const DetailsPage = lazy(() => import('./pages/DetailsPage'))
 const CatalogPage = lazy(() => import('./pages/CatalogPage'))
@@ -101,7 +102,8 @@ export default function App() {
   const inChat = /^\/messages\/[^/]+$/.test(pathname)
   const isCall = pathname === '/call'
   const isAuth = pathname.startsWith('/auth/') || pathname === '/login'
-  const bare = pathname === '/busted' || isEmbed || reader || isWatchPath(pathname) || isCall || isMessages || isAuth
+  const gate = pathname === '/' // opening picker: full-screen, no sidebar / header / dock
+  const bare = gate || pathname === '/busted' || isEmbed || reader || isWatchPath(pathname) || isCall || isMessages || isAuth
   const section = sectionOf(pathname)
 
   const showNav = !bare && !isDetailsPath(pathname) && !isApi
@@ -154,7 +156,7 @@ export default function App() {
         <ErrorBoundary resetKey={pathname}>
           <Suspense fallback={<PageLoader />}>
             <Routes>
-              <Route path="/" element={<HomePage />} />
+              <Route path="/" element={<LandingPage />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/trending" element={<CatalogPage preset="trending" />} />
               <Route path="/popular" element={<CatalogPage preset="popular" />} />
