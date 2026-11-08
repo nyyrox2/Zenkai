@@ -47,7 +47,7 @@ export default function PublicProfilePage() {
     authUsername.toLowerCase() === username.toLowerCase()
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 px-4 pb-28 pt-24 sm:px-6">
+    <main className="mx-auto max-w-4xl space-y-6 px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pt-10">
       {/* Top Back Navigation Bar */}
       <div className="flex items-center justify-between">
         <button

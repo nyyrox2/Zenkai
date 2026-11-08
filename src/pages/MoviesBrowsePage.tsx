@@ -92,7 +92,7 @@ export default function MoviesBrowsePage() {
 
   return (
     <main>
-      <section className="relative overflow-hidden px-4 pb-8 pt-28 sm:px-6 sm:pb-10 sm:pt-36">
+      <section className="relative overflow-hidden px-4 pb-8 pt-6 sm:px-6 sm:pb-10 sm:pt-8 md:pt-10">
         <Meteors number={12} />
         <span aria-hidden className="pointer-events-none absolute -right-4 top-16 select-none font-display text-[9rem] font-black leading-none text-foreground/[0.04]">映画</span>
         <div className="relative mx-auto max-w-7xl">

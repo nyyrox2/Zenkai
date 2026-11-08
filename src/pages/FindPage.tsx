@@ -111,7 +111,7 @@ function Finder({ kind, title, alt, cover }: { kind: Kind; title: string; alt: s
   )
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-20 pt-24 sm:px-6 sm:pt-28">
+    <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pt-10">
       <button
         type="button"
         onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/home'))}
