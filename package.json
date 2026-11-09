@@ -16,6 +16,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
     "anime4k-webgpu": "^1.0.0",
+    "falling-snow": "^1.0.0",
     "framer-motion": "^14.1.0",
     "hls.js": "^1.7.3",
     "lucide-react": "^1.55.0",

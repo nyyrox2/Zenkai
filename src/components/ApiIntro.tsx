@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, Code2, Server, Sparkles, Volume2, X } from 'lucide-react'
 
@@ -16,23 +16,30 @@ const seen = () => {
 export function ApiIntro() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
+  const { pathname } = useLocation()
 
   useEffect(() => {
-    if (seen()) return
+    if (pathname === '/' || seen()) return // not over the winter intro / landing
     let t = 0
-    // wait while another modal (release notes) has locked the page scroll
+    let waited = false
+    // wait while the release notes are open, then give a breather before this one
     const tick = () => {
-      if (document.body.style.overflow === 'hidden') t = window.setTimeout(tick, 1000)
-      else {
+      if (document.body.style.overflow === 'hidden') {
+        waited = true
+        t = window.setTimeout(tick, 1000)
+      } else if (waited) {
+        waited = false
+        t = window.setTimeout(tick, 3000)
+      } else {
         try {
           localStorage.setItem(KEY, '1')
         } catch {}
         setOpen(true)
       }
     }
-    t = window.setTimeout(tick, 1500)
+    t = window.setTimeout(tick, 7000)
     return () => window.clearTimeout(t)
-  }, [])
+  }, [pathname])
 
   useEffect(() => {
     if (!open) return

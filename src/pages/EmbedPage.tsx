@@ -3,14 +3,25 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { fetchAnimeLite, type AniLite } from '../services/anilist'
 import { fetchStream, fetchEpisodeServers, type StreamResult, type ServerAudioMap } from '../services/api'
 import CinePlayer, { type PlayerServer } from '../components/CinePlayer'
-import { Loader2, AlertCircle, RotateCcw, Volume2, HardDrive, Play, ShieldAlert } from 'lucide-react'
+import { StreamProblem } from '../components/StreamProblem'
+import { Loader2, Play, ShieldAlert } from 'lucide-react'
 import { opaqueOrigin, popupsBlocked, sameOriginParent } from '../lib/embedGuard'
+import { cn } from '../lib/utils'
+
+const pill = 'rounded-full border px-4 py-2 text-xs sm:text-sm font-semibold transition active:scale-95'
 
 const BASE_SERVER_NAMES: Record<string, string> = {
   megaplay: 'Server 1 (MegaPlay)',
   vidstream: 'Server 2 (VidStream)',
   flixcloud: 'Server 3 (FlixCloud)',
   acdn: 'Multi-Audio (ACDN)',
+}
+
+const SERVER_DISPLAY_NAMES: Record<string, string> = {
+  megaplay: 'MegaPlay',
+  vidstream: 'Vidstream',
+  flixcloud: 'FlixCloud',
+  acdn: 'ACDN',
 }
 
 export default function EmbedPage() {
@@ -168,6 +179,10 @@ export default function EmbedPage() {
     })
       .then((res) => {
         if (!active) return
+        if (!res?.streamUrl) {
+          setError('No stream found.')
+          return
+        }
         setStream(res)
       })
       .catch((err) => {
@@ -191,6 +206,14 @@ export default function EmbedPage() {
       active = false
     }
   }, [animeId, ep, effectiveServer, effectiveAudio, animeTitle, anime?.format, gate])
+
+  const altServerId = useMemo(() => {
+    const list = ['megaplay', 'vidstream', 'flixcloud', 'acdn']
+    const idx = list.indexOf(effectiveServer)
+    return list[(idx + 1) % list.length] || 'megaplay'
+  }, [effectiveServer])
+
+  const altServerName = SERVER_DISPLAY_NAMES[altServerId] || altServerId
 
   const totalEpisodes = anime?.episodes || 24
   const hasNext = ep < totalEpisodes
@@ -225,53 +248,32 @@ export default function EmbedPage() {
           </span>
         </button>
       ) : error ? (
-        <div className="flex h-full w-full items-center justify-center bg-[#070709] p-4 text-white">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#121217] p-6 text-center shadow-2xl backdrop-blur-xl">
-            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-400">
-              <AlertCircle className="size-6" />
-            </div>
-            <h2 className="mb-1.5 text-base font-bold text-white">Playback Error</h2>
-            <p className="mb-5 text-xs text-zinc-400 leading-relaxed">{error}</p>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {effectiveAudio === 'dub' ? (
-                <button
-                  onClick={() => updateParams({ audio: 'sub' })}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 hover:text-white"
-                >
-                  <Volume2 className="size-3.5" />
-                  <span>Try SUB</span>
-                </button>
-              ) : hasAnyDub ? (
-                <button
-                  onClick={() => updateParams({ audio: 'dub' })}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-semibold text-zinc-200 transition hover:bg-white/10 hover:text-white"
-                >
-                  <Volume2 className="size-3.5" />
-                  <span>Try DUB</span>
-                </button>
-              ) : null}
-              <button
-                onClick={() => {
-                  const allServers = ['megaplay', 'vidstream', 'flixcloud', 'acdn']
-                  const currentIndex = allServers.indexOf(effectiveServer)
-                  const nextServer = allServers[(currentIndex + 1) % allServers.length]
-                  updateParams({ server: nextServer })
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-semibold text-zinc-200 transition hover:bg-white/10 hover:text-white"
-              >
-                <HardDrive className="size-3.5" />
-                <span>Try Other Server</span>
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-500"
-              >
-                <RotateCcw className="size-3.5" />
-                <span>Retry</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <StreamProblem reason={error} onReconnect={() => updateParams({ server: altServerId })}>
+          <button
+            type="button"
+            onClick={() => updateParams({ server: altServerId })}
+            className={cn(pill, 'border-transparent bg-white text-black hover:bg-white/90')}
+          >
+            Try {altServerName}
+          </button>
+          {effectiveAudio === 'dub' ? (
+            <button
+              type="button"
+              onClick={() => updateParams({ audio: 'sub' })}
+              className={cn(pill, 'border-white/15 bg-white/5 text-white hover:bg-white/10')}
+            >
+              SUB instead
+            </button>
+          ) : hasAnyDub ? (
+            <button
+              type="button"
+              onClick={() => updateParams({ audio: 'dub' })}
+              className={cn(pill, 'border-white/15 bg-white/5 text-white hover:bg-white/10')}
+            >
+              DUB instead
+            </button>
+          ) : null}
+        </StreamProblem>
       ) : stream ? (
         <CinePlayer
           streamUrl={stream.streamUrl}

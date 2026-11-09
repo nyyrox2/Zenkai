@@ -50,6 +50,8 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Roboto Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --font-display: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-snowy: "Mountains of Christmas", "Sniglet", cursive, sans-serif;
+  --font-cozy: "Comfortaa", "Fredoka", sans-serif;
 }
 
 /* ---------- Base ---------- */
