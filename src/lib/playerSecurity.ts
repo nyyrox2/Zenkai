@@ -50,7 +50,9 @@ export function attachPlayerSecurity(
     video.addEventListener('contextmenu', blockEvent, true);
     video.addEventListener('dragstart', blockEvent, true);
     video.setAttribute('controlsList', 'nodownload noplaybackrate');
-    video.setAttribute('disablePictureInPicture', 'true');
+    // PiP must stay available (the player has its own PiP button), so make sure nothing leaves it disabled
+    video.removeAttribute('disablePictureInPicture');
+    video.disablePictureInPicture = false;
   }
 
   // 3. Dynamic Anonymous Function Debugger Trap

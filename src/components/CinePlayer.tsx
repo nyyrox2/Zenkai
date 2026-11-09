@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import Hls from 'hls.js'
 import {
-  AudioLines, Check, CheckCircle2, ChevronDown, FastForward, Flag, Languages, List, Loader2, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
+  Airplay, AudioLines, Cast, Check, CheckCircle2, ChevronDown, FastForward, Flag, Languages, List, Loader2, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
   Search, Server, Settings, SkipBack, SkipForward, TriangleAlert, Upload, Users, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { apiUrl, fetchStream, type EpInfo, type EpKind } from '../services/api'
@@ -16,6 +16,9 @@ import { findActiveCue, parseSubtitleText, type Cue } from '../lib/subtitles'
 import { submitStreamReport } from '../lib/supabase'
 import { toast } from '../lib/toast'
 import { attachPlayerSecurity } from '../lib/playerSecurity'
+import {
+  airplayPicker, airplaySupported, castLoad, castRequest, castSeek, castSetVolume, castStop, castToggleMute, castTogglePlay, castUrl, getCast, initCast, onCastFinished, useCast,
+} from '../lib/cast'
 import './cineplayer.css'
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -867,6 +870,16 @@ export default function CinePlayer({
   const [tour, setTour] = useState(false)
   const autoFs = useRef(false)
   const [pip, setPip] = useState(false)
+  const cst = useCast()
+  const casting = cst.status === 'connected'
+  const castOn = useRef(false)
+  castOn.current = casting
+  const canCast = !preview && !watchPartyActive
+  const airplay = airplaySupported()
+  const castAvail = cst.status === 'ready' || cst.status === 'connecting' || cst.status === 'connected' || airplay
+  const castLoadedFor = useRef<string | null>(null)
+  const castLast = useRef({ time: 0, playing: false })
+  const wasCasting = useRef(false)
   const [hover, setHover] = useState<number | null>(null)
   const pv = useRef<HTMLVideoElement>(null) // seek-bar preview video (muted, lowest quality, starts on first hover)
   const pvT = useRef<number | null>(null)
@@ -1024,7 +1037,7 @@ export default function CinePlayer({
       } catch {}
       return n
     })
-  const [setTab, setSetTab] = useState<'video' | 'picture' | 'play'>('video')
+  const [setTab, setSetTab] = useState<'video' | 'picture' | 'play' | 'cast'>('video')
   const [ar, setArRaw] = useState<Aspect>(loadAspect)
   const setAr = (a: Aspect) => {
     setArRaw(a)
@@ -1163,7 +1176,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     const saved = readPos(animeId, episode)
     const onMeta = () => {
       if (saved > 10 && saved < v.duration - 45) v.currentTime = saved
-      v.play().catch(() => {})
+      if (!castOn.current) v.play().catch(() => {})
     }
     let h: Hls | null = null
     let fails = 0
@@ -1185,7 +1198,8 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           h.currentLevel = pick.i
           setLvl(pick.i)
         }
-        v.play().catch(() => {})
+        if (castOn.current) h?.stopLoad() // the TV is playing: don't download the same stream here
+        else v.play().catch(() => {})
       })
       // Multi-audio streams (ACDN, FlixCloud, etc.): list the renditions, match audioMode or language
       h.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_: any, d: any) => {
@@ -1252,16 +1266,101 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     }
   }, [streamUrl, retry, animeId, episode])
 
+  /* ── Cast ── */
+  useEffect(() => {
+    if (canCast) void initCast()
+  }, [canCast])
+
+  // start / replace what the TV plays: on connect, and whenever the stream changes while connected (next episode, other server)
+  useEffect(() => {
+    if (!casting) {
+      castLoadedFor.current = null
+      return
+    }
+    if (!streamUrl) return
+    const id = `${streamUrl}|${retry}`
+    if (castLoadedFor.current === id) return
+    const switched = castLoadedFor.current !== null
+    castLoadedFor.current = id
+    const v = vid.current
+    const saved = readPos(animeId, episode)
+    const start = switched ? saved : v && v.currentTime > 3 ? v.currentTime : saved
+    v?.pause()
+    hls.current?.stopLoad()
+    setBusy(true)
+    void castLoad({
+      url: castUrl(apiUrl(streamUrl)),
+      title,
+      subtitle: `Episode ${episode}${episodeTitle ? ` · ${episodeTitle}` : ''}`,
+      image: fallbackImg,
+      time: start > 3 ? start : 0,
+      autoplay: true,
+      file: isFileSrc(streamUrl),
+    }).then((ok) => {
+      if (!ok) {
+        setBusy(false)
+        flash('err', 'Could not start on the TV')
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [casting, streamUrl, retry, episode])
+
+  // show the TV's state in the player's own controls
+  useEffect(() => {
+    if (!casting) return
+    castLast.current = { time: cst.time, playing: cst.playing }
+    setTime(cst.time)
+    if (cst.duration > 0) setDur(cst.duration)
+    setPlaying(cst.playing)
+    setBusy(cst.buffering || !cst.loaded)
+    setVol(cst.volume)
+    setMuted(cst.muted)
+  }, [casting, cst])
+
+  // stopped casting: pick up here from where the TV was
+  useEffect(() => {
+    if (casting) {
+      wasCasting.current = true
+      return
+    }
+    if (!wasCasting.current) return
+    wasCasting.current = false
+    const v = vid.current
+    const last = castLast.current
+    hls.current?.startLoad(-1)
+    setBusy(false)
+    if (!v) return
+    if (last.time > 1) v.currentTime = last.time
+    if (last.playing) v.play().catch(() => {})
+  }, [casting])
+
+  useEffect(
+    () =>
+      onCastFinished(() => {
+        if (!castOn.current) return
+        try {
+          localStorage.removeItem(posKey(animeId, episode))
+        } catch {
+          /* ignore */
+        }
+        onEnded?.()
+      }),
+    [animeId, episode, onEnded],
+  )
+
   /* remember position every 5s */
   useEffect(() => {
     if (!playing) return
     const tick = () => {
       const v = vid.current
-      if (!v || !v.duration) return
-      onProgress?.(Math.floor(v.currentTime), Math.floor(v.duration))
+      const r = castOn.current ? getCast() : null
+      const ct = r ? r.time : v?.currentTime ?? 0
+      const du = r ? r.duration : v?.duration ?? 0
+      if (!du) return
+      onProgress?.(Math.floor(ct), Math.floor(du))
       try {
-        if (v.currentTime > 3 && v.currentTime < v.duration - 45) localStorage.setItem(posKey(animeId, episode), String(Math.floor(v.currentTime)))
-        else if (v.currentTime >= v.duration - 45) localStorage.removeItem(posKey(animeId, episode))
+        if (ct > 3 && ct < du - 45) localStorage.setItem(posKey(animeId, episode), String(Math.floor(ct)))
+        else if (ct >= du - 45) localStorage.removeItem(posKey(animeId, episode))
       } catch {
         /* storage unavailable */
       }
@@ -1269,7 +1368,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     tick()
     const id = window.setInterval(tick, 5000)
     return () => window.clearInterval(id)
-  }, [playing, animeId, episode])
+  }, [playing, animeId, episode, casting])
 
   /* ── subtitles ── */
   /** Fetch + parse a caption file; true when it produced cues. Stream captions need the player's referer, so try the proxy first, then the raw url. */
@@ -1439,7 +1538,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   /* ── video events ── */
   const onTime = () => {
     const v = vid.current
-    if (!v || performance.now() < animUntil.current) return
+    if (!v || castOn.current || performance.now() < animUntil.current) return
     setTime(v.currentTime)
     if (v.duration > 0) {
       let end = 0
@@ -1470,7 +1569,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   const inOutro = outro != null && outro.end > 0 && time >= outro.start && time <= outro.end
   const skip = inIntro ? { label: 'Skip intro', to: intro!.end } : inOutro ? { label: 'Skip outro', to: outro!.end } : null
   const doSkip = () => {
-    if (skip && vid.current) {
+    if (skip && castOn.current) {
+      castSeek(skip.to)
+      poke()
+    } else if (skip && vid.current) {
       vid.current.currentTime = skip.to
       poke()
     }
@@ -1521,12 +1623,18 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   useEffect(() => {
     if (autoSkip && skip && skipped.current !== skip.to && vid.current) {
       skipped.current = skip.to
-      vid.current.currentTime = skip.to
+      if (castOn.current) castSeek(skip.to)
+      else vid.current.currentTime = skip.to
     }
   })
 
   /* ── actions ── */
   const togglePlay = () => {
+    if (castOn.current) {
+      castTogglePlay()
+      poke()
+      return
+    }
     const v = vid.current
     if (!v) return
     if (v.paused) v.play().catch(() => {})
@@ -1541,8 +1649,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     }
     const v = vid.current
     if (!v) return
-    const t = clamp(v.currentTime + d, 0, v.duration || 0)
-    v.currentTime = t
+    const r = castOn.current ? getCast() : null
+    const t = r ? clamp(r.time + d, 0, r.duration || 0) : clamp(v.currentTime + d, 0, v.duration || 0)
+    if (r) castSeek(t)
+    else v.currentTime = t
     setTime(t)
     const side = d < 0 ? -1 : 1
     const now = Date.now()
@@ -1554,6 +1664,11 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   }
 
   const setVolume = (f: number) => {
+    if (castOn.current) {
+      castSetVolume(f)
+      poke()
+      return
+    }
     const v = vid.current
     if (!v) return
     const n = clamp(f, 0, 1)
@@ -1563,6 +1678,11 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   }
 
   const toggleMute = () => {
+    if (castOn.current) {
+      castToggleMute()
+      poke()
+      return
+    }
     const v = vid.current
     if (!v) return
     v.muted = !v.muted
@@ -1571,6 +1691,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   }
 
   const setRate = (s: number) => {
+    if (castOn.current) {
+      toast('Playback speed is not available while casting', 'info')
+      return
+    }
     setSpeed(s)
     if (vid.current) vid.current.playbackRate = s
   }
@@ -1668,9 +1792,16 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   }
 
   const togglePiP = async () => {
+    const v = vid.current as (HTMLVideoElement & { webkitSetPresentationMode?: (m: string) => void; webkitPresentationMode?: string }) | null
     try {
       if (document.pictureInPictureElement) await document.exitPictureInPicture()
-      else await vid.current?.requestPictureInPicture()
+      else if (v) {
+        v.removeAttribute('disablePictureInPicture')
+        v.disablePictureInPicture = false
+        if (v.readyState < 1) await new Promise<void>((r) => (v.addEventListener('loadedmetadata', () => r(), { once: true }), setTimeout(r, 2000)))
+        if (document.pictureInPictureEnabled && v.requestPictureInPicture) await v.requestPictureInPicture()
+        else if (v.webkitSetPresentationMode) v.webkitSetPresentationMode(v.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture')
+      }
     } catch {
       /* not allowed */
     }
@@ -1684,7 +1815,8 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       if (!on) screen.orientation?.unlock?.()
     }
     document.addEventListener('fullscreenchange', f)
-    setPip(!!document.pictureInPictureEnabled)
+    const wk = typeof (document.createElement('video') as HTMLVideoElement & { webkitSetPresentationMode?: unknown }).webkitSetPresentationMode === 'function'
+    setPip(!!document.pictureInPictureEnabled || wk)
     return () => document.removeEventListener('fullscreenchange', f)
   }, [])
 
@@ -1748,10 +1880,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         h = () => root.current?.querySelector<HTMLElement>('.zp-hero')?.focus()
       } else if (k === 'arrowup') h = () => kk.setVolume(a.v + 0.1)
       else if (k === 'arrowdown') h = () => kk.setVolume(a.v - 0.1)
-      else if (/^[0-9]$/.test(key) && v && kk.dur) h = () => ((v.currentTime = (kk.dur * Number(key)) / 10), setTime(v.currentTime))
-      else if (k === 'home' && v) h = () => ((v.currentTime = 0), setTime(0))
-      else if (k === 'end' && v && kk.dur) h = () => ((v.currentTime = Math.max(0, kk.dur - 1)), setTime(v.currentTime))
-      else if ((key === ',' || key === '.') && v && v.paused) h = () => ((v.currentTime = clamp(v.currentTime + (key === ',' ? -1 : 1) / 24, 0, v.duration || 0)), setTime(v.currentTime))
+      else if (/^[0-9]$/.test(key) && v && kk.dur) h = () => { const t = (kk.dur * Number(key)) / 10; castOn.current ? castSeek(t) : (v.currentTime = t); setTime(t) }
+      else if (k === 'home' && v) h = () => { castOn.current ? castSeek(0) : (v.currentTime = 0); setTime(0) }
+      else if (k === 'end' && v && kk.dur) h = () => { const t = Math.max(0, kk.dur - 1); castOn.current ? castSeek(t) : (v.currentTime = t); setTime(t) }
+      else if ((key === ',' || key === '.') && v && v.paused && !castOn.current) h = () => ((v.currentTime = clamp(v.currentTime + (key === ',' ? -1 : 1) / 24, 0, v.duration || 0)), setTime(v.currentTime))
       else if (key === '<') h = () => kk.setRate(SPEEDS[Math.max(0, SPEEDS.indexOf(kk.speed) - 1)])
       else if (key === '>') h = () => kk.setRate(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(kk.speed) + 1)])
       else if (k === 'f') h = a.toggleFs
@@ -1823,7 +1955,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     window.clearTimeout(h.timer)
     h.timer = window.setTimeout(() => {
       const v = vid.current
-      if (!v || v.paused || st.current.pop) return
+      if (!v || castOn.current || v.paused || st.current.pop) return
       h.on = true
       h.prev = v.playbackRate
       v.playbackRate = pfRef.current.hold
@@ -1879,7 +2011,8 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   const sUp = (e: RPointerEvent<HTMLDivElement>) => {
     if (isPartyGuest || scrub === null) return
     const t = frac(e) * dur
-    if (vid.current) vid.current.currentTime = t
+    if (castOn.current) castSeek(t)
+    else if (vid.current) vid.current.currentTime = t
     setTime(t)
     setScrub(null)
     poke()
@@ -1914,8 +2047,9 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         playsInline
         preload="auto"
         onTimeUpdate={onTime}
-        onDurationChange={() => setDur(vid.current?.duration || 0)}
+        onDurationChange={() => !castOn.current && setDur(vid.current?.duration || 0)}
         onPlay={() => {
+          if (castOn.current) return
           setPlaying(true)
           if (!loadingSubs) setNote((n) => (n?.k === 'load' ? null : n))
           if (!isExternalAction.current && vid.current) {
@@ -1924,22 +2058,25 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           onPlay?.()
         }}
         onPause={() => {
+          if (castOn.current) return
           setPlaying(false)
           if (!isExternalAction.current && vid.current) {
             onPlayerAction?.({ type: 'pause', time: vid.current.currentTime })
           }
         }}
         onSeeked={() => {
-          if (!isExternalAction.current && vid.current) {
+          if (!castOn.current && !isExternalAction.current && vid.current) {
             onPlayerAction?.({ type: 'seek', time: vid.current.currentTime })
           }
         }}
-        onWaiting={() => setBusy(true)}
+        onWaiting={() => !castOn.current && setBusy(true)}
         onCanPlay={() => {
+          if (castOn.current) return
           setBusy(false)
           if (!loadingSubs) setNote((n) => (n?.k === 'load' ? null : n))
         }}
         onPlaying={() => {
+          if (castOn.current) return
           setBusy(false)
           if (!loadingSubs) setNote((n) => (n?.k === 'load' ? null : n))
           const v = vid.current
@@ -1947,11 +2084,12 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         }}
         onVolumeChange={() => {
           const v = vid.current
-          if (!v) return
+          if (!v || castOn.current) return
           setVol(v.volume)
           setMuted(v.muted)
         }}
         onEnded={() => {
+          if (castOn.current) return
           try {
             localStorage.removeItem(posKey(animeId, episode))
           } catch {
@@ -1962,6 +2100,20 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       />
       {up && !upErr && <canvas ref={cv} className="zp-v" style={{ ...aspectStyle(ar), opacity: upInt / 100, pointerEvents: 'none', filter: videoFilterStyle }} />}
       <div className="zp-g" onPointerDown={holdStart} onPointerUp={(e) => holdEnd() || onTap(e)} onPointerCancel={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => e.preventDefault()} />
+      {casting && (
+        <div className="zp-cast" role="status" aria-live="polite">
+          <span className="zp-castic big">
+            <Cast />
+          </span>
+          <b>Casting to {cst.device || 'your device'}</b>
+          <small>
+            {title} · Episode {episode}
+          </small>
+          <button className="zp-pi" onClick={() => castStop()}>
+            Stop casting
+          </button>
+        </div>
+      )}
 
       <div className="zp-in">
         {busy && !err && <div className="zp-spn" />}
@@ -1999,7 +2151,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           </div>
         )}
 
-        {cue && (
+        {cue && !casting && (
           <div className="zp-sub" style={{ '--sp': `${cs.pos}%`, justifyContent: { left: 'flex-start', center: 'center', right: 'flex-end' }[cs.align] } as CSSProperties}>
             <span
               style={capCss(cs, 'var(--u)')}
@@ -2230,7 +2382,18 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               <button className="zp-b" data-tour="p-set" onClick={() => (closePop(), setSheet('set'))} aria-label="Settings" title="Settings">
                 <Settings />
               </button>
-              {pip && (
+              {canCast && castAvail && (
+                <button
+                  className={cx('zp-b', casting && 'on')}
+                  data-tour="p-cast"
+                  onClick={() => (closePop(), setSetTab('cast'), setSheet('set'))}
+                  aria-label={casting ? `Casting to ${cst.device || 'device'}` : 'Cast'}
+                  title={casting ? `Casting to ${cst.device || 'device'}` : 'Cast to TV'}
+                >
+                  <Cast />
+                </button>
+              )}
+              {pip && !casting && (
                 <button className="zp-b" onClick={togglePiP} aria-label="Picture in picture" title="Picture in picture">
                   <PictureInPicture2 />
                 </button>
@@ -2828,7 +2991,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         <Sheet title="Settings" onClose={() => setSheet(null)} target={target} dialog>
           <div className="zp-prev">
             <div className="zp-tabs" role="tablist">
-              {([['video', 'Video'], ['picture', 'Picture'], ['play', 'Playback']] as const).map(([k, l]) => (
+              {([['video', 'Video'], ['picture', 'Picture'], ['play', 'Playback'], ...(canCast && castAvail ? [['cast', 'Cast']] : [])] as unknown as ReadonlyArray<readonly ['video' | 'picture' | 'play' | 'cast', string]>).map(([k, l]) => (
                 <button key={k} role="tab" aria-selected={setTab === k} className={cx('zp-tab', setTab === k && 'on')} onClick={() => setSetTab(k)}>
                   {l}
                 </button>
@@ -2958,6 +3121,79 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           )}
 
 
+            </div>
+          )}
+
+          {setTab === 'cast' && (
+            <div className="zp-tc">
+              <div className={cx('zp-castcard', casting && 'on')}>
+                <span className="zp-castic">
+                  <Cast />
+                </span>
+                <div>
+                  <b>{casting ? `Casting to ${cst.device || 'your device'}` : cst.status === 'connecting' ? 'Connecting…' : 'Not connected'}</b>
+                  <small>{casting ? (cst.buffering || !cst.loaded ? 'Starting on the TV…' : cst.playing ? 'Playing on the TV' : 'Paused on the TV') : 'Send this episode to a TV or speaker'}</small>
+                </div>
+              </div>
+
+              {!casting ? (
+                <>
+                  {(cst.status === 'ready' || cst.status === 'connecting') && (
+                    <button className="zp-row" disabled={cst.status === 'connecting'} onClick={() => void castRequest()}>
+                      <Cast />
+                      <span>
+                        Cast to a device
+                        <small>Chromecast, Google TV, Android TV, Nest Hub</small>
+                      </span>
+                    </button>
+                  )}
+                  {airplay && (
+                    <button className="zp-row" onClick={() => airplayPicker(vid.current)}>
+                      <Airplay />
+                      <span>
+                        AirPlay
+                        <small>Apple TV, HomePod and AirPlay TVs</small>
+                      </span>
+                    </button>
+                  )}
+                  {cst.status === 'unsupported' && !airplay && (
+                    <p className="zp-ct">Casting isn&apos;t available in this browser. Use Chrome or Edge (Android or desktop) over https.</p>
+                  )}
+                  {cst.error && <p className="zp-ct err">{cst.error}</p>}
+                  <p className="zp-sec">Good to know</p>
+                  <p className="zp-ct">
+                    Your phone and the TV must be on the same Wi-Fi. The TV plays the stream itself, so you can lock your phone or leave the page open.
+                    Captions and playback speed stay on this device.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="zp-sec">Remote</p>
+                  <button className="zp-row" onClick={togglePlay}>
+                    {cst.playing ? <Pause /> : <Play />}
+                    <span>{cst.playing ? 'Pause' : 'Play'}</span>
+                    <small>
+                      {fmt(cst.time)} / {fmt(cst.duration)}
+                    </small>
+                  </button>
+                  <p className="zp-sec">Volume ({Math.round((cst.muted ? 0 : cst.volume) * 100)}%)</p>
+                  <input
+                    type="range" className="zp-rg" min={0} max={100} step={1} value={Math.round((cst.muted ? 0 : cst.volume) * 100)}
+                    style={{ '--p': `${Math.round((cst.muted ? 0 : cst.volume) * 100)}%` } as CSSProperties}
+                    onChange={(e) => castSetVolume(+e.target.value / 100)}
+                    aria-label="TV volume"
+                  />
+                  <button className="zp-row" onClick={toggleMute}>
+                    <span>Mute TV</span>
+                    <i className={cx('zp-tg', cst.muted && 'on')} />
+                  </button>
+                  <button className="zp-row" onClick={() => (castStop(), setSheet(null))}>
+                    <X />
+                    <span>Stop casting</span>
+                  </button>
+                  {cst.error && <p className="zp-ct err">{cst.error}</p>}
+                </>
+              )}
             </div>
           )}
 

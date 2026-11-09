@@ -688,3 +688,21 @@
 .zp-lite .zp-sh,.zp-lite .zp-toast,.zp-lite .zp-tip{background:rgba(16,16,22,.95)!important;box-shadow:0 6px 20px rgba(0,0,0,.5)!important}
 .zp-lite .zp-pop{background:rgba(11,11,15,.96)!important;box-shadow:0 8px 24px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06)!important}
 .zp-lite .zp-sw .zp-sh{animation-duration:.27s!important}
+
+/* ── Cast ── */
+.zp-cast{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u,10px)*.7);padding:0 8% calc(var(--u,10px)*6);text-align:center;color:#fff;background:radial-gradient(ellipse at 50% 38%,rgba(255,255,255,.07),transparent 60%),rgba(8,8,12,.94);pointer-events:none}
+.zp-cast b{font-size:max(14px,calc(var(--u,10px)*1.6));font-weight:800}
+.zp-cast small{max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:max(11px,calc(var(--u,10px)*1.1));opacity:.6}
+.zp-cast .zp-pi{pointer-events:auto;margin-top:calc(var(--u,10px)*.6)}
+.zp-castic{flex:none;display:grid;place-items:center;width:2.6em;height:2.6em;border-radius:50%;background:rgba(255,255,255,.08);color:#fff}
+.zp-castic svg{width:55%;height:55%}
+.zp-castic.big{width:calc(var(--u,10px)*6);height:calc(var(--u,10px)*6);background:linear-gradient(135deg,var(--a),var(--a2,var(--a)));box-shadow:0 0 calc(var(--u,10px)*2.4) color-mix(in srgb,var(--a) 50%,transparent);animation:zpcast 2.4s ease-in-out infinite}
+@keyframes zpcast{50%{transform:scale(1.06)}}
+.zp-castcard{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);margin-bottom:6px}
+.zp-castcard.on{border-color:var(--a);background:color-mix(in srgb,var(--a) 14%,transparent)}
+.zp-castcard.on .zp-castic{background:var(--a)}
+.zp-castcard b{display:block;font-weight:700}
+.zp-castcard small{display:block;font-size:.85em;opacity:.6}
+.zp-row>small{flex:none;display:inline;opacity:.55}
+.zp-ct{margin:6px 2px;font-size:.88em;line-height:1.45;opacity:.65}
+.zp-ct.err{color:#ff8a8a;opacity:1}
