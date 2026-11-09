@@ -1327,7 +1327,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     wasCasting.current = false
     const v = vid.current
     const last = castLast.current
-    hls.current?.startLoad(-1)
+    hls.current?.startLoad()
     setBusy(false)
     if (!v) return
     if (last.time > 1) v.currentTime = last.time
