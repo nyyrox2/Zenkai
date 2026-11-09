@@ -20,6 +20,7 @@ import { resolveAcdn } from "./acdn.js";
 import { validateProxyUrl } from "./ssrf.js";
 import novelEngine from "./novel.js";
 import * as manga from "./manga.js";
+import { shield } from "./shield.js";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const TMDB = "https://aniversee.vercel.app/api/tmdb";
@@ -402,6 +403,8 @@ export async function handle(request, env) {
   if (request.method === "OPTIONS" && (path.startsWith("/api/") || path === "/proxy"))
     return new Response(null, { status: 204, headers: CORS });
 
+  const blocked = await shield(request, env, path, json);
+  if (blocked) return blocked;
 
   if (path === "/api/local-media" || path === "/api/offline-video" || path === "/api/offline-stream") {
     if (!fsNode || !pathNode) return json({ error: "Local media streaming not supported in this runtime" }, 501);
