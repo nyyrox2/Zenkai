@@ -4,6 +4,7 @@ import { fetchAnimeFallback } from './fallback'
 import { AniListDownError, markAniListDown, markAniListUp } from '../lib/anilistStatus'
 import { catalogFromMal, homeFromMal, searchFromMal } from './malFallback'
 import { catalogFromKitsu, homeFromKitsu, searchFromKitsu } from './kitsuFallback'
+import { getCustomShowById, searchCustomShows } from '../lib/customAnime'
 
 const ENDPOINT = 'https://graphql.anilist.co'
 const TTL = 5 * 60 * 1000
@@ -139,8 +140,21 @@ async function homeAniList(): Promise<HomeData> {
 }
 
 /* ---------- Search ---------- */
-export const searchAnime = (search: string, genre?: string): Promise<AniMedia[]> =>
-  guard(() => searchAniList(search, genre), () => searchFromKitsu(search), () => searchFromMal(search))
+export const searchAnime = async (search: string, genre?: string): Promise<AniMedia[]> => {
+  const custom = searchCustomShows(search)
+  let results: AniMedia[] = []
+  try {
+    results = await guard(() => searchAniList(search, genre), () => searchFromKitsu(search), () => searchFromMal(search))
+  } catch {
+    results = []
+  }
+  if (custom.length) {
+    const existing = new Set(results.map((r) => r.id))
+    const fresh = custom.filter((c) => !existing.has(c.id))
+    return [...fresh, ...results]
+  }
+  return results
+}
 async function searchAniList(search: string, genre?: string): Promise<AniMedia[]> {
   const query = /* GraphQL */ `
     query ($search: String, $genre: String, $sort: [MediaSort]) {
@@ -232,8 +246,11 @@ async function withFallback(run: () => Promise<AniMediaDetails>, id: number, fro
   }
 }
 
-export const fetchAnimeById = (id: number) =>
-  withFallback(async () => (await gql<{ Media: AniMediaDetails }>(DETAILS_QUERY, { id })).Media, id, false)
+export const fetchAnimeById = (id: number) => {
+  const custom = getCustomShowById(id)
+  if (custom) return Promise.resolve(custom)
+  return withFallback(async () => (await gql<{ Media: AniMediaDetails }>(DETAILS_QUERY, { id })).Media, id, false)
+}
 
 export const fetchAnimeByMalId = (idMal: number) =>
   withFallback(async () => (await gql<{ Media: AniMediaDetails }>(DETAILS_QUERY, { idMal })).Media, idMal, true)
@@ -250,8 +267,23 @@ export interface CatalogParams {
   minPopularity?: number
 }
 
-export const fetchCatalog = (p: CatalogParams, page: number): Promise<{ items: AniCardMedia[]; hasNext: boolean }> =>
-  guard(() => catalogAniList(p, page), () => catalogFromKitsu(p, page), () => catalogFromMal(p, page))
+export const fetchCatalog = async (p: CatalogParams, page: number): Promise<{ items: AniCardMedia[]; hasNext: boolean }> => {
+  const custom = page === 1 && p.search ? (searchCustomShows(p.search) as unknown as AniCardMedia[]) : []
+  const res = await guard(
+    () => catalogAniList(p, page),
+    () => catalogFromKitsu(p, page),
+    () => catalogFromMal(p, page),
+  )
+  if (custom.length) {
+    const existing = new Set(res.items.map((i) => i.id))
+    const fresh = custom.filter((c) => !existing.has(c.id))
+    return {
+      items: [...fresh, ...res.items],
+      hasNext: res.hasNext,
+    }
+  }
+  return res
+}
 async function catalogAniList(p: CatalogParams, page: number): Promise<{ items: AniCardMedia[]; hasNext: boolean }> {
   const query = /* GraphQL */ `
     query ($page: Int, $search: String, $genre: String, $format: MediaFormat, $year: Int, $season: MediaSeason, $status: MediaStatus, $sort: [MediaSort], $pop: Int) {
@@ -332,11 +364,14 @@ export interface AniLite extends AniMedia {
   relations: { edges: { relationType: string; node: { id: number; type: string; format: string | null; title: AniMedia['title'] } }[] }
 }
 
-export const fetchAnimeLite = (id: number): Promise<AniLite> =>
-  guard(
+export const fetchAnimeLite = (id: number): Promise<AniLite> => {
+  const custom = getCustomShowById(id)
+  if (custom) return Promise.resolve(custom as unknown as AniLite)
+  return guard(
     async () => (await gql<{ Media: AniLite }>(LITE_QUERY, { id })).Media,
     () => fetchAnimeFallback(id, false) as Promise<AniLite>,
   )
+}
 
 /* ---------- Watch order (franchise walk through PREQUEL / SEQUEL / SIDE_STORY / SPIN_OFF / PARENT) ---------- */
 interface OrderNode {

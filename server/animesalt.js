@@ -87,10 +87,12 @@ export function getCandidateSlugs({
   isMovie = false,
   mapping = {}
 }) {
-  // Direct Mapping via anime-mapping.json only (strict: never guess slugs or generate fuzzy fallbacks)
+  // Direct Mapping via anime-mapping.json (using slug if present, or saltId + season + episode)
   const mapped = pickMapping(mapping, anilistId, episode, isMovie);
-  if (!mapped?.slug) return [];
-  return [mapped.slug];
+  if (!mapped || !mapped.saltId) return [];
+  if (mapped.slug) return [mapped.slug];
+  if (mapped.isMovie || isMovie) return [mapped.saltId];
+  return [`${mapped.saltId}-${mapped.season || 1}x${mapped.finalEp || episode}`];
 }
 
 function extractIframeSrc(snippet) {

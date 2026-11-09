@@ -370,8 +370,45 @@ export default function CommunityPage() {
   const profile = useProfile()
   const { user, username: authUsername, signInWithGoogle } = useAuth()
 
-  const authorName = profile?.name || user?.user_metadata?.full_name || user?.user_metadata?.name || authUsername || 'Guest'
-  const authorHandle = authUsername || (user?.email ? user.email.split('@')[0] : null)
+  const defaultName = useMemo(() => {
+    if (profile?.name) return profile.name
+    if (authUsername) return authUsername
+    if (user?.user_metadata?.full_name) return user.user_metadata.full_name
+    if (anilist?.user?.name) return anilist.user.name
+    try {
+      let stored = localStorage.getItem('zk_anon_username') || ''
+      if (!stored) {
+        stored = randomName()
+        localStorage.setItem('zk_anon_username', stored)
+      }
+      return stored
+    } catch {
+      return randomName()
+    }
+  }, [anilist, profile, user, authUsername])
+
+  const [name, setName] = useState(defaultName)
+  const [draftName, setDraftName] = useState(defaultName)
+  useEffect(() => {
+    setName(defaultName)
+    setDraftName(defaultName)
+  }, [defaultName])
+
+  const authorName =
+    profile?.name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    authUsername ||
+    anilist?.user?.name ||
+    name ||
+    'Otaku'
+
+  const authorHandle =
+    authUsername ||
+    (user?.email ? user.email.split('@')[0] : null) ||
+    (anilist?.user?.name ? anilist.user.name.toLowerCase().replace(/[^a-z0-9_-]/g, '') : null) ||
+    (name ? name.toLowerCase().replace(/[^a-z0-9_-]/g, '') : null)
+
   const myAvatar = profile?.avatar || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || anilist?.user?.avatar || null
   const myFrame = profile?.frame || null
 
@@ -380,6 +417,15 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+
+  const [sentCounter, setSentCounter] = useState(0)
+  const mySentIds = useMemo(() => {
+    try {
+      return new Set<string>(JSON.parse(localStorage.getItem('zk_my_sent_msgs') || '[]'))
+    } catch {
+      return new Set<string>()
+    }
+  }, [sentCounter])
 
   const [liked, setLiked] = useState<Record<string, true>>(() => readJson('zk_liked_msgs', {}))
   const [burst, setBurst] = useState<string | null>(null)
@@ -410,30 +456,6 @@ export default function CommunityPage() {
   latest.current = messages
 
   const channel = CHANNELS.find((c) => c.id === channelId) ?? CHANNELS[0]
-
-  const defaultName = useMemo(() => {
-    if (profile?.name) return profile.name
-    if (authUsername) return authUsername
-    if (user?.user_metadata?.full_name) return user.user_metadata.full_name
-    if (anilist?.user?.name) return anilist.user.name
-    try {
-      let stored = localStorage.getItem('zk_anon_username') || ''
-      if (!stored) {
-        stored = randomName()
-        localStorage.setItem('zk_anon_username', stored)
-      }
-      return stored
-    } catch {
-      return randomName()
-    }
-  }, [anilist, profile])
-
-  const [name, setName] = useState(defaultName)
-  const [draftName, setDraftName] = useState(defaultName)
-  useEffect(() => {
-    setName(defaultName)
-    setDraftName(defaultName)
-  }, [defaultName])
 
 
   useEffect(() => {
@@ -533,10 +555,6 @@ export default function CommunityPage() {
   }, [text])
 
   async function send() {
-    if (!user) {
-      toast('Please sign in to join the conversation', 'info')
-      return
-    }
     const content = text.trim()
     if (!content || sending) return
     setSending(true)
@@ -546,7 +564,7 @@ export default function CommunityPage() {
     const optimistic: CommunityPost = {
       id: tempId,
       created_at: new Date().toISOString(),
-      user_id: user?.id,
+      user_id: user?.id || null,
       username: displayAuthor,
       avatar_url: myAvatar,
       frame: myFrame,
@@ -567,7 +585,7 @@ export default function CommunityPage() {
     setTagged(null)
     try {
       const real = await createCommunityPost({
-        user_id: user?.id,
+        user_id: user?.id || null,
         title: optimistic.title,
         content,
         username: displayAuthor,
@@ -580,6 +598,15 @@ export default function CommunityPage() {
       })
       if (real) {
         fresh.current.add(real.id)
+        try {
+          const sent = JSON.parse(localStorage.getItem('zk_my_sent_msgs') || '[]');
+          if (!sent.includes(real.id)) {
+            sent.push(real.id);
+            if (sent.length > 200) sent.shift();
+            localStorage.setItem('zk_my_sent_msgs', JSON.stringify(sent));
+            setSentCounter((c) => c + 1);
+          }
+        } catch {}
         // the poll may already have delivered the real row: never show it twice
         setMessages((prev) => (prev.some((m) => m.id === real.id) ? prev.filter((m) => m.id !== tempId) : prev.map((m) => (m.id === tempId ? real : m))))
       }
@@ -643,7 +670,10 @@ export default function CommunityPage() {
     setSavingEdit(true)
     const ok = await updateCommunityPost(id, v)
     setSavingEdit(false)
-    if (!ok) return toast('Could not save your edit', 'error')
+    if (!ok) {
+      if (!user) return toast('Sign in to permanently manage or edit your posts', 'info')
+      return toast('Could not save your edit', 'error')
+    }
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, content: v, edited: true } : m)))
     setEditId(null)
   }
@@ -651,7 +681,10 @@ export default function CommunityPage() {
   async function remove(id: string) {
     setConfirmId(null)
     const ok = await deleteCommunityPost(id)
-    if (!ok) return toast('Could not delete that message', 'error')
+    if (!ok) {
+      if (!user) return toast('Sign in to permanently manage or delete your posts', 'info')
+      return toast('Could not delete that message', 'error')
+    }
     setMessages((prev) => prev.filter((m) => m.id !== id))
   }
 
@@ -819,7 +852,8 @@ export default function CommunityPage() {
                           ? true
                           : Boolean(
                               (user?.id && msg.user_id && msg.user_id === user.id) ||
-                              (authorHandle && msg.username.includes(`@${authorHandle}`))
+                              (authorHandle && msg.username.includes(`@${authorHandle}`)) ||
+                              mySentIds.has(msg.id)
                             )
                         const isLiked = !!liked[msg.id]
                         const editing = editId === msg.id
@@ -1072,7 +1106,22 @@ export default function CommunityPage() {
               </button>
             </div>
           </div>
-          <p className="text-xs leading-relaxed text-muted">No account needed. Your name and the messages you can edit or delete are remembered on this device. Connect AniList in your profile to chat with your AniList name and picture.</p>
+          <p className="text-xs leading-relaxed text-muted">No account needed to chat. Your nickname and messages are remembered on this device. Connect AniList in your profile or sign in with Google for a verified profile badge.</p>
+          {!user && (
+            <div className="rounded-2xl border border-border/80 bg-foreground/5 p-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setNameOpen(false)
+                  void signInWithGoogle()
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-3 py-2 text-xs font-bold text-background transition hover:opacity-90 active:scale-95"
+              >
+                <GoogleIcon className="size-4" />
+                <span>Sign in with Google</span>
+              </button>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setNameOpen(false)} className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-muted hover:text-foreground">Cancel</button>
             <button type="submit" className="rounded-xl bg-accent px-5 py-2 text-sm font-bold text-accent-fg hover:brightness-110 active:scale-95">Save</button>

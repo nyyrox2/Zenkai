@@ -76,11 +76,23 @@ export async function createCommunityPost(post: {
   anime_image?: string
 }): Promise<CommunityPost | null> {
   try {
+    let resolvedUserId = post.user_id || null
+    if (!resolvedUserId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user?.id) {
+          resolvedUserId = session.user.id
+        }
+      } catch {
+        // guest or anon
+      }
+    }
+
     const { data, error } = await supabase
       .from('community_posts')
       .insert([
         {
-          user_id: post.user_id || null,
+          user_id: resolvedUserId,
           title: post.title.trim(),
           content: post.content.trim(),
           username: post.username?.trim() || 'Otaku',

@@ -16,6 +16,8 @@ interface State {
   /** Set while the server wants a captcha solved (svg is the image). */
   captcha: { svg: string; error: boolean } | null
   verified: boolean
+  /** token fetch gave up (network / rate limit / server error); UI can offer a retry */
+  failed: boolean
 }
 
 let token: string | null = null
@@ -35,6 +37,7 @@ let state: State = {
   bot: false,
   captcha: null,
   verified: import.meta.env.DEV || isTokenValid(),
+  failed: false,
 }
 const subs = new Set<() => void>()
 const set = (p: Partial<State>) => {
@@ -85,42 +88,62 @@ export function submitCaptcha(a: string) {
 // Set once DevTools have been seen: the next token then has to come with a captcha.
 let flagged = false
 
-async function fetchToken(): Promise<string | null> {
-  try {
-    let wrong = false
-    for (let tries = 0; tries < 6; tries++) {
-      const { svg, ...c } = await (await nativeFetch(`${API}/api/shield/challenge${flagged || state.bot ? '?cap=1' : ''}`)).json()
-      if (c.off) {
-        off = true
-        set({ verified: true })
-        return null
-      }
-      const nonce = await solve(c.cid, c.salt, c.difficulty)
-      // Every API call waits here until the captcha is solved.
-      const answer = c.cap ? await askCaptcha(svg, wrong) : undefined
-      const r = await nativeFetch(`${API}/api/shield/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...c, nonce, answer }),
-      })
-      const d = await r.json().catch(() => null)
-      if (r.ok && d?.token) {
-        token = d.token
-        exp = Date.now() + d.expiresIn * 1000
-        try {
-          sessionStorage.setItem(KEY.tok, token!)
-          sessionStorage.setItem(KEY.exp, String(exp))
-        } catch {}
-        set({ verified: true, captcha: null })
-        return token
-      }
-      if (d?.code !== 'SHIELD_CAPTCHA_WRONG') return null
-      wrong = true
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+async function fetchTokenOnce(): Promise<{ token: string | null; retry: boolean }> {
+  let wrong = false
+  for (let tries = 0; tries < 6; tries++) {
+    const cr = await nativeFetch(`${API}/api/shield/challenge${flagged || state.bot ? '?cap=1' : ''}`)
+    if (cr.status === 429 || cr.status >= 500) return { token: null, retry: true }
+    const { svg, ...c } = await cr.json()
+    if (c.off) {
+      off = true
+      set({ verified: true, failed: false })
+      return { token: null, retry: false }
     }
-    return null
-  } catch {
-    return null
+    const nonce = await solve(c.cid, c.salt, c.difficulty)
+    if (nonce < 0) return { token: null, retry: true }
+    // Every API call waits here until the captcha is solved.
+    const answer = c.cap ? await askCaptcha(svg, wrong) : undefined
+    const r = await nativeFetch(`${API}/api/shield/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...c, nonce, answer }),
+    })
+    const d = await r.json().catch(() => null)
+    if (r.ok && d?.token) {
+      token = d.token
+      exp = Date.now() + d.expiresIn * 1000
+      try {
+        sessionStorage.setItem(KEY.tok, token!)
+        sessionStorage.setItem(KEY.exp, String(exp))
+      } catch {}
+      set({ verified: true, captcha: null, failed: false })
+      return { token, retry: false }
+    }
+    if (r.status === 429 || r.status >= 500) return { token: null, retry: true }
+    if (d?.code !== 'SHIELD_CAPTCHA_WRONG') {
+      // stale / bad proof (e.g. challenge expired while the captcha was open): just get a fresh challenge
+      if (d?.code === 'SHIELD_BAD_PROOF') continue
+      return { token: null, retry: false }
+    }
+    wrong = true
   }
+  return { token: null, retry: false }
+}
+
+// Transient failures (offline blip, 429, cold start) used to leave the player locked until a full reload.
+async function fetchToken(): Promise<string | null> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const out = await fetchTokenOnce()
+      if (out.token || off) return out.token
+      if (!out.retry && attempt >= 1) break
+    } catch {}
+    await sleep(Math.min(1500 * 2 ** attempt, 12_000))
+  }
+  set({ failed: true })
+  return null
 }
 
 export function getToken(): Promise<string | null> {
@@ -136,7 +159,7 @@ const forget = () => {
     sessionStorage.removeItem(KEY.tok)
     sessionStorage.removeItem(KEY.exp)
   } catch {}
-  set({ verified: import.meta.env.DEV || off })
+  set({ verified: import.meta.env.DEV || off, failed: false })
 }
 
 /* ---------- fetch interceptor ---------- */
@@ -209,6 +232,7 @@ const looksAutomated = () =>
   /HeadlessChrome|PhantomJS/i.test(navigator.userAgent) ||
   (!!(window as unknown as { chrome?: unknown }).chrome && !navigator.languages?.length)
 
+let slowHits = 0
 function checkDevTools() {
   if (state.bot || import.meta.env.DEV) return // DEV: never stall or lock the dev's own DevTools
   const inIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -218,13 +242,22 @@ function checkDevTools() {
     if (state.devtools) set({ devtools: false });
     return;
   }
-  const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  let open = !mobile && (window.outerWidth - window.innerWidth > 175 || window.outerHeight - window.innerHeight > 175);
-  try {
-    const t = performance.now();
-    Function('debugger')();
-    if (performance.now() - t > 100) open = true;
-  } catch {}
+  const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024)
+  // phones: window-size and timing heuristics false-positive constantly (URL bar, keyboard, jank) and there is no DevTools anyway
+  if (mobile) {
+    if (state.devtools) set({ devtools: false })
+    return
+  }
+  let open = window.outerWidth - window.innerWidth > 175 || window.outerHeight - window.innerHeight > 175
+  if (!open) {
+    try {
+      const t = performance.now();
+      Function('debugger')();
+      // a busy main thread can stall this once; require two slow hits in a row
+      slowHits = performance.now() - t > 100 ? slowHits + 1 : 0
+      if (slowHits >= 2) open = true
+    } catch {}
+  }
   if (open !== state.devtools) {
     set({ devtools: open })
     if (open) {

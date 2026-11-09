@@ -10,7 +10,7 @@ import { Tabs } from '../components/Tabs'
 import { useAsync } from '../hooks/useAsync'
 import { cn } from '../lib/utils'
 import { fetchDetails, fetchEpisodes, fetchProviders, movieHref, resolveProvider, type MediaType } from '../services/movies'
-import { useShieldVerified, getToken } from '../lib/shield'
+import { useShieldVerified, useShield, getToken } from '../lib/shield'
 
 const PREF = 'zk:movie-server:v1'
 const readPref = () => {
@@ -41,10 +41,12 @@ export default function MovieWatchPage() {
 
   const [frameLoaded, setFrameLoaded] = useState(false)
   const sessionVerified = useShieldVerified()
+  const shieldFailed = useShield().failed
   useEffect(() => {
-    if (!sessionVerified) {
-      void getToken()
-    }
+    if (sessionVerified) return
+    void getToken()
+    const t = window.setInterval(() => void getToken(), 6000)
+    return () => window.clearInterval(t)
   }, [sessionVerified])
 
   const src = useAsync(
@@ -105,6 +107,11 @@ export default function MovieWatchPage() {
             <p className="mt-1.5 max-w-sm text-xs text-muted leading-relaxed">
               Verification challenge in progress. Complete the challenge to unlock high-speed streaming.
             </p>
+            {shieldFailed && (
+              <button onClick={() => void getToken()} className="mt-4 rounded-full bg-white px-5 py-2 text-xs font-bold text-black active:scale-95">
+                Retry
+              </button>
+            )}
           </div>
         ) : (
           <>

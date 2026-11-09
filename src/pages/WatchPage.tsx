@@ -73,7 +73,7 @@ import { LogoFill } from '../components/LogoFill'
 import { LOGO_URL } from '../lib/constants'
 import { Tour, tourDone, tourSeen, type TourStep } from '../components/Tour'
 import { ServerPopup, type ServerOpt } from '../components/ServerPopup'
-import { useShieldVerified, getToken } from '../lib/shield'
+import { useShieldVerified, useShield, getToken } from '../lib/shield'
 import { StreamProblem } from '../components/StreamProblem'
 
 
@@ -173,10 +173,13 @@ export default function WatchPage() {
     if (shieldOk) setEverOk(true)
   }, [shieldOk])
   const sessionVerified = shieldOk || everOk
+  const shieldFailed = useShield().failed
   useEffect(() => {
-    if (!shieldOk) {
-      void getToken()
-    }
+    if (shieldOk) return
+    void getToken()
+    // keep trying: one failed fetch must never leave the player locked until a manual reload
+    const t = window.setInterval(() => void getToken(), 6000)
+    return () => window.clearInterval(t)
   }, [shieldOk])
   const [loadKind, setLoadKind] = useState<'episode' | 'server'>('episode')
   const [aud, setAud] = useState<{ tracks: { i: number; label: string; lang: string }[]; active: number }>({ tracks: [], active: 0 })
@@ -205,7 +208,8 @@ export default function WatchPage() {
     [id, ep, title, sessionVerified]
   )
   const serverAudio = serverAudioQuery.data
-  const wanted = serverById(sp.get('server') ?? saved.server ?? 'megaplay')
+  const defaultServer = id >= 900000 ? 'acdn' : (saved.server ?? 'megaplay')
+  const wanted = serverById(sp.get('server') ?? defaultServer)
   const server = wanted.id === 'acdn' && acdn === false ? serverById('megaplay') : wanted
   const directList = DIRECT.filter((s) => s.id !== 'acdn' || acdn === true)
   const audio: 'sub' | 'dub' = (sp.get('audio') ?? saved.audio) === 'dub' ? 'dub' : 'sub'
@@ -687,6 +691,11 @@ export default function WatchPage() {
                 <p className="mt-1.5 max-w-sm text-xs text-muted leading-relaxed">
                   Verification challenge in progress. Complete the challenge to unlock high-speed streaming.
                 </p>
+                {shieldFailed && (
+                  <button onClick={() => void getToken()} className="mt-4 rounded-full bg-white px-5 py-2 text-xs font-bold text-black active:scale-95">
+                    Retry
+                  </button>
+                )}
               </div>
             </Frame>
           ) : !a ? (
