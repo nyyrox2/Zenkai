@@ -1,47 +1,22 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
-import { Snowflake } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion, useMotionValue, useSpring } from 'framer-motion'
 import { HyperText } from './HyperText'
-import { OrbitingCircles } from './OrbitingCircles'
-import { LOGO_URL } from '../lib/constants'
+import { WinterScene } from './WinterScene'
 
 const STORAGE_KEY = 'zenkai_winter_intro_2026'
 const EASE = [0.16, 1, 0.3, 1] as const
-const SPOT = 640 // pointer spotlight diameter
+const SPOT = 520
+const LINES = ['When the nights grow long,', 'the best stories wait to be watched.']
+const BAR = 8 // letterbox height in svh
+const TITLE = 'font-display text-[clamp(3.5rem,14vw,9.5rem)] leading-none font-black tracking-[0.14em] pl-[0.14em]'
+const GRAIN = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")`
 
-const rise = (delay: number) => ({
-  initial: { opacity: 0, y: 16 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.8, delay, ease: EASE },
-})
-
-const SPARKLES = [
-  { l: '-3%', t: '12%', s: 14, d: 0 },
-  { l: '101%', t: '26%', s: 10, d: 0.9 },
-  { l: '86%', t: '-4%', s: 16, d: 1.7 },
-  { l: '14%', t: '98%', s: 9, d: 2.4 },
-]
-
-/** Twinkling four-point star (Magic UI "Sparkles Text"). */
-function Sparkle({ l, t, s, d }: (typeof SPARKLES)[number]) {
-  return (
-    <motion.svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      width={s}
-      height={s}
-      className="absolute fill-sky-100"
-      style={{ left: l, top: t, marginLeft: -s / 2, marginTop: -s / 2 }}
-      animate={{ scale: [0, 1, 0], opacity: [0, 1, 0], rotate: [0, 90, 180] }}
-      transition={{ duration: 2.6, delay: 1.8 + d, repeat: Infinity, repeatDelay: 1.2, ease: 'easeInOut' }}
-    >
-      <path d="M12 0C12.9 7.5 16.5 11.1 24 12C16.5 12.9 12.9 16.5 12 24C11.1 16.5 7.5 12.9 0 12C7.5 11.1 11.1 7.5 12 0Z" />
-    </motion.svg>
-  )
-}
-
-/** First-visit winter intro. Never auto-closes: tap / click anywhere to enter. Transform + opacity animation only. */
+/**
+ * Cinematic first-visit intro: letterbox opens on a moonlit mountain scene, two title cards, then the title with a lens-flare streak.
+ * Never auto-closes — click / tap anywhere (or Enter, Space, Escape) to enter. Transform + opacity animation only.
+ */
 export function WinterIntro({ onFinish }: { onFinish: () => void }) {
+  const [step, setStep] = useState(0)
   const done = useRef(false)
   const cb = useRef(onFinish)
   cb.current = onFinish
@@ -55,14 +30,17 @@ export function WinterIntro({ onFinish }: { onFinish: () => void }) {
     cb.current()
   }, [])
 
-  // Pointer -> tilt of the orbit stage + a soft spotlight that trails the cursor (touch drag works too)
+  // Title-card timeline
+  useEffect(() => {
+    const ts = [2000, 4600, 7400].map((ms, i) => window.setTimeout(() => setStep(i + 1), ms))
+    return () => ts.forEach(window.clearTimeout)
+  }, [])
+
+  // Pointer -> camera parallax + a light that trails the cursor (touch drag works too)
   const px = useMotionValue(0)
   const py = useMotionValue(0)
   const gx = useMotionValue(window.innerWidth / 2 - SPOT / 2)
   const gy = useMotionValue(window.innerHeight / 2 - SPOT / 2)
-  const tilt = { damping: 30, stiffness: 120 }
-  const rotY = useSpring(useTransform(px, (v) => v * 12), tilt)
-  const rotX = useSpring(useTransform(py, (v) => -v * 12), tilt)
   const sx = useSpring(gx, { damping: 40, stiffness: 70 })
   const sy = useSpring(gy, { damping: 40, stiffness: 70 })
 
@@ -82,100 +60,135 @@ export function WinterIntro({ onFinish }: { onFinish: () => void }) {
     }
   }, [px, py, gx, gy, finish])
 
+  const bar = (origin: string) => ({
+    initial: { scaleY: 1 },
+    animate: { scaleY: BAR / 50 },
+    exit: { scaleY: 1, transition: { duration: 0.55, ease: EASE } },
+    transition: { duration: 2.2, delay: 0.3, ease: EASE },
+    className: `absolute inset-x-0 z-20 h-[50svh] bg-black ${origin}`,
+  })
+
   return (
     <motion.aside
       key="winter-intro-scene"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1, transition: { duration: 0.6 } }}
-      exit={{ opacity: 0, scale: 1.05, transition: { duration: 0.6, ease: EASE } }}
+      exit={{ opacity: 0, transition: { duration: 0.4, delay: 0.5 } }}
       onClick={finish}
       aria-label="Winter intro. Click anywhere to enter."
-      className="relative z-10 flex min-h-svh w-full cursor-pointer flex-col items-center justify-center overflow-hidden bg-[#05070d] px-6 text-center text-white select-none"
+      className="relative z-10 min-h-svh w-full cursor-pointer overflow-hidden bg-black text-white select-none"
     >
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_45%_at_50%_0%,rgba(56,189,248,.10),transparent)]" />
+      {/* camera: slow push-in over the whole scene */}
+      <motion.div
+        className="absolute inset-0 will-change-transform"
+        initial={{ opacity: 0, scale: 1 }}
+        animate={{ opacity: 1, scale: 1.08 }}
+        transition={{ opacity: { duration: 2.2, delay: 0.4 }, scale: { duration: 26, ease: 'linear' } }}
+      >
+        <WinterScene px={px} py={py} />
+      </motion.div>
+
       <motion.div
         aria-hidden
         style={{ x: sx, y: sy, width: SPOT, height: SPOT }}
-        className="pointer-events-none absolute top-0 left-0 rounded-full bg-[radial-gradient(closest-side,rgba(125,211,252,.16),transparent)] will-change-transform"
+        className="pointer-events-none absolute top-0 left-0 rounded-full bg-[radial-gradient(closest-side,rgba(186,230,253,.10),transparent)] will-change-transform"
       />
+      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[.07]" style={{ backgroundImage: GRAIN }} />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_45%,transparent_55%,rgba(0,0,0,.65)_100%)]" />
 
-      {/* Orbit stage */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1, delay: 0.1, ease: EASE }}
-        className="relative z-10"
-      >
-        <motion.div style={{ rotateX: rotX, rotateY: rotY, transformPerspective: 900 }} className="relative aspect-square h-[clamp(190px,34svh,300px)] will-change-transform">
-          <OrbitingCircles size={100} duration={38} reverse>
-            <Snowflake className="size-4 text-sky-200/80" />
-            <span className="block size-1.5 rounded-full bg-sky-200/60" />
-            <Snowflake className="size-3 text-indigo-200/70" />
-            <span className="block size-1 rounded-full bg-white/60" />
-            <Snowflake className="size-4 text-sky-100/80" />
-            <span className="block size-1.5 rounded-full bg-indigo-200/60" />
-          </OrbitingCircles>
-          <OrbitingCircles size={62} duration={26}>
-            <Snowflake className="size-5 text-sky-100" />
-            <span className="block size-1.5 rounded-full bg-sky-200/70" />
-            <Snowflake className="size-3.5 text-sky-200/80" />
-          </OrbitingCircles>
-          <div className="absolute inset-0 grid place-items-center">
-            <motion.img
-              src={LOGO_URL}
-              alt=""
-              draggable={false}
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-              className="w-[24%] rounded-2xl object-cover shadow-[0_0_60px_rgba(125,211,252,.35)] ring-1 ring-white/15"
+      {/* title cards */}
+      <div className="pointer-events-none absolute inset-x-0 top-[19svh] z-10 flex min-h-[clamp(9rem,24vw,13rem)] flex-col items-center justify-center px-6 text-center sm:top-[17svh]">
+        <AnimatePresence mode="wait">
+          {(step === 1 || step === 2) && (
+            <motion.p
+              key={step}
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.5 } }}
+              className="max-w-[24ch] font-display text-[clamp(1.25rem,3.4vw,2.1rem)] leading-snug font-light tracking-[0.04em] text-white/90 [text-shadow:0_2px_30px_rgba(0,0,0,.7)]"
+            >
+              {LINES[step - 1].split(' ').map((w, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.9, delay: i * 0.12, ease: EASE }}
+                  className="mr-[0.3em] inline-block"
+                >
+                  {w}
+                </motion.span>
+              ))}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        {step >= 3 && (
+          <div className="relative flex flex-col items-center">
+            <motion.span
+              aria-hidden
+              className="absolute top-1/2 left-1/2 h-px w-[min(92vw,980px)] -translate-x-1/2 bg-[linear-gradient(90deg,transparent,rgba(125,211,252,.9),#fff,rgba(125,211,252,.9),transparent)] will-change-transform"
+              initial={{ scaleX: 0, opacity: 0 }}
+              animate={{ scaleX: 1, opacity: [0, 1, 0.5] }}
+              transition={{ duration: 1.8, ease: EASE }}
             />
+            <h1 aria-label="Zenkai" className={`relative ${TITLE} text-[#e8f6ff] [text-shadow:0_0_50px_rgba(125,211,252,.45),0_2px_0_rgba(0,0,0,.4)]`}>
+              {'ZENKAI'.split('').map((c, i) => (
+                <motion.span
+                  key={i}
+                  aria-hidden
+                  className="inline-block"
+                  initial={{ opacity: 0, y: 36, scale: 1.12 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 1, delay: 0.15 + i * 0.09, ease: EASE }}
+                >
+                  {c}
+                </motion.span>
+              ))}
+              <motion.span
+                aria-hidden
+                className={`pointer-events-none absolute inset-0 bg-clip-text text-transparent ${TITLE}`}
+                style={{
+                  fontKerning: 'none',
+                  textShadow: 'none',
+                  backgroundImage: 'linear-gradient(105deg, transparent 42%, rgba(255,255,255,.95) 50%, transparent 58%)',
+                  backgroundSize: '300% 100%',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: '100% 0%',
+                }}
+                animate={{ backgroundPosition: ['100% 0%', '0% 0%'] }}
+                transition={{ duration: 2.4, delay: 1.5, repeat: Infinity, repeatDelay: 4.5, ease: 'easeInOut' }}
+              >
+                ZENKAI
+              </motion.span>
+            </h1>
+            <HyperText text="WINTER · 2026" delay={900} className="mt-5 font-mono text-xs font-semibold tracking-[0.45em] text-sky-100/75 sm:text-sm" />
           </div>
-        </motion.div>
-      </motion.div>
+        )}
+      </div>
 
-      <motion.div {...rise(0.6)} className="relative z-10 mt-6">
-        <HyperText text="WINTER 2026" delay={700} className="font-mono text-xs font-semibold tracking-[0.35em] text-sky-200/70" />
+      {/* letterbox */}
+      <motion.div {...bar('top-0 origin-top')} />
+      <motion.div {...bar('bottom-0 origin-bottom')} />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 2, duration: 1 }}
+        style={{ height: `${BAR}svh` }}
+        className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between px-6 font-mono text-[10px] tracking-[0.35em] text-white/35 uppercase sm:px-10"
+      >
+        <span>A Zenkai Original</span>
+        <span>Chapter · Winter</span>
       </motion.div>
-
-      <h1 className="relative z-10 mt-4 font-display font-extrabold tracking-[-0.03em]">
-        <motion.span {...rise(0.8)} className="block text-[clamp(1.4rem,4vw,2.25rem)] font-semibold text-white/70">
-          Welcome to
-        </motion.span>
-        <motion.span {...rise(1)} className="relative mt-1 inline-block text-[clamp(3.75rem,13vw,8rem)] leading-none">
+      <div style={{ height: `${BAR}svh` }} className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-center">
+        <AnimatePresence mode="wait">
           <motion.span
-            className="block bg-clip-text pb-2 text-transparent"
-            style={{
-              backgroundImage: 'linear-gradient(110deg,#7dd3fc,#c7d2fe,#f5d0fe,#a5f3fc,#7dd3fc)',
-              backgroundSize: '200% 100%',
-            }}
-            animate={{ backgroundPosition: ['0% 0%', '200% 0%'] }}
-            transition={{ duration: 7, repeat: Infinity, ease: 'linear' }}
+            key={step >= 3 ? 'enter' : 'skip'}
+            initial={{ opacity: 0 }}
+            animate={step >= 3 ? { opacity: [0.35, 0.95, 0.35] } : { opacity: 0.4 }}
+            exit={{ opacity: 0, transition: { duration: 0.3 } }}
+            transition={step >= 3 ? { duration: 2.6, repeat: Infinity, ease: 'easeInOut' } : { delay: 2, duration: 1 }}
+            className="text-[11px] font-medium tracking-[0.3em] text-white uppercase"
           >
-            Winter
+            {step >= 3 ? 'Click anywhere to enter' : 'Click to skip'}
           </motion.span>
-          {SPARKLES.map((s) => (
-            <Sparkle key={s.l} {...s} />
-          ))}
-        </motion.span>
-      </h1>
-
-      <p className="relative z-10 mt-5 max-w-md text-base leading-relaxed text-white/55 sm:text-lg">
-        {'Cold nights, warm blankets and every new episode. Settle in.'.split(' ').map((w, i) => (
-          <motion.span key={i} {...rise(1.3 + i * 0.05)} className="mr-[0.28em] inline-block">
-            {w}
-          </motion.span>
-        ))}
-      </p>
-
-      <motion.div {...rise(2.2)} className="relative z-10 mt-10">
-        <motion.span
-          animate={{ opacity: [0.35, 0.9, 0.35] }}
-          transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
-          className="block text-[11px] font-medium tracking-[0.3em] text-white uppercase"
-        >
-          Click anywhere to enter
-        </motion.span>
-      </motion.div>
+        </AnimatePresence>
+      </div>
     </motion.aside>
   )
 }

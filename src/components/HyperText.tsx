@@ -15,7 +15,7 @@ export function HyperText({ text, className, duration = 900, delay = 0 }: { text
       setOut(
         text
           .split('')
-          .map((c, i) => (c === ' ' || i < p * text.length ? c : LETTERS[(Math.random() * LETTERS.length) | 0]))
+          .map((c, i) => (!/\w/.test(c) || i < p * text.length ? c : LETTERS[(Math.random() * LETTERS.length) | 0]))
           .join(''),
       )
       if (p < 1) raf.current = requestAnimationFrame(tick)
