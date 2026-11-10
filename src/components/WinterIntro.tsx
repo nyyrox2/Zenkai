@@ -1,193 +1,228 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion, useMotionValue, useSpring } from 'framer-motion'
-import { HyperText } from './HyperText'
-import { WinterScene } from './WinterScene'
+import { useCallback, useEffect, useState } from 'react'
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 
 const STORAGE_KEY = 'zenkai_winter_intro_2026'
-const EASE = [0.16, 1, 0.3, 1] as const
-const SPOT = 520
-const LINES = ['When the nights grow long,', 'the best stories wait to be watched.']
-const BAR = 8 // letterbox height in svh
-const TITLE = 'font-display text-[clamp(3.5rem,14vw,9.5rem)] leading-none font-black tracking-[0.14em] pl-[0.14em]'
-const GRAIN = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")`
+const INTRO_DURATION_MS = 5000
+
+interface WinterIntroProps {
+  onFinish: () => void
+}
 
 /**
- * Cinematic first-visit intro: letterbox opens on a moonlit mountain scene, two title cards, then the title with a lens-flare streak.
- * Never auto-closes — click / tap anywhere (or Enter, Space, Escape) to enter. Transform + opacity animation only.
+ * High-end immersive Winter Intro sequence.
+ * - 3D Interactive Mouse/Touch Parallax: Layers shift smoothly in opposite directions.
+ * - Character Lighting & Lens Flare: Pulsing starlight glint and warm ambient lighting.
+ * - Staggered Typography Reveal: Subtitle first -> Scale/Slide Headline with text-shadow glow -> Cozy description last.
+ * - Cinematic Radial Zoom Exit: Camera pushes through soft frost blur when entering the site.
  */
-export function WinterIntro({ onFinish }: { onFinish: () => void }) {
-  const [step, setStep] = useState(0)
-  const done = useRef(false)
-  const cb = useRef(onFinish)
-  cb.current = onFinish
+export function WinterIntro({ onFinish }: WinterIntroProps) {
+  const [active, setActive] = useState(true)
+
+  // Motion values for smooth interactive 3D parallax
+  const rawMouseX = useMotionValue(0)
+  const rawMouseY = useMotionValue(0)
+
+  // Opposite-direction 3D parallax layers
+  const bgX = useSpring(useTransform(rawMouseX, (v) => -v * 26), { damping: 36, stiffness: 80 })
+  const bgY = useSpring(useTransform(rawMouseY, (v) => -v * 26), { damping: 36, stiffness: 80 })
+
+  const charX = useSpring(useTransform(rawMouseX, (v) => -v * 14), { damping: 30, stiffness: 95 })
+  const charY = useSpring(useTransform(rawMouseY, (v) => -v * 14), { damping: 30, stiffness: 95 })
+
+  const textX = useSpring(useTransform(rawMouseX, (v) => -v * 7), { damping: 32, stiffness: 110 })
+  const textY = useSpring(useTransform(rawMouseY, (v) => -v * 7), { damping: 32, stiffness: 110 })
 
   const finish = useCallback(() => {
-    if (done.current) return
-    done.current = true
     try {
       localStorage.setItem(STORAGE_KEY, 'true')
     } catch {}
-    cb.current()
-  }, [])
+    setActive(false)
+    // Allow smooth exit animation to complete before unmounting
+    const t = window.setTimeout(onFinish, 700)
+    return () => window.clearTimeout(t)
+  }, [onFinish])
 
-  // Title-card timeline
+  // Mouse & Touch Parallax Listener
   useEffect(() => {
-    const ts = [2000, 4600, 7400].map((ms, i) => window.setTimeout(() => setStep(i + 1), ms))
-    return () => ts.forEach(window.clearTimeout)
-  }, [])
-
-  // Pointer -> camera parallax + a light that trails the cursor (touch drag works too)
-  const px = useMotionValue(0)
-  const py = useMotionValue(0)
-  const gx = useMotionValue(window.innerWidth / 2 - SPOT / 2)
-  const gy = useMotionValue(window.innerHeight / 2 - SPOT / 2)
-  const sx = useSpring(gx, { damping: 40, stiffness: 70 })
-  const sy = useSpring(gy, { damping: 40, stiffness: 70 })
-
-  useEffect(() => {
-    const move = (e: PointerEvent) => {
-      px.set((e.clientX / window.innerWidth) * 2 - 1)
-      py.set((e.clientY / window.innerHeight) * 2 - 1)
-      gx.set(e.clientX - SPOT / 2)
-      gy.set(e.clientY - SPOT / 2)
+    const handlePointerMove = (e: PointerEvent) => {
+      const { innerWidth, innerHeight } = window
+      const x = (e.clientX - innerWidth / 2) / (innerWidth / 2)
+      const y = (e.clientY - innerHeight / 2) / (innerHeight / 2)
+      rawMouseX.set(x)
+      rawMouseY.set(y)
     }
-    const key = (e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') && finish()
-    window.addEventListener('pointermove', move, { passive: true })
-    window.addEventListener('keydown', key)
+
+    const handlePointerLeave = () => {
+      rawMouseX.set(0)
+      rawMouseY.set(0)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true })
+    window.addEventListener('pointerleave', handlePointerLeave, { passive: true })
+
     return () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('keydown', key)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerleave', handlePointerLeave)
     }
-  }, [px, py, gx, gy, finish])
+  }, [rawMouseX, rawMouseY])
 
-  const bar = (origin: string) => ({
-    initial: { scaleY: 1 },
-    animate: { scaleY: BAR / 50 },
-    exit: { scaleY: 1, transition: { duration: 0.55, ease: EASE } },
-    transition: { duration: 2.2, delay: 0.3, ease: EASE },
-    className: `absolute inset-x-0 z-20 h-[50svh] bg-black ${origin}`,
-  })
+  // Auto-transition to landing page after sequence completes
+  useEffect(() => {
+    const timer = window.setTimeout(finish, INTRO_DURATION_MS)
+    return () => window.clearTimeout(timer)
+  }, [finish])
+
+  // Allow instant skip on any key, scroll, or tap
+  useEffect(() => {
+    const onKey = () => finish()
+    const onScroll = () => finish()
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('wheel', onScroll, { passive: true })
+    window.addEventListener('touchmove', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('wheel', onScroll)
+      window.removeEventListener('touchmove', onScroll)
+    }
+  }, [finish])
 
   return (
     <motion.aside
       key="winter-intro-scene"
-      exit={{ opacity: 0, transition: { duration: 0.4, delay: 0.5 } }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: active ? 1 : 0 }}
+      exit={{
+        opacity: 0,
+        scale: 1.15,
+        filter: 'blur(16px)',
+        transition: { duration: 0.72, ease: [0.22, 1, 0.36, 1] },
+      }}
       onClick={finish}
-      aria-label="Winter intro. Click anywhere to enter."
-      className="relative z-10 min-h-svh w-full cursor-pointer overflow-hidden bg-black text-white select-none"
+      className="relative z-10 flex min-h-svh w-full cursor-pointer flex-col items-center justify-center p-4 sm:p-6 text-center select-none overflow-hidden"
+      aria-label="Winter intro animation. Tap anywhere to enter."
     >
-      {/* camera: slow push-in over the whole scene */}
-      <motion.div
-        className="absolute inset-0 will-change-transform"
-        initial={{ opacity: 0, scale: 1 }}
-        animate={{ opacity: 1, scale: 1.08 }}
-        transition={{ opacity: { duration: 2.2, delay: 0.4 }, scale: { duration: 26, ease: 'linear' } }}
-      >
-        <WinterScene px={px} py={py} />
-      </motion.div>
-
+      {/* Background Parallax Layer: Deep Aurora & Ambient Glow */}
       <motion.div
         aria-hidden
-        style={{ x: sx, y: sy, width: SPOT, height: SPOT }}
-        className="pointer-events-none absolute top-0 left-0 rounded-full bg-[radial-gradient(closest-side,rgba(186,230,253,.10),transparent)] will-change-transform"
+        style={{ x: bgX, y: bgY }}
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.18)_0%,rgba(99,102,241,0.08)_40%,transparent_68%)]"
       />
-      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[.07]" style={{ backgroundImage: GRAIN }} />
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_45%,transparent_55%,rgba(0,0,0,.65)_100%)]" />
 
-      {/* title cards */}
-      <div className="pointer-events-none absolute inset-x-0 top-[19svh] z-10 flex min-h-[clamp(9rem,24vw,13rem)] flex-col items-center justify-center px-6 text-center sm:top-[17svh]">
-        <AnimatePresence mode="wait">
-          {(step === 1 || step === 2) && (
-            <motion.p
-              key={step}
-              exit={{ opacity: 0, y: -8, transition: { duration: 0.5 } }}
-              className="max-w-[24ch] font-display text-[clamp(1.25rem,3.4vw,2.1rem)] leading-snug font-light tracking-[0.04em] text-white/90 [text-shadow:0_2px_30px_rgba(0,0,0,.7)]"
-            >
-              {LINES[step - 1].split(' ').map((w, i) => (
-                <motion.span
-                  key={i}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.9, delay: i * 0.12, ease: EASE }}
-                  className="mr-[0.3em] inline-block"
-                >
-                  {w}
-                </motion.span>
-              ))}
-            </motion.p>
-          )}
-        </AnimatePresence>
+      <div className="relative z-10 flex flex-col items-center max-w-xl px-4">
+        {/* Character Showcase with 3D Parallax & Custom Lighting */}
+        <motion.div
+          style={{ x: charX, y: charY }}
+          initial={{ opacity: 0, scale: 0.88, y: 22 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+          className="relative mb-3 flex items-center justify-center"
+        >
+          {/* Soft ambient light gradient that pulses on her scarf and silhouette */}
+          <motion.div
+            aria-hidden
+            animate={{
+              opacity: [0.45, 0.75, 0.45],
+              scale: [0.98, 1.04, 0.98],
+            }}
+            transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+            className="pointer-events-none absolute -inset-8 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.25)_0%,rgba(244,114,182,0.12)_45%,transparent_70%)] blur-2xl"
+          />
 
-        {step >= 3 && (
-          <div className="relative flex flex-col items-center">
-            <motion.span
-              aria-hidden
-              className="absolute top-1/2 left-1/2 h-px w-[min(92vw,980px)] -translate-x-1/2 bg-[linear-gradient(90deg,transparent,rgba(125,211,252,.9),#fff,rgba(125,211,252,.9),transparent)] will-change-transform"
-              initial={{ scaleX: 0, opacity: 0 }}
-              animate={{ scaleX: 1, opacity: [0, 1, 0.5] }}
-              transition={{ duration: 1.8, ease: EASE }}
-            />
-            <h1 aria-label="Zenkai" className={`relative ${TITLE} text-[#e8f6ff] [text-shadow:0_0_50px_rgba(125,211,252,.45),0_2px_0_rgba(0,0,0,.4)]`}>
-              {'ZENKAI'.split('').map((c, i) => (
-                <motion.span
-                  key={i}
-                  aria-hidden
-                  className="inline-block"
-                  initial={{ opacity: 0, y: 36, scale: 1.12 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 1, delay: 0.15 + i * 0.09, ease: EASE }}
-                >
-                  {c}
-                </motion.span>
-              ))}
-              <motion.span
-                aria-hidden
-                className={`pointer-events-none absolute inset-0 bg-clip-text text-transparent ${TITLE}`}
-                style={{
-                  fontKerning: 'none',
-                  textShadow: 'none',
-                  backgroundImage: 'linear-gradient(105deg, transparent 42%, rgba(255,255,255,.95) 50%, transparent 58%)',
-                  backgroundSize: '300% 100%',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: '100% 0%',
-                }}
-                animate={{ backgroundPosition: ['100% 0%', '0% 0%'] }}
-                transition={{ duration: 2.4, delay: 1.5, repeat: Infinity, repeatDelay: 4.5, ease: 'easeInOut' }}
-              >
-                ZENKAI
-              </motion.span>
-            </h1>
-            <HyperText text="WINTER · 2026" delay={900} className="mt-5 font-mono text-xs font-semibold tracking-[0.45em] text-sky-100/75 sm:text-sm" />
-          </div>
-        )}
-      </div>
-
-      {/* letterbox */}
-      <motion.div {...bar('top-0 origin-top')} />
-      <motion.div {...bar('bottom-0 origin-bottom')} />
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 2, duration: 1 }}
-        style={{ height: `${BAR}svh` }}
-        className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between px-6 font-mono text-[10px] tracking-[0.35em] text-white/35 uppercase sm:px-10"
-      >
-        <span>A Zenkai Original</span>
-        <span>Chapter · Winter</span>
-      </motion.div>
-      <div style={{ height: `${BAR}svh` }} className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-center">
-        <AnimatePresence mode="wait">
-          <motion.span
-            key={step >= 3 ? 'enter' : 'skip'}
-            initial={{ opacity: 0 }}
-            animate={step >= 3 ? { opacity: [0.35, 0.95, 0.35] } : { opacity: 0.4 }}
-            exit={{ opacity: 0, transition: { duration: 0.3 } }}
-            transition={step >= 3 ? { duration: 2.6, repeat: Infinity, ease: 'easeInOut' } : { delay: 2, duration: 1 }}
-            className="text-[11px] font-medium tracking-[0.3em] text-white uppercase"
+          {/* 2D Anime Character */}
+          <motion.div
+            animate={{ y: [0, -8, 0] }}
+            transition={{ repeat: Infinity, duration: 4.8, ease: 'easeInOut' }}
+            className="relative flex items-center justify-center"
           >
-            {step >= 3 ? 'Click anywhere to enter' : 'Click to skip'}
-          </motion.span>
-        </AnimatePresence>
+            <img
+              src="/winter/anime_character.png"
+              alt="Happy Winter Anime Girl"
+              className="h-48 w-auto max-w-[14rem] sm:h-60 sm:max-w-[17rem] object-contain drop-shadow-[0_12px_36px_rgba(56,189,248,0.4)]"
+            />
+
+            {/* Glowing Lens Flare & Pulsing Starlight on the snowflake in her hand */}
+            <motion.div
+              animate={{
+                scale: [0.9, 1.35, 0.9],
+                opacity: [0.7, 1, 0.7],
+              }}
+              transition={{ repeat: Infinity, duration: 2.8, ease: 'easeInOut' }}
+              className="pointer-events-none absolute right-[18%] top-[16%] flex items-center justify-center"
+            >
+              {/* Outer soft aura ring */}
+              <div className="absolute size-10 rounded-full bg-cyan-300/35 blur-md" />
+              {/* Core golden/cyan star glint */}
+              <div className="absolute size-3 rounded-full bg-white shadow-[0_0_16px_rgba(255,255,255,0.9),0_0_30px_rgba(56,189,248,0.8)]" />
+              {/* Horizontal flare beam */}
+              <div className="absolute h-[1.5px] w-12 bg-gradient-to-r from-transparent via-cyan-200 to-transparent" />
+              {/* Vertical flare beam */}
+              <div className="absolute w-[1.5px] h-12 bg-gradient-to-b from-transparent via-cyan-200 to-transparent" />
+            </motion.div>
+          </motion.div>
+        </motion.div>
+
+        {/* Parallax Content Container */}
+        <motion.div
+          style={{ x: textX, y: textY }}
+          className="flex flex-col items-center"
+        >
+          {/* Step 1: Subtitle ("冬の季節 • ZENKAI WINTER 2026") fades & slides in FIRST */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, delay: 0.28, ease: 'easeOut' }}
+            className="flex items-center gap-2 text-xs font-bold tracking-[0.35em] text-sky-200/90 uppercase drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]"
+            style={{ fontFamily: "'Comfortaa', 'Outfit', sans-serif" }}
+          >
+            <span>冬の季節</span>
+            <span className="text-sky-400">•</span>
+            <span>ZENKAI WINTER 2026</span>
+          </motion.div>
+
+          {/* Step 2: "Welcome to Winter" smooth scale-up & slide-up reveal with text-shadow glow */}
+          <motion.h1
+            initial={{ opacity: 0, scale: 0.9, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{
+              duration: 0.9,
+              delay: 0.85,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            className="mt-3 text-5xl sm:text-7xl font-bold tracking-wide text-white drop-shadow-[0_0_36px_rgba(56,189,248,0.65)]"
+            style={{ fontFamily: "'Mountains of Christmas', 'Sniglet', cursive" }}
+          >
+            Welcome to{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-200 via-sky-300 to-indigo-200 drop-shadow-[0_0_40px_rgba(56,189,248,0.85)]">
+              Winter
+            </span>
+          </motion.h1>
+
+          {/* Step 3: Description fades in LAST (no cursor line) */}
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.85,
+              delay: 1.65,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            className="mt-3 text-sm sm:text-base font-medium text-slate-200 drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] max-w-md leading-relaxed"
+            style={{ fontFamily: "'Comfortaa', sans-serif" }}
+          >
+            The cold nights have arrived. Grab a warm blanket and cozy up with Zenkai.
+          </motion.p>
+
+          {/* Bottom Skip Hint */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.65 }}
+            transition={{ duration: 0.6, delay: 2.2 }}
+            className="mt-7 text-[11px] font-medium tracking-widest text-slate-300 uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+            style={{ fontFamily: "'Comfortaa', sans-serif" }}
+          >
+            tap or click anywhere to enter
+          </motion.p>
+        </motion.div>
       </div>
     </motion.aside>
   )

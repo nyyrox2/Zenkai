@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
 import { hasSeenLatestRelease, markReleaseSeen, onChangelogToggle, useRelease } from '../lib/changelog'
 
 /** Minimal black & white "what's new" card, crimson only on the version label and button hover. No blur, no per-mouse state. */
 export function ChangelogModal() {
   const [open, setOpen] = useState(false)
   const { release: r, ready } = useRelease()
-  const { pathname } = useLocation()
 
   useEffect(() => {
-    if (pathname === '/' || !ready || hasSeenLatestRelease(r.version)) return // not over the winter intro / landing
-    const t = window.setTimeout(() => setOpen(true), 3500)
+    if (!ready || hasSeenLatestRelease(r.version)) return
+    const t = window.setTimeout(() => setOpen(true), 750)
     return () => window.clearTimeout(t)
-  }, [ready, r.version, pathname])
+  }, [ready, r.version])
   useEffect(() => onChangelogToggle(setOpen), [])
 
   const close = () => (markReleaseSeen(r.version), setOpen(false))
