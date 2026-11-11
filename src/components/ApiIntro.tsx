@@ -19,18 +19,14 @@ export function ApiIntro() {
 
   useEffect(() => {
     if (seen()) return
-    let t = 0
-    // wait while another modal (release notes) has locked the page scroll
-    const tick = () => {
-      if (document.body.style.overflow === 'hidden') t = window.setTimeout(tick, 1000)
-      else {
-        try {
-          localStorage.setItem(KEY, '1')
-        } catch {}
-        setOpen(true)
-      }
-    }
-    t = window.setTimeout(tick, 1500)
+    // release notes and the API promo never stack: if notes opened (or are about to) this visit, the promo waits for the next one
+    const t = window.setTimeout(() => {
+      try {
+        if (sessionStorage.getItem('zk:notes-shown') || document.body.style.overflow === 'hidden') return
+        localStorage.setItem(KEY, '1')
+      } catch {}
+      setOpen(true)
+    }, 8000)
     return () => window.clearTimeout(t)
   }, [])
 

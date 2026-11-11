@@ -10,7 +10,12 @@ export function ChangelogModal() {
 
   useEffect(() => {
     if (!ready || hasSeenLatestRelease(r.version)) return
-    const t = window.setTimeout(() => setOpen(true), 750)
+    const t = window.setTimeout(() => {
+      try {
+        sessionStorage.setItem('zk:notes-shown', '1') // ApiIntro waits for a later visit
+      } catch {}
+      setOpen(true)
+    }, 750)
     return () => window.clearTimeout(t)
   }, [ready, r.version])
   useEffect(() => onChangelogToggle(setOpen), [])

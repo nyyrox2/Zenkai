@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent as RMouseEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowUpRight, ChevronDown, Code2, MessageSquare, Shuffle, Smartphone } from 'lucide-react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { InteractiveSnowfall } from '../components/InteractiveSnowfall'
-import { WinterIntro } from '../components/WinterIntro'
+import { motion } from 'framer-motion'
 import { cn } from '../lib/utils'
 import { FadeSlideshow } from '../components/FadeSlideshow'
 import { Logo } from '../components/Logo'
@@ -46,13 +44,6 @@ export default function LandingPage() {
   const [active, setActive] = useState<Key>('anime')
   const [picked, setPicked] = useState<Key | null>(null)
   const [now, setNow] = useState<Partial<Record<Key, string>>>({})
-  const [showIntro, setShowIntro] = useState(() => {
-    try {
-      return !localStorage.getItem('zenkai_winter_intro_2026')
-    } catch {
-      return false
-    }
-  })
   const timers = useRef<number[]>([])
 
   const clearTimers = useCallback(() => {
@@ -66,13 +57,6 @@ export default function LandingPage() {
   }, [clearTimers])
 
   useEffect(() => {
-    const handleReplay = () => setShowIntro(true)
-    window.addEventListener('zenkai:replay-winter-intro', handleReplay)
-    return () => window.removeEventListener('zenkai:replay-winter-intro', handleReplay)
-  }, [])
-
-  useEffect(() => {
-    if (showIntro) return
     const step = (d: number) => setActive((k) => SECTIONS[(SECTIONS.findIndex((s) => s.key === k) + d + SECTIONS.length) % SECTIONS.length].key)
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -83,7 +67,7 @@ export default function LandingPage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate, stacked, showIntro])
+  }, [navigate, stacked])
 
   const onTitle = useCallback((k: Key, title: string) => setNow((p) => (p[k] === title ? p : { ...p, [k]: title })), [])
 
@@ -108,11 +92,6 @@ export default function LandingPage() {
 
   return (
     <main className="relative flex min-h-svh flex-col bg-background text-foreground overflow-x-hidden">
-      <InteractiveSnowfall count={50} speedMultiplier={0.24} />
-      <AnimatePresence mode="wait">
-        {showIntro ? (
-          <WinterIntro key="winter-intro" onFinish={() => setShowIntro(false)} />
-        ) : (
           <motion.div
             key="landing-page-content"
             initial={{ opacity: 0, y: 12 }}
@@ -169,8 +148,6 @@ export default function LandingPage() {
               <span className="hidden lg:inline">Press 1–4 to jump in, or use the arrow keys to look around</span>
             </footer>
           </motion.div>
-        )}
-      </AnimatePresence>
     </main>
   )
 }
