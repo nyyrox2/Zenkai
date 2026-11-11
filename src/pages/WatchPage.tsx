@@ -555,7 +555,7 @@ export default function WatchPage() {
   }, [stream.data])
   const cur = stream.data ? { d: stream.data, ep, audio } : held && held.sid === server.id && !stream.error ? held : null
   const serverBusy = loadKind === 'server' && (stream.loading || salt.loading)
-  const embedSrc = sessionVerified && server.kind === 'embed' ? (server.url?.(ctx) ?? null) : null
+  const embedSrc = server.kind === 'embed' ? (server.url?.(ctx) ?? null) : null
 
   useEffect(() => {
     if (a) saveEpisode(id, ep)
@@ -685,7 +685,7 @@ export default function WatchPage() {
       <div className="mx-auto max-w-7xl lg:px-6 lg:pt-6">
         <div className="min-w-0">
           {/* Player */}
-          {!sessionVerified ? (
+          {!sessionVerified && server.kind !== 'embed' ? (
             <Frame>
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
                 <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-xl shadow-black/50">
@@ -693,7 +693,7 @@ export default function WatchPage() {
                 </div>
                 <h3 className="font-display text-lg font-bold text-foreground">Media Playback Locked</h3>
                 <p className="mt-1.5 max-w-sm text-xs text-muted leading-relaxed">
-                  Verification challenge in progress. Complete the challenge to unlock high-speed streaming.
+                  Verification challenge in progress. Complete the challenge to unlock high-speed streaming. Embed servers below still work.
                 </p>
                 {shieldFailed && (
                   <button onClick={() => void getToken()} className="mt-4 rounded-full bg-white px-5 py-2 text-xs font-bold text-black active:scale-95">

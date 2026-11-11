@@ -114,8 +114,8 @@ export default function MovieWatchPage() {
 
   // Standard embed iframe stream resolution (Videasy, Vidzee, etc.)
   const src = useAsync(
-    () => (sessionVerified && providerId && !isMovieBox ? resolveProvider({ providerId, type, tmdbId: id, season, episode }) : Promise.resolve(null)),
-    [sessionVerified, providerId, isMovieBox, type, id, season, episode],
+    () => (providerId && !isMovieBox ? resolveProvider({ providerId, type, tmdbId: id, season, episode }) : Promise.resolve(null)),
+    [providerId, isMovieBox, type, id, season, episode],
   )
 
   useEffect(() => setFrameLoaded(false), [src.data])
@@ -185,14 +185,14 @@ export default function MovieWatchPage() {
       <div className="mx-auto max-w-7xl lg:px-6 lg:pt-6">
       {/* Player */}
       <div className="relative aspect-video w-full overflow-hidden bg-black lg:shadow-2xl lg:shadow-black/40 lg:ring-1 lg:ring-white/10">
-        {!sessionVerified ? (
+        {!sessionVerified && isMovieBox ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
             <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-xl shadow-black/50">
               <Lock className="size-8 animate-pulse" />
             </div>
             <h3 className="font-display text-lg font-bold text-foreground">Media Playback Locked</h3>
             <p className="mt-1.5 max-w-sm text-xs text-muted leading-relaxed">
-              Verification challenge in progress. Complete the challenge to unlock high-speed streaming.
+              Verification challenge in progress. Complete the challenge to unlock high-speed streaming. Embed servers below still work.
             </p>
             {shieldFailed && (
               <button onClick={() => void getToken()} className="mt-4 rounded-full bg-white px-5 py-2 text-xs font-bold text-black active:scale-95">
