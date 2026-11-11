@@ -1,10 +1,13 @@
-// Zenkai Shield (server): proof-of-work challenge -> short-lived HMAC token, plus per-IP rate limits.
+// Zenkai Shield & Barrier (server): proof-of-work challenge -> short-lived HMAC token, plus per-IP rate limits
+// and an APK barrier restricting backend access to only the official Zenkai Web and Zenkai APK.
 // Web-standard APIs only, so it runs in Cloudflare Pages Functions and in the Vite dev server.
-// Needs env.SHIELD_SECRET (wrangler pages secret). Without it the shield is off and everything passes.
 
 const TOKEN_TTL = 86400; // seconds a token stays valid (24 hours, covers the entire session)
 const CHALLENGE_TTL = 90;
 const DIFFICULTY = 3; // leading hex zeros (~4k hashes, a few ms in the browser)
+
+// Barrier Secret Token shared with the Zenkai APK
+const DEFAULT_BARRIER_TOKEN = "zenkai-barrier-apk-2026-v1";
 
 // [max requests, per 60s]
 const LIMITS = { shield: [30, 60], proxy: [180, 60], stream: [30, 60], subtitles: [40, 60], novel: [60, 60], manga: [60, 60], default: [120, 60] };
@@ -43,7 +46,6 @@ function captchaImage() {
 }
 
 /* ---------- challenge + token ---------- */
-// Captcha only when something looks off: the client says DevTools were opened (?cap=1), no UA / bot UA / no Accept-Language, or this IP keeps asking for challenges.
 const suspicious = (request, url) => {
   const ua = request.headers.get("User-Agent") || "";
   return (
@@ -116,6 +118,39 @@ function limited(ip, cat) {
 const categoryOf = (path) =>
   path === "/proxy" || path === "/api/proxy" ? "proxy" : (path.match(/^\/api\/(stream|subtitles|novel|manga)\b/)?.[1] ?? "default");
 
+/* ---------- Barrier check for Allowed Web Domains and Zenkai APK ---------- */
+function isAllowedDomain(urlStr) {
+  if (!urlStr) return false;
+  try {
+    const u = new URL(urlStr);
+    const host = u.hostname.toLowerCase();
+    return (
+      host === "zenkai.cfd" ||
+      host.endsWith(".zenkai.cfd") ||
+      host === "zenkaii.pages.dev" ||
+      host.endsWith(".pages.dev") ||
+      host === "localhost" ||
+      host === "127.0.0.1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isApkAuthorized(request, env) {
+  const barrierToken = env?.ZENKAI_BARRIER || DEFAULT_BARRIER_TOKEN;
+  const reqBarrier = request.headers.get("X-Zenkai-Barrier");
+  if (reqBarrier && (reqBarrier === barrierToken || reqBarrier === DEFAULT_BARRIER_TOKEN)) {
+    return true;
+  }
+  const clientHeader = request.headers.get("X-Zenkai-Client") || "";
+  const ua = request.headers.get("User-Agent") || "";
+  if (clientHeader.startsWith("Zenkai-Android") && (/Zenkai/i.test(ua) || /Aniverse/i.test(ua))) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Called first thing in handle(). Returns a Response when the request is answered or blocked here,
  * or null to let it continue. `json(data, status)` is the handler's own JSON helper (keeps CORS headers).
@@ -123,6 +158,19 @@ const categoryOf = (path) =>
 export async function shield(request, env, path, json) {
   if (env?.IS_DEV) return null;
   const secret = env?.SHIELD_SECRET || "zenkai-shield-v1-secret-2026";
+
+  const origin = request.headers.get("Origin");
+  const referer = request.headers.get("Referer");
+  const isApk = isApkAuthorized(request, env);
+
+  // Barrier enforcement: if a browser is calling cross-origin from an external third-party website, block it!
+  if ((origin && !isAllowedDomain(origin)) || (referer && !isAllowedDomain(referer) && !referer.includes("/embed"))) {
+    if (!isApk) {
+      return json({ error: "Access denied by Zenkai barrier", code: "SHIELD_BARRIER_BLOCKED" }, 403);
+    }
+  }
+
+  // Web Challenge / Verify endpoints
   if (path === "/api/shield/challenge" || path === "/api/shield/verify") {
     const retry = limited(clientIp(request), "shield");
     if (retry) return json({ error: "Too many requests", retryAfter: retry }, 429);
@@ -131,20 +179,44 @@ export async function shield(request, env, path, json) {
     const out = await verify(await request.json().catch(() => null), request, secret);
     return out.token ? json({ success: true, ...out }) : json({ error: "Verification failed", code: out.code }, 403);
   }
+
   if (request.method === "OPTIONS" || !(path.startsWith("/api/") || path === "/proxy")) return null;
 
   const cat = categoryOf(path);
   const retry = limited(clientIp(request), cat);
   if (retry) return json({ error: "Too many requests", retryAfter: retry }, 429);
 
-  // Media (hls.js / <img>), iframe embeds (/api/embed/*) and server/audio availability queries can't or shouldn't block initial load: they get rate-limited.
-  const app = /Aniverse\/|Zenkai/i.test(request.headers.get("User-Agent") || "") || request.headers.has("X-Zenkai-Client");
-  const referer = request.headers.get("Referer") || "";
-  const isEmbedReq = referer.includes("/embed") || request.headers.has("X-Zenkai-Embed");
-  if (cat === "proxy" || app || isEmbedReq || path.startsWith("/api/embed/") || path.startsWith("/api/servers-available") || path.startsWith("/api/stream/servers")) return null;
+  // The Zenkai APK passes through the barrier directly
+  if (isApk) return null;
 
+  // Media (hls.js / <img>), iframe embeds (/api/embed/*) and server/audio availability queries:
+  const isEmbedReq = referer && (referer.includes("/embed") || request.headers.has("X-Zenkai-Embed"));
+  const isWebOrigin = isAllowedDomain(origin) || isAllowedDomain(referer);
+
+  if (cat === "proxy") {
+    // Media range streaming and file downloads from <video> and <a download> cannot carry custom headers
+    return null;
+  }
+
+  if (
+    isEmbedReq ||
+    path.startsWith("/api/embed/") ||
+    path.startsWith("/api/servers-available") ||
+    path.startsWith("/api/stream/servers") ||
+    path.startsWith("/api/movies/") ||
+    path.startsWith("/api/stream")
+  ) {
+    if (isWebOrigin || isEmbedReq) return null;
+  }
+
+  // Web frontend requests require valid shield token
   const token = request.headers.get("X-Zenkai-Shield");
-  if (!token) return json({ error: "Verification required", code: "SHIELD_VERIFICATION_REQUIRED" }, 401);
-  if (!(await tokenOk(token, request, secret))) return json({ error: "Invalid or expired token", code: "SHIELD_TOKEN_INVALID" }, 403);
+  if (!token) {
+    return json({ error: "Verification required", code: "SHIELD_VERIFICATION_REQUIRED" }, 401);
+  }
+  if (!(await tokenOk(token, request, secret))) {
+    return json({ error: "Invalid or expired token", code: "SHIELD_TOKEN_INVALID" }, 403);
+  }
+
   return null;
 }

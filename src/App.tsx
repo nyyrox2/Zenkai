@@ -12,6 +12,7 @@ import { ScrollToTop } from './components/ScrollToTop'
 import { TopLoader } from './components/TopLoader'
 import { PageLoader } from './components/PageLoader'
 import { ShieldGate } from './components/ShieldGate'
+import { AdPopup } from './components/AdPopup'
 import { ApiIntro } from './components/ApiIntro'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { Toaster } from './components/Toaster'
@@ -37,6 +38,7 @@ const SchedulePage = lazy(() => import('./pages/SchedulePage'))
 const WatchPage = lazy(() => import('./pages/WatchPage'))
 const ListPage = lazy(() => import('./pages/ListPage'))
 const AppPage = lazy(() => import('./pages/AppPage'))
+const ExtensionPage = lazy(() => import('./pages/ExtensionPage'))
 const NovelHomePage = lazy(() => import('./pages/NovelHomePage'))
 const NovelDetailsPage = lazy(() => import('./pages/NovelDetailsPage'))
 const NovelReaderPage = lazy(() => import('./pages/NovelReaderPage'))
@@ -165,6 +167,8 @@ export default function App() {
               <Route path="/list" element={<ListPage />} />
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/app" element={<AppPage />} />
+              <Route path="/extension" element={<ExtensionPage />} />
+              <Route path="/companion" element={<ExtensionPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/u/:username" element={<PublicProfilePage />} />
               <Route path="/user/:username" element={<PublicProfilePage />} />
@@ -217,6 +221,7 @@ export default function App() {
       <Toaster />
       <ShortcutsHelp />
       <ShieldGate />
+      <AdPopup enabled={!bare && !isApi} />
       <ChangelogModal />
       <ChooseUsernameModal />
       {!isApi && !isEmbed && !reader && !isWatchPath(pathname) && pathname !== '/busted' && <ApiIntro />}

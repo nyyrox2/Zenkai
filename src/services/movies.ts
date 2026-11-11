@@ -1,6 +1,7 @@
 /** Movies + TV: TMDB catalogue (through /api/movies) and the embed servers (through /api/providers). */
 import { apiUrl } from './api'
 import { listProviders, providerUrl } from '../lib/providers'
+import { isCompanionActive } from '../lib/useCompanion'
 
 export type MediaType = 'movie' | 'tv'
 
@@ -85,6 +86,9 @@ const toItem = (r: RawItem, fallback: MediaType): MovieItem | null => {
 
 const mem = new Map<string, Promise<unknown>>()
 
+const RAILWAY_URL = 'https://zenkai-movies-production.up.railway.app'
+const LOVABLE_PROXY_URL = 'https://webpage-launchpad.lovable.app/api/public/proxy'
+
 async function get<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
   const qs = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
@@ -92,16 +96,38 @@ async function get<T>(path: string, params: Record<string, string | number | und
   const url = apiUrl(`/api/${path}${tail}`)
   const hit = mem.get(url)
   if (hit) return hit as Promise<T>
-  // ponytail: TMDB proxy called straight from the browser (no Worker request); the Worker is only the fallback
-  const direct = `https://aniversee.vercel.app/api/tmdb/${path.slice(7)}?${new URLSearchParams({ language: 'en-US', include_adult: 'false', ...Object.fromEntries(qs) })}`
+
   const p = (async () => {
-    const res = await fetch(direct).then((r) => (r.ok ? r : fetch(url)), () => fetch(url))
-    const data = (await res.json().catch(() => null)) as T | { error?: string } | null
-    if (!res.ok || !data) throw new Error((data as { error?: string } | null)?.error ?? `Request failed (${res.status})`)
+    // 1. Fetch via Railway through Lovable Edge Proxy (bypasses ISP blocks, Cloudflare 100k limits, and anti-bot checks)
+    const sub = path.startsWith('movies/') ? path.slice('movies/'.length) : path
+    const railwayUrl = `${RAILWAY_URL}/api/movies/${sub}${tail}`
+    const lovableUrl = `${LOVABLE_PROXY_URL}?url=${encodeURIComponent(railwayUrl)}`
+
+    try {
+      const res = await fetch(lovableUrl, { signal: AbortSignal.timeout(6000) })
+      if (res.ok) {
+        const data = await res.json().catch(() => null)
+        if (data && !data.error) return data as T
+      }
+    } catch {}
+
+    // 2. Direct Railway fallback
+    try {
+      const res = await fetch(railwayUrl, { signal: AbortSignal.timeout(6000) })
+      if (res.ok) {
+        const data = await res.json().catch(() => null)
+        if (data && !data.error) return data as T
+      }
+    } catch {}
+
+    // 3. Cloudflare Pages Worker fallback
+    const res = await fetch(url).catch(() => null)
+    const data = res ? ((await res.json().catch(() => null)) as T | { error?: string } | null) : null
+    if (!res || !res.ok || !data) throw new Error((data as { error?: string } | null)?.error ?? `Request failed`)
     return data as T
   })()
   mem.set(url, p)
-  p.catch(() => mem.delete(url)) // never keep a failure around
+  p.catch(() => mem.delete(url))
   return p
 }
 
@@ -252,6 +278,181 @@ export interface Provider {
 }
 
 export const fetchProviders = async (type: MediaType): Promise<Provider[]> => listProviders(type)
+
+export interface MovieDub {
+  id: string
+  label: string
+  selected?: boolean
+}
+
+export interface MovieStream {
+  quality: string
+  resolutionNum?: number
+  format: string
+  size?: number
+  sizeLabel?: string | null
+  duration?: number
+  streamUrl: string
+  proxyStreamUrl?: string
+  downloadUrl: string
+  downloadFileName?: string
+  rawStreamUrl?: string
+  url?: string
+}
+
+export interface MovieStreamResult {
+  success: boolean
+  server: string
+  title: string
+  subjectId: string
+  streamUrl: string
+  proxyStreamUrl?: string
+  downloadUrl?: string
+  rawStreamUrl: string
+  quality: string
+  format: string
+  duration?: number
+  dubs: MovieDub[]
+  streams: MovieStream[]
+  subtitles?: { id: string; label: string; language: string; lang: string; url: string; source: string }[]
+  referer: string
+}
+
+const MOVIEBOX_SERVICE_URL = ((import.meta.env.VITE_MOVIEBOX_PROXY_URL as string | undefined) || 'https://zenkai-movies-production.up.railway.app').replace(/\/+$/, '')
+
+export async function fetchMovieBoxStream(p: {
+  id: number
+  type: MediaType
+  season?: number
+  episode?: number
+  title?: string
+  year?: string
+  dubId?: string | null
+  imdbId?: string | null
+}): Promise<MovieStreamResult> {
+  const qs = new URLSearchParams({
+    id: String(p.id),
+    type: p.type,
+    s: String(p.season ?? 1),
+    e: String(p.episode ?? 1),
+  })
+  if (p.title) qs.set('title', p.title)
+  if (p.year) qs.set('year', p.year)
+  if (p.dubId) qs.set('dub', p.dubId)
+  if (p.imdbId) qs.set('imdb', p.imdbId)
+
+  let data: any = null
+  let resOk = false
+
+  // 1. Primary: Direct Railway midman call (fast, global US MovieBox profile, direct streaming proxy)
+  if (MOVIEBOX_SERVICE_URL) {
+    const railwayUrl = `${MOVIEBOX_SERVICE_URL}/api/movies/stream?${qs}`
+    try {
+      const res = await fetch(railwayUrl, {
+        signal: AbortSignal.timeout(8000),
+      })
+      if (res.ok) {
+        const d = await res.json().catch(() => null)
+        if (d && d.success === true && d.streams?.length > 0) {
+          data = d
+          resOk = true
+        } else if (d?.embedServers?.length && !data) {
+          data = d
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Secondary: Cloudflare Pages Worker / local resolver fallback
+  if (!resOk) {
+    try {
+      const res = await fetch(apiUrl(`/api/movies/stream?${qs}`))
+      if (res.ok) {
+        const d = await res.json().catch(() => null)
+        if (d && d.success === true && d.streams?.length > 0) {
+          data = d
+          resOk = true
+        } else if (d?.embedServers?.length && !data) {
+          data = d
+        }
+      }
+    } catch {}
+  }
+
+  if (!data?.success && !data?.embedServers?.length) {
+    throw new Error(data?.error ?? 'MovieBox stream not available for this title')
+  }
+
+  const hasCompanion = isCompanionActive()
+  const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  const resolveProxyStreamUrl = (u?: string, rawUrl?: string) => {
+    if (!u) return u
+    const isWebMirror = (rawUrl && rawUrl.includes('bcdnxw')) || u.includes('bcdnxw')
+
+    // On local machine (dev server), ALWAYS use the local domestic proxy for bcdnxw
+    if (isLocalHost && isWebMirror) {
+      let target = rawUrl
+      if (!target && u.includes('url=')) {
+        try {
+          const parsed = new URL(u, window.location.href)
+          target = parsed.searchParams.get('url') || undefined
+        } catch {}
+      }
+      return `/proxy?url=${encodeURIComponent(target || u)}&referer=${encodeURIComponent('https://123moviesfree.club/')}`
+    }
+
+    if (u.startsWith('http://') || u.startsWith('https://')) return u
+
+    if (isWebMirror) {
+      return apiUrl(u.startsWith('/proxy') ? u : `/proxy?url=${encodeURIComponent(rawUrl || u)}&referer=${encodeURIComponent('https://123moviesfree.club/')}`)
+    }
+
+    return MOVIEBOX_SERVICE_URL ? `${MOVIEBOX_SERVICE_URL}${u}` : apiUrl(u)
+  }
+
+  const resolveStreamUrl = (u?: string, rawUrl?: string) => {
+    if (!u) return u
+
+    // If Zenkai Companion extension is active, use the raw CDN stream DIRECTLY with zero proxies!
+    if (hasCompanion) {
+      let directUrl = rawUrl
+      if (!directUrl && u.includes('url=')) {
+        try {
+          const parsed = new URL(u, typeof window !== 'undefined' ? window.location.href : 'http://localhost')
+          directUrl = parsed.searchParams.get('url') || undefined
+        } catch {}
+      }
+      if (directUrl && (directUrl.startsWith('http://') || directUrl.startsWith('https://'))) {
+        return directUrl
+      }
+    }
+
+    return resolveProxyStreamUrl(u, rawUrl)
+  }
+
+  return {
+    ...data,
+    proxyStreamUrl: resolveProxyStreamUrl(data.streamUrl, data.rawStreamUrl),
+    streamUrl: resolveStreamUrl(data.streamUrl, data.rawStreamUrl),
+    downloadUrl: data.downloadUrl ? resolveStreamUrl(data.downloadUrl, data.rawStreamUrl) : undefined,
+    streams: (data.streams || []).map((s: MovieStream) => {
+      const direct = s.url || s.rawStreamUrl || ''
+      const proxied = resolveProxyStreamUrl(s.streamUrl, s.url)
+      return {
+        ...s,
+        rawStreamUrl: direct,
+        proxyStreamUrl: proxied,
+        streamUrl: resolveStreamUrl(s.streamUrl, s.url),
+        downloadUrl: s.downloadUrl ? resolveStreamUrl(s.downloadUrl, s.url) : undefined,
+      }
+    }),
+    subtitles: (data.subtitles || []).map((s: { id: string; label: string; language: string; lang: string; url: string; source: string }) => ({
+      ...s,
+      url: resolveStreamUrl(s.url),
+    })),
+  }
+}
 
 export async function resolveProvider(p: { providerId: string; type: MediaType; tmdbId: number; season?: number; episode?: number }): Promise<string> {
   const url = providerUrl(p.providerId, p.type, p.tmdbId, p.season ?? 1, p.episode ?? 1)

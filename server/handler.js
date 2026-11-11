@@ -3,27 +3,36 @@
 let fsNode = null;
 let pathNode = null;
 let streamNode = null;
-if (typeof globalThis.process !== "undefined" && globalThis.process?.versions?.node) {
-  try {
-    const dns = await import("node:dns");
-    dns.setDefaultResultOrder?.("ipv4first");
-    fsNode = await import("node:fs");
-    pathNode = await import("node:path");
-    streamNode = await import("node:stream");
-  } catch {}
+
+async function loadLocalMediaModules() {
+  if (fsNode && pathNode && streamNode) return true;
+  if (typeof globalThis.process !== "undefined" && globalThis.process?.versions?.node) {
+    try {
+      const modFs = "node:fs";
+      const modPath = "node:path";
+      const modStream = "node:stream";
+      fsNode = await import(/* @vite-ignore */ modFs);
+      pathNode = await import(/* @vite-ignore */ modPath);
+      streamNode = await import(/* @vite-ignore */ modStream);
+      return true;
+    } catch {}
+  }
+  return false;
 }
 
 import { resolveDirectStreamWorker, checkEpisodeAudioAvailability } from "./direct-stream.js";
 import { resolveFlixCloud, resolveReanimeEmbed } from "./flixcloud.js";
 import { extractAnimeSaltPlayer } from "./animesalt.js";
 import { resolveAcdn } from "./acdn.js";
+import { resolveMovieBoxStream } from "./moviebox.js";
 import { validateProxyUrl } from "./ssrf.js";
 import novelEngine from "./novel.js";
 import * as manga from "./manga.js";
 import { shield } from "./shield.js";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const TMDB = "https://aniversee.vercel.app/api/tmdb";
+import { tmdbFetch, TMDB_FALLBACK } from "./tmdb.js";
+const TMDB = TMDB_FALLBACK;
 const ANIBRIDGE = "https://anibridge.eliasbenb.dev/api/mappings?source.descriptor=anilist:";
 const ARM = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=";
 const OPENSUBS = "https://opensubtitles-v3.strem.io/subtitles";
@@ -33,6 +42,7 @@ const CORS = {
   "Access-Control-Allow-Headers": "*",
   "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
   "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
+  "Access-Control-Allow-Private-Network": "true",
 };
 
 const json = (data, status = 200, ttl = 0) =>
@@ -125,22 +135,22 @@ const cleanTitle = (t = "") =>
     .replace(/\s*:\s*$/, "")
     .trim();
 
-export async function tmdbFor(anilistId, title, format) {
+export async function tmdbFor(anilistId, title, format, env = null) {
   const map = anilistId ? await mapOf(anilistId) : null;
   let ref = map?.tmdb ? { id: map.tmdb.id, type: map.tmdb.type, season: map.tmdb.season } : null;
 
   if (!ref && title) {
     try {
       const want = format === "MOVIE" ? "movie" : "tv";
-      const res = await getJson(`${TMDB}/search/multi?query=${encodeURIComponent(cleanTitle(title) || title)}`);
+      const res = await tmdbFetch(`search/multi?query=${encodeURIComponent(cleanTitle(title) || title)}`, env);
       const hit = res.results?.find((r) => r.media_type === want) || res.results?.find((r) => r.media_type === "tv" || r.media_type === "movie");
       if (hit) ref = { id: hit.id, type: hit.media_type, season: null };
     } catch {}
   }
   if (!ref) return { map, tmdb: null };
 
-  const d = await getJson(
-    `${TMDB}/${ref.type}/${ref.id}?language=en-US&append_to_response=images,videos,credits,external_ids,content_ratings,release_dates&include_image_language=en,null`,
+  const d = await tmdbFetch(
+    `${ref.type}/${ref.id}?language=en-US&append_to_response=images,videos,credits,external_ids,content_ratings,release_dates&include_image_language=en,null`, env
   );
 
   const pngs = (d.images?.logos || []).filter((l) => l.file_path && !l.file_path.toLowerCase().endsWith(".svg"));
@@ -214,24 +224,78 @@ function refererFor(host, requested) {
   if (/animeapps|nukitashi|playeng/.test(host)) return "https://playeng.animeapps.top/";
   if (/nexabloom|stellarfrontier|phantomharbor|shadowharbor|hiddenvertex|emeralddrift|eclipseharbor|megaplay|megap|shiora|akirax|imgnex/.test(host)) return "https://megaplay.buzz/";
   if (/animesalt|as-cdn|acdn\.top|ravok/.test(host)) return "https://animesalt.cx/";
+  if (/bcdnxw/.test(host)) return "https://123moviesfree.club/";
+  if (/aoneroom|bcdn\.hakunaymatata\.com/.test(host)) return null;
   if (/flixcloud|atomic4cdn|rundowncdn|vividcdn|fallencdn|enc-dec/.test(host)) return "https://flixcloud.cc/";
+  if (/moviebox/.test(host)) return "https://moviebox.ph/";
   return requested || null;
 }
 
-async function proxy(request, url, proxyBase = "/proxy") {
+async function proxy(request, url, proxyBase = "/proxy", env = null) {
   const target = url.searchParams.get("url");
   const check = validateProxyUrl(target);
   if (!check.valid) return json({ error: check.error }, 403);
   const t = check.url;
-  const referer = refererFor(t.hostname.toLowerCase(), url.searchParams.get("referer")) || `${t.origin}/`;
+  const host = t.hostname.toLowerCase();
+  const isWebMirrorCdn = host.includes("bcdnxw") || host.includes("123moviesfree") || host.includes("sflix");
+  const isDirectAppCdn = !isWebMirrorCdn && (/aoneroom/.test(host) || host === "bcdn.hakunaymatata.com");
 
-  const headers = new Headers({ "User-Agent": UA, Referer: referer, Origin: referer.replace(/\/$/, ""), Accept: "*/*" });
+  let referer = null;
+  if (isDirectAppCdn) {
+    referer = null;
+  } else if (isWebMirrorCdn) {
+    referer = url.searchParams.get("referer") || "https://123moviesfree.club/";
+  } else {
+    referer = refererFor(host, url.searchParams.get("referer")) || `${t.origin}/`;
+  }
+
+  const headers = new Headers({ Accept: "*/*" });
+  if (referer) {
+    headers.set("Referer", referer);
+    if (!isWebMirrorCdn) {
+      headers.set("Origin", referer.replace(/\/$/, ""));
+    }
+  }
+  if (!isDirectAppCdn) {
+    headers.set("User-Agent", UA);
+  }
+
   const range = request.headers.get("Range");
   if (range) headers.set("Range", range);
 
+  const midmanUrl = (
+    env?.VITE_MOVIEBOX_PROXY_URL || 
+    env?.MOVIEBOX_PROXY_URL || 
+    (typeof process !== "undefined" ? (process.env?.VITE_MOVIEBOX_PROXY_URL || process.env?.MOVIEBOX_PROXY_URL) : "") || "https://zenkai-movies-production.up.railway.app"
+  )?.replace(/\/+$/, "");
+
   let up;
   try {
-    up = await fetch(t, { headers });
+    if ((isDirectAppCdn || isWebMirrorCdn) && midmanUrl) {
+      try {
+        const midmanProxyUrl = `${midmanUrl}/proxy?url=${encodeURIComponent(t.href)}${referer ? '&referer=' + encodeURIComponent(referer) : ''}`;
+        const midmanHeaders = new Headers({ Accept: "*/*" });
+        if (range) midmanHeaders.set("Range", range);
+        const midmanUp = await fetch(midmanProxyUrl, { headers: midmanHeaders });
+        if (midmanUp.ok || midmanUp.status === 206) {
+          up = midmanUp;
+        }
+      } catch {}
+    }
+    if (!up) {
+      up = await fetch(t, { headers });
+    }
+    if ((up.status === 429 || up.status === 428 || up.status === 403) && /hakunaymatata|aoneroom/.test(host)) {
+      const retryHeaders = new Headers({ Accept: "*/*" });
+      if (range) retryHeaders.set("Range", range);
+      if (!headers.has("Referer")) {
+        retryHeaders.set("Referer", "https://123moviesfree.club/");
+      }
+      const retryUp = await fetch(t, { headers: retryHeaders });
+      if (retryUp.ok || retryUp.status === 206) {
+        up = retryUp;
+      }
+    }
   } catch (e) {
     const cause = e.cause?.message || e.cause?.code || "";
     return json({ error: "Proxy fetch failed: " + e.message + " " + cause }, 502);
@@ -282,7 +346,15 @@ async function proxy(request, url, proxyBase = "/proxy") {
     return new Response(body, { status: up.status, headers: out });
   }
 
-  if (type) out.set("Content-Type", type);
+  const isDownload = url.searchParams.get("dl") === "1" || url.searchParams.get("download") === "1";
+  if (isDownload) {
+    const fn = url.searchParams.get("fn") || t.pathname.split("/").pop() || "video.mp4";
+    const cleanFn = fn.replace(/[^\w\s\-\.\(\)\[\]]/gi, "").trim() || "video.mp4";
+    out.set("Content-Disposition", `attachment; filename="${cleanFn}"`);
+    out.set("Content-Type", "application/octet-stream");
+  } else if (type) {
+    out.set("Content-Type", type);
+  }
   if (/\.(bin|key)$/i.test(t.pathname)) out.set("Content-Type", "application/octet-stream");
   for (const h of ["Content-Length", "Content-Range", "Accept-Ranges"]) {
     const v = up.headers.get(h);
@@ -381,7 +453,19 @@ const slugVariants = (t) => {
 };
 
 function getProxyBase(request, env) {
-  let p = env?.STREAM_PROXY_URL || env?.VITE_STREAM_PROXY_URL || globalThis.process?.env?.STREAM_PROXY_URL || globalThis.process?.env?.VITE_STREAM_PROXY_URL || "";
+  try {
+    const host = new URL(request.url).hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1" || host.endsWith(".local")) {
+      return "/proxy";
+    }
+  } catch {}
+
+  let p =
+    env?.STREAM_PROXY_URL ||
+    env?.VITE_STREAM_PROXY_URL ||
+    globalThis.process?.env?.STREAM_PROXY_URL ||
+    globalThis.process?.env?.VITE_STREAM_PROXY_URL ||
+    "https://webpage-launchpad.lovable.app/api/public/proxy";
   p = p.trim().replace(/\/+$/, "");
   if (!p) return "/proxy";
   try {
@@ -407,7 +491,8 @@ export async function handle(request, env) {
   if (blocked) return blocked;
 
   if (path === "/api/local-media" || path === "/api/offline-video" || path === "/api/offline-stream") {
-    if (!fsNode || !pathNode) return json({ error: "Local media streaming not supported in this runtime" }, 501);
+    const loaded = await loadLocalMediaModules();
+    if (!loaded || !fsNode || !pathNode) return json({ error: "Local media streaming not supported in this runtime" }, 501);
 
     const filePath = q("path");
     const isHls = q("hls") === "1";
@@ -479,7 +564,7 @@ export async function handle(request, env) {
     });
   }
 
-  if (path === "/proxy" || path === "/api/proxy") return proxy(request, url, proxyBase);
+  if (path === "/proxy" || path === "/api/proxy") return proxy(request, url, proxyBase, env);
 
   if (path === "/api" || path === "/api/" || path === "/api/docs") {
     const accept = request.headers.get("accept") || "";
@@ -635,7 +720,7 @@ export async function handle(request, env) {
     const title = q("title");
     if (!id && !title) return json({ error: "Missing id or title" }, 400);
     try {
-      const r = await cached(`tmdb:${id}:${title}`, 24 * 3600e3, () => tmdbFor(id, title, q("format").toUpperCase()));
+      const r = await cached(`tmdb:${id}:${title}`, 24 * 3600e3, () => tmdbFor(id, title, q("format").toUpperCase(), env));
       return json({ success: !!r?.tmdb, mapping: r?.map ?? null, tmdb: r?.tmdb ?? null }, 200, 86400);
     } catch {
       return json({ success: false, mapping: null, tmdb: null }, 200, 300);
@@ -648,7 +733,7 @@ export async function handle(request, env) {
     const kind = ["movie", "tv"].includes(q("type")) ? q("type") : "multi";
     if (term.length < 2) return json({ results: [] }, 200, 60);
     try {
-      const d = await cached(`msearch:${kind}:${term.toLowerCase()}`, 10 * 60e3, () => getJson(`${TMDB}/search/${kind}?query=${encodeURIComponent(term)}&include_adult=false&language=en-US`));
+      const d = await cached(`msearch:${kind}:${term.toLowerCase()}`, 10 * 60e3, () => tmdbFetch(`search/${kind}?query=${encodeURIComponent(term)}&include_adult=false&language=en-US`, env));
       const results = (d.results || [])
         .filter((r) => (r.media_type ? r.media_type === "movie" || r.media_type === "tv" : true) && r.poster_path)
         .slice(0, 20)
@@ -665,21 +750,144 @@ export async function handle(request, env) {
         }));
       return json({ results }, 200, 600);
     } catch {
-      return json({ error: "Search is unavailable right now" }, 502);
+      return json({ results: [], error: "Search is unavailable right now" }, 200);
+    }
+  }
+
+  // Direct stream endpoint for Movies & TV shows via MovieBox:
+  // /api/movies/stream?id=27205&type=movie&s=1&e=1&title=Inception&year=2010&dub=...
+  if (path === "/api/movies/stream") {
+    const tmdbId = parseInt(q("id", "0"), 10);
+    const type = q("type", "movie").toLowerCase() === "tv" ? "tv" : "movie";
+    const season = parseInt(q("s", q("season", "1")), 10) || 1;
+    const episode = parseInt(q("e", q("episode", "1")), 10) || 1;
+    const title = q("title");
+    const year = q("year");
+    const dubId = q("dub") || null;
+    const imdbId = q("imdb");
+
+    if (!tmdbId && !title) return json({ error: "Missing id or title" }, 400);
+
+    const midmanUrl = (
+      env?.VITE_MOVIEBOX_PROXY_URL || 
+      env?.MOVIEBOX_PROXY_URL || 
+      (typeof process !== "undefined" ? (process.env?.VITE_MOVIEBOX_PROXY_URL || process.env?.MOVIEBOX_PROXY_URL) : "")
+    )?.replace(/\/+$/, "");
+
+    try {
+      const cacheKey = `mb:${tmdbId}:${type}:${season}:${episode}:${dubId || "default"}`;
+      const hit = memo.get(cacheKey);
+      let res = null;
+      let localErrMsg = "";
+
+      if (hit && Date.now() - hit.at < 10 * 60e3 && hit.v?.success === true && hit.v?.streams?.length > 0) {
+        res = hit.v;
+      } else {
+        // Tier 1: Local edge MovieBox resolver (fast, direct, robust on Cloudflare Pages)
+        try {
+          res = await resolveMovieBoxStream({ tmdbId, type, season, episode, title, year, dubId, proxyBase, midmanUrl, env });
+        } catch (localErr) {
+          localErrMsg = localErr.message || String(localErr);
+          console.warn("[MovieBox] Local resolver error, falling back to midman:", localErr.message);
+        }
+
+        // Tier 2: Railway Midman fallback if local returned no streams
+        if ((!res || !res.success || !res.streams?.length) && midmanUrl && !q("no_midman")) {
+          try {
+            const extQs = new URLSearchParams({
+              id: String(tmdbId || 0),
+              type,
+              s: String(season),
+              e: String(episode),
+              ...(title ? { title } : {}),
+              ...(year ? { year } : {}),
+              ...(dubId ? { dub: dubId } : {}),
+              ...(imdbId ? { imdb: imdbId } : {})
+            });
+            const railwayStream = `${midmanUrl}/api/movies/stream?${extQs.toString()}`;
+            const proxyStream = `${proxyBase}?url=${encodeURIComponent(railwayStream)}`;
+            const extResp = await fetch(proxyStream, {
+              headers: { "Accept": "application/json" },
+              signal: AbortSignal.timeout(10000)
+            }).catch(() => fetch(railwayStream, { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(10000) }));
+            if (extResp.ok) {
+              const extData = await extResp.json().catch(() => null);
+              if (extData && extData.success === true && extData.streams?.length > 0) {
+                res = extData;
+              }
+            }
+          } catch (extErr) {
+            console.warn("[MovieBox] Midman service fetch error:", extErr.message);
+          }
+        }
+
+        // Only cache in memory when valid streams were successfully found
+        if (res && res.success === true && res.streams?.length > 0) {
+          memo.set(cacheKey, { at: Date.now(), v: res });
+        }
+      }
+
+      if (!res || !res.success) {
+        res = {
+          success: false,
+          error: res?.error || localErrMsg || `No streams found for ${title || tmdbId}`,
+          server: "MovieBox",
+          streams: []
+        };
+      }
+
+      // Subtitles lookup
+      let subtitles = [];
+      let effectiveImdb = imdbId;
+      if (!effectiveImdb && tmdbId) {
+        try {
+          const d = await cached(`tmdb_ext:${type}:${tmdbId}`, 24 * 3600e3, () =>
+            tmdbFetch(`${type}/${tmdbId}?append_to_response=external_ids`, env)
+          );
+          effectiveImdb = d.external_ids?.imdb_id || d.imdb_id;
+        } catch {}
+      }
+      if (effectiveImdb) {
+        try {
+          const osUrl = type === "movie" ? `${OPENSUBS}/movie/${effectiveImdb}.json` : `${OPENSUBS}/series/${effectiveImdb}:${season}:${episode}.json`;
+          const osData = await cached(`os_${effectiveImdb}_${season}_${episode}`, 24 * 3600e3, () => getJson(osUrl).catch(() => null));
+          const count = {};
+          subtitles = (osData?.subtitles || []).slice(0, 50).map((s, i) => {
+            const language = LANGS[s.lang] || (s.lang ? s.lang[0].toUpperCase() + s.lang.slice(1) : "English");
+            count[language] = (count[language] || 0) + 1;
+            return {
+              id: s.id || `os_${i}`,
+              label: count[language] > 1 ? `${language} #${count[language]}` : language,
+              language,
+              lang: s.lang,
+              url: `${proxyBase}?url=${encodeURIComponent(s.url)}&referer=${encodeURIComponent("https://opensubtitles.org/")}`,
+              source: "OpenSubtitles",
+            };
+          });
+        } catch {}
+      }
+
+      return json({
+        ...res,
+        subtitles,
+      }, 200, 300);
+    } catch (e) {
+      return json({ success: false, error: e.message || "MovieBox stream resolution failed" }, 200);
     }
   }
 
   // Movies / TV catalogue: whitelisted read-only passthrough to the TMDB proxy, e.g. /api/movies/trending/movie/week
-  if (path.startsWith("/api/movies/")) {
-    const sub = path.slice("/api/movies/".length).replace(/\/+$/, "");
-    const ok = /^(trending\/(movie|tv)\/(day|week)|(movie|tv)\/(popular|top_rated|now_playing|upcoming|airing_today|on_the_air)|discover\/(movie|tv)|search\/(movie|tv|multi)|(movie|tv)\/\d+(\/(similar|recommendations))?|tv\/\d+\/season\/\d+)$/.test(sub);
+  if (path.startsWith("/api/movies/") || (path.startsWith("/api/tmdb/") && path !== "/api/tmdb/episodes")) {
+    let sub = path.startsWith("/api/movies/") ? path.slice("/api/movies/".length).replace(/\/+$/, "") : path.slice("/api/tmdb/".length).replace(/\/+$/, "");
+    if (sub.startsWith("proxy/")) sub = sub.slice("proxy/".length);
+    const ok = /^(trending\/(all|movie|tv)\/(day|week)|(movie|tv)\/(popular|top_rated|now_playing|upcoming|airing_today|on_the_air)|discover\/(movie|tv)|search\/(movie|tv|multi)|(movie|tv)\/\d+(\/(credits|images|videos|similar|recommendations|external_ids|alternative_titles|release_dates|content_ratings|season\/\d+(\/episode\/\d+)?))?|tv\/\d+\/(episode_groups|season\/\d+(\/episode\/\d+)?)|tv\/episode_group\/[a-zA-Z0-9_-]+|genre\/(movie|tv)\/list|person\/\d+)$/.test(sub);
     if (!ok) return json({ error: "Unsupported path" }, 400);
     const qs = new URLSearchParams(url.searchParams);
     if (!qs.has("language")) qs.set("language", "en-US");
     qs.set("include_adult", "false");
     qs.sort();
     try {
-      const d = await cached(`movies:${sub}?${qs}`, 10 * 60e3, () => getJson(`${TMDB}/${sub}?${qs}`));
+      const d = await cached(`movies:${sub}?${qs}`, 10 * 60e3, () => tmdbFetch(`${sub}?${qs}`, env));
       return json(d, 200, 600);
     } catch {
       return json({ error: "TMDB is unavailable right now" }, 502);
@@ -693,7 +901,7 @@ export async function handle(request, env) {
 
     if (season === 1) {
       try {
-        const eg = await cached(`tmdb-eg:${id}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/${id}/episode_groups`));
+        const eg = await cached(`tmdb-eg:${id}`, 24 * 3600e3, () => tmdbFetch(`tv/${id}/episode_groups`, env));
         const groups = eg?.results || [];
         const best =
           groups.find((g) => g.type === 2 && /no specials/i.test(g.name)) ||
@@ -702,7 +910,7 @@ export async function handle(request, env) {
           groups.find((g) => /absolute|correct order/i.test(g.name));
 
         if (best) {
-          const d = await cached(`tmdb-eps-grp:${best.id}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/episode_group/${best.id}?language=en-US`));
+          const d = await cached(`tmdb-eps-grp:${best.id}`, 24 * 3600e3, () => tmdbFetch(`tv/episode_group/${best.id}?language=en-US`, env));
           const pool = (d.groups || []).filter((g) => !/special/i.test(g.name || "") && g.order !== 0);
           const list = pool.length ? pool : d.groups || [];
           let chosen = [];
@@ -733,7 +941,7 @@ export async function handle(request, env) {
     }
 
     try {
-      const d = await cached(`tmdb-eps:${id}:${season}`, 24 * 3600e3, () => getJson(`${TMDB}/tv/${id}/season/${season}?language=en-US`));
+      const d = await cached(`tmdb-eps:${id}:${season}`, 24 * 3600e3, () => tmdbFetch(`tv/${id}/season/${season}?language=en-US`, env));
       const episodes = (d.episodes || []).map((e) => ({ n: e.episode_number, name: e.name || null, overview: e.overview || null, still: e.still_path || null, runtime: e.runtime || null, air: e.air_date || null }));
       return json({ success: true, episodes }, 200, 86400);
     } catch {

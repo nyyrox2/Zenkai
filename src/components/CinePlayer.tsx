@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import Hls from 'hls.js'
 import {
-  Airplay, AudioLines, Cast, Check, CheckCircle2, ChevronDown, FastForward, Flag, Languages, List, Loader2, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
+  Airplay, AudioLines, Cast, Check, CheckCircle2, ChevronDown, Download, FastForward, Flag, Languages, List, Loader2, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
   Search, Server, Settings, SkipBack, SkipForward, TriangleAlert, Upload, Users, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { apiUrl, fetchStream, type EpInfo, type EpKind } from '../services/api'
@@ -19,6 +19,7 @@ import { attachPlayerSecurity } from '../lib/playerSecurity'
 import {
   airplayPicker, airplaySupported, castLoad, castRequest, castSeek, castSetVolume, castStop, castToggleMute, castTogglePlay, castUrl, getCast, initCast, onCastFinished, useCast,
 } from '../lib/cast'
+import { isCompanionActive } from '../lib/useCompanion'
 import './cineplayer.css'
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -342,6 +343,18 @@ export interface CinePlayerProps {
   watchPartyPeersCount?: number
   /** When watching together in a room as a guest (non-host), timestamp and episode changes are host-controlled */
   isPartyGuest?: boolean
+  qualities?: {
+    label: string
+    url: string
+    size?: number
+    sizeLabel?: string | null
+    downloadUrl?: string
+  }[]
+  currentQuality?: string
+  onQualityChange?: (quality: { label: string; url: string; size?: number; sizeLabel?: string | null; downloadUrl?: string }) => void
+  downloadUrl?: string
+  fallbackStreamUrl?: string
+  isTmdb?: boolean
 }
 
 const PLAYER_TOUR: TourStep[] = [
@@ -667,14 +680,25 @@ function Episodes({
   )
 }
 
-/** Plain files (mp4 / webm) bypass hls.js; the proxied url keeps the real one in ?url= */
+/** Plain files (mp4 / webm / mkv) bypass hls.js; the proxied url keeps the real one in ?url= */
 const isFileSrc = (u: string) => {
+  if (!u) return false
   try {
-    const real = new URL(u, window.location.href).searchParams.get('url') ?? u
-    return /\.(mp4|webm|mkv)(\?|$)/i.test(real) && !/\.m3u8/i.test(real)
-  } catch {
-    return false
-  }
+    let curr = u
+    for (let i = 0; i < 5; i++) {
+      try {
+        const parsed = new URL(curr, window.location.href)
+        const inner = parsed.searchParams.get('url')
+        if (inner) curr = inner
+        else break
+      } catch {
+        break
+      }
+    }
+    const decoded = decodeURIComponent(curr)
+    if (/\.m3u8(\?|&|$)/i.test(decoded)) return false
+    return /\.(mp4|webm|mkv)(\?|&|$)/i.test(decoded) || /\.(mp4|webm|mkv)/i.test(decoded)
+  } catch { return false }
 }
 let noSeg = false
 const ALANG = 'zp-alang'
@@ -770,7 +794,18 @@ export default function CinePlayer({
   episodesInfo, fallbackImg, defaultRuntime, kinds,
   onVideoRef, onPlayerAction, externalControl, onWatchTogetherClick, watchPartyActive, watchPartyPeersCount,
   isPartyGuest = false,
+  qualities, currentQuality, onQualityChange, downloadUrl, fallbackStreamUrl, isTmdb = false,
 }: CinePlayerProps) {
+  const isMovie = format === 'MOVIE' || (totalEpisodes <= 1 && format !== 'TV')
+  const cleanEpTitle = episodeTitle?.trim()
+  const hasDistinctEpTitle = !!(
+    cleanEpTitle &&
+    cleanEpTitle !== String(episode) &&
+    !(() => {
+      const m = cleanEpTitle.match(/^(?:ep(?:isode)?\.?|ch(?:apter)?\.?)\s*0*(\d+)$/i)
+      return m && Number(m[1]) === Number(episode)
+    })()
+  )
   const vid = useRef<HTMLVideoElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const isExternalAction = useRef(false)
@@ -804,6 +839,11 @@ export default function CinePlayer({
     return () => clearTimeout(t)
   }, [externalControl])
   const hls = useRef<Hls | null>(null)
+  const triedFallback = useRef(false)
+
+  useEffect(() => {
+    triedFallback.current = false
+  }, [streamUrl])
 
   // Anti-Debug, Anti-DevTools & Anti-Scraping Protection (Scoped exclusively to CinePlayer)
   useEffect(() => {
@@ -886,7 +926,8 @@ export default function CinePlayer({
   const [pvOn, setPvOn] = useState(false)
   const [pvRdy, setPvRdy] = useState(false)
   const [scrub, setScrub] = useState<number | null>(null)
-  const [levels, setLevels] = useState<{ i: number; label: string }[]>([])
+  const lastTimeRef = useRef<number>(0)
+  const [levels, setLevels] = useState<{ i: number; label: string; sub?: string; url?: string }[]>([])
   const [lvl, setLvl] = useState(-1)
   const [audioTracks, setAudioTracks] = useState<{ i: number; label: string; lang: string }[]>([])
   const [audioIdx, setAudioIdx] = useState(0)
@@ -1169,14 +1210,37 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     setAudioTracks([])
     setAudioIdx(0)
     setTime(0)
-    setDur(0)
+    setDur(defaultRuntime && defaultRuntime > 0 ? defaultRuntime * 60 : 0)
     setBuf(0)
     setCard(true)
     skipped.current = -1
     const saved = readPos(animeId, episode)
+    const resumeTime = lastTimeRef.current > 10 ? lastTimeRef.current : saved
     const onMeta = () => {
-      if (saved > 10 && saved < v.duration - 45) v.currentTime = saved
-      if (!castOn.current) v.play().catch(() => {})
+      if (v.duration && isFinite(v.duration) && v.duration > 0) setDur(v.duration)
+      else if (defaultRuntime && defaultRuntime > 0) setDur(defaultRuntime * 60)
+      const effectiveDur = (v.duration && isFinite(v.duration) && v.duration > 0) ? v.duration : (defaultRuntime ? defaultRuntime * 60 : 0)
+      if (resumeTime > 10 && effectiveDur > 0 && resumeTime < effectiveDur - 45) v.currentTime = resumeTime
+      setBusy(false)
+      if (!castOn.current) {
+        v.play().catch(() => {
+          setBusy(false)
+        })
+      }
+    }
+
+    if (isFileSrc(streamUrl) && qualities && qualities.length > 0) {
+      const qLevels = qualities.map((q, idx) => ({
+        i: idx,
+        label: q.label,
+        sub: q.sizeLabel || undefined,
+        url: q.url,
+      }))
+      setLevels(qLevels)
+      const curIdx = qLevels.findIndex(
+        (l) => (currentQuality && l.label.toLowerCase() === currentQuality.toLowerCase()) || l.url === streamUrl
+      )
+      setLvl(curIdx >= 0 ? curIdx : 0)
     }
     let h: Hls | null = null
     let fails = 0
@@ -1230,9 +1294,63 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         }
       })
     } else if (isFileSrc(streamUrl) || v.canPlayType('application/vnd.apple.mpegurl')) {
-      v.src = streamUrl
+      const cleanUrl = isFileSrc(streamUrl) ? streamUrl.replace(/([?&])seg=1(&|$)/, (_m, a, b) => (b ? a : '')) : streamUrl
+      v.src = cleanUrl
       v.addEventListener('loadedmetadata', onMeta)
+      v.addEventListener('error', onVideoError)
     } else {
+      setErr(true)
+      setBusy(false)
+    }
+
+    function onVideoError() {
+      if (!v) return;
+      if (fallbackStreamUrl && fallbackStreamUrl !== v.src && !triedFallback.current) {
+        triedFallback.current = true;
+        console.warn('[CinePlayer] Direct stream encountered error, seamlessly falling back to proxy stream:', fallbackStreamUrl);
+        v.src = fallbackStreamUrl;
+        v.load();
+        v.play().catch(() => {});
+        return;
+      }
+      if (v.src && v.src.includes('url=')) {
+        try {
+          const u = new URL(v.src, window.location.href)
+          const targetUrl = u.searchParams.get('url')
+          if (targetUrl) {
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            // If on localhost and not already on localhost /proxy:
+            if (isLocal && !v.src.startsWith(window.location.origin + '/proxy')) {
+              const localUrl = `/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent('https://123moviesfree.club/')}`
+              v.src = localUrl
+              v.load()
+              v.play().catch(() => {})
+              return
+            }
+            // If on production zenkai.cfd, test if user has localhost running on 5174 or 5173 (desktop dev/helper)
+            if (!isLocal && !v.src.includes('localhost:')) {
+              const candidate = `http://localhost:5174/proxy?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent('https://123moviesfree.club/')}`
+              fetch(`http://localhost:5174/proxy?url=test`, { method: 'OPTIONS', signal: AbortSignal.timeout(800) })
+                .then(r => {
+                  if (r.ok || r.status === 204) {
+                    console.log('[CinePlayer] Local domestic helper detected on port 5174! Seamlessly switching stream.')
+                    v.src = candidate
+                    v.load()
+                    v.play().catch(() => {})
+                  } else {
+                    setErr(true)
+                    setBusy(false)
+                  }
+                })
+                .catch(() => {
+                  setErr(true)
+                  setBusy(false)
+                })
+              return
+            }
+          }
+        } catch {}
+      }
       setErr(true)
       setBusy(false)
     }
@@ -1257,6 +1375,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       window.removeEventListener('zenkai:devtools-halt', onHalt)
       window.clearTimeout(t)
       v.removeEventListener('loadedmetadata', onMeta)
+      v.removeEventListener('error', onVideoError)
       if (h) h.destroy()
       hls.current = null
       if (!h) {
@@ -1291,7 +1410,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     void castLoad({
       url: castUrl(apiUrl(streamUrl)),
       title,
-      subtitle: `Episode ${episode}${episodeTitle ? ` · ${episodeTitle}` : ''}`,
+      subtitle: isMovie ? (title || '') : `Episode ${episode}${hasDistinctEpTitle ? ` · ${cleanEpTitle}` : ''}`,
       image: fallbackImg,
       time: start > 3 ? start : 0,
       autoplay: true,
@@ -1460,42 +1579,48 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         source: servers?.find((x) => x.id === serverId)?.name ?? 'Stream',
         referer: sourceReferer(serverId),
       }))
-      try {
-        const q = new URLSearchParams({ title, ep: String(episode), id: String(animeId), format: format ?? '' })
-        const res = await fetch(apiUrl(`/api/subtitles?${q}`))
-        if (res.ok) {
-          const data = (await res.json()) as { subtitles?: Track[] }
-          for (const s of data.subtitles ?? []) if (!all.some((c) => c.url === s.url)) all.push(s) // every source, not one per language
+      if (!isTmdb) {
+        try {
+          const q = new URLSearchParams({ title, ep: String(episode), id: String(animeId), format: format ?? '' })
+          const res = await fetch(apiUrl(`/api/subtitles?${q}`))
+          if (res.ok) {
+            const data = (await res.json()) as { subtitles?: Track[] }
+            for (const s of data.subtitles ?? []) if (!all.some((c) => c.url === s.url)) all.push(s) // every source, not one per language
+          }
+        } catch {
+          /* OpenSubtitles is optional */
         }
-      } catch {
-        /* OpenSubtitles is optional */
       }
       if (dead) return
       setTracks(all)
 
-      // ask every other direct server for its captions too; they trickle into the menu as each answers
-      const seen = new Set(all.map((t) => t.url))
-      const others = (servers ?? []).filter((x) => x.id !== serverId)
-      setSrcLeft(others.length)
-      for (const x of others) {
-        const fetchSubs = async () => {
-          let r = await fetchStream({ id: animeId, ep: episode, server: x.id, audio: audioMode, title, format })
-          if ((!r.subtitles || !r.subtitles.length) && audioMode !== 'sub' && x.id !== 'acdn') {
-            try {
-              r = await fetchStream({ id: animeId, ep: episode, server: x.id, audio: 'sub', title, format })
-            } catch {}
+      // ask every other direct server for its captions too; they trickle into the menu as each answers (anime only)
+      if (!isTmdb && !isMovie && format !== 'MOVIE') {
+        const seen = new Set(all.map((t) => t.url))
+        const others = (servers ?? []).filter((x) => x.id !== serverId)
+        setSrcLeft(others.length)
+        for (const x of others) {
+          const fetchSubs = async () => {
+            let r = await fetchStream({ id: animeId, ep: episode, server: x.id, audio: audioMode, title, format })
+            if ((!r.subtitles || !r.subtitles.length) && audioMode !== 'sub' && x.id !== 'acdn') {
+              try {
+                r = await fetchStream({ id: animeId, ep: episode, server: x.id, audio: 'sub', title, format })
+              } catch {}
+            }
+            const add: Track[] = (r.subtitles || [])
+              .filter((s) => s.file && !seen.has(s.file))
+              .map((s, i) => ({ id: `${x.id}_${i}_${s.file}`, label: s.label, language: s.label, url: s.file, source: x.name, referer: sourceReferer(x.id) }))
+            add.forEach((t) => seen.add(t.url))
+            if (!dead && add.length) setTracks((p) => [...p, ...add])
           }
-          const add: Track[] = (r.subtitles || [])
-            .filter((s) => s.file && !seen.has(s.file))
-            .map((s, i) => ({ id: `${x.id}_${i}_${s.file}`, label: s.label, language: s.label, url: s.file, source: x.name, referer: sourceReferer(x.id) }))
-          add.forEach((t) => seen.add(t.url))
-          if (!dead && add.length) setTracks((p) => [...p, ...add])
+          fetchSubs()
+            .catch(() => {
+              /* that server has nothing for this episode */
+            })
+            .finally(() => !dead && setSrcLeft((n) => Math.max(0, n - 1)))
         }
-        fetchSubs()
-          .catch(() => {
-            /* that server has nothing for this episode */
-          })
-          .finally(() => !dead && setSrcLeft((n) => Math.max(0, n - 1)))
+      } else {
+        setSrcLeft(0)
       }
 
       const def = all.find(isEn) || all[0]
@@ -1539,6 +1664,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   const onTime = () => {
     const v = vid.current
     if (!v || castOn.current || performance.now() < animUntil.current) return
+    lastTimeRef.current = v.currentTime
     setTime(v.currentTime)
     if (v.duration > 0) {
       let end = 0
@@ -1700,7 +1826,26 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   }
   const setQuality = (i: number) => {
     setLvl(i)
-    if (hls.current) hls.current.currentLevel = i
+    if (hls.current) {
+      hls.current.currentLevel = i
+    } else if (qualities && qualities[i] && vid.current) {
+      const target = qualities[i]
+      if (vid.current.src !== target.url) {
+        const curTime = vid.current.currentTime
+        const wasPlaying = !vid.current.paused
+        setBusy(true)
+        vid.current.src = target.url
+        const onSwitched = () => {
+          vid.current?.removeEventListener('loadedmetadata', onSwitched)
+          if (vid.current && curTime > 0) vid.current.currentTime = curTime
+          if (wasPlaying && vid.current) vid.current.play().catch(() => {})
+          setBusy(false)
+        }
+        vid.current.addEventListener('loadedmetadata', onSwitched)
+        onQualityChange?.(target)
+        flash('ok', `Quality: ${target.label}${target.sizeLabel ? ` (${target.sizeLabel})` : ''}`)
+      }
+    }
   }
   const setAudioTrack = (t: { i: number; lang: string; label: string }) => {
     flash('ok', `Audio: ${t.label}`)
@@ -2048,6 +2193,16 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         preload="auto"
         onTimeUpdate={onTime}
         onDurationChange={() => !castOn.current && setDur(vid.current?.duration || 0)}
+        onLoadedMetadata={() => {
+          if (castOn.current) return
+          const v = vid.current
+          if (v?.duration && isFinite(v.duration)) setDur(v.duration)
+          setBusy(false)
+        }}
+        onLoadedData={() => {
+          if (castOn.current) return
+          setBusy(false)
+        }}
         onPlay={() => {
           if (castOn.current) return
           setPlaying(true)
@@ -2107,7 +2262,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           </span>
           <b>Casting to {cst.device || 'your device'}</b>
           <small>
-            {title} · Episode {episode}
+            {title}{!isMovie ? ` · Episode ${episode}` : ''}
           </small>
           <button className="zp-pi" onClick={() => castStop()}>
             Stop casting
@@ -2129,9 +2284,15 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           <div className="zp-card">
             <h3>{title}</h3>
             <p>
-              Episode {episode}
-              {episodeTitle ? ` · ${episodeTitle}` : ''}
-              {episodeKind ? ` · ${episodeKind === 'mixed' ? 'Mixed canon' : episodeKind === 'recap' ? 'Recap' : 'Filler'}` : ''}
+              {isMovie ? (
+                format === 'MOVIE' ? 'Movie' : ''
+              ) : (
+                <>
+                  Episode {episode}
+                  {hasDistinctEpTitle ? ` · ${cleanEpTitle}` : ''}
+                  {episodeKind ? ` · ${episodeKind === 'mixed' ? 'Mixed canon' : episodeKind === 'recap' ? 'Recap' : 'Filler'}` : ''}
+                </>
+              )}
               {audioMode ? ` · ${audioMode.toUpperCase()}` : ''}
             </p>
           </div>
@@ -2188,10 +2349,12 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           <div className="zp-top">
             <div className="zp-ti">
               <h3>{title}</h3>
-              <p>
-                Episode {episode}
-                {episodeTitle ? ` · ${episodeTitle}` : ''}
-              </p>
+              {!isMovie && (
+                <p>
+                  Episode {episode}
+                  {hasDistinctEpTitle ? ` · ${cleanEpTitle}` : ''}
+                </p>
+              )}
             </div>
             <div className="zp-ac">
               {audioTracks.length > 1 && (
@@ -2242,50 +2405,56 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
             </div>
           </div>
 
-          <div className="zp-mid">
-            <button
-              className={cx('zp-b zp-pn', isPartyGuest && 'opacity-40 cursor-not-allowed')}
-              disabled={isPartyGuest || !hasPrevEpisode}
-              onClick={() => onPrevEpisode?.()}
-              aria-label="Previous episode"
-              title={isPartyGuest ? 'Episode changes controlled by party host' : 'Previous episode'}
-            >
-              <SkipBack />
-            </button>
-            <button
-              className={cx('zp-b zp-sd', isPartyGuest && 'opacity-40 cursor-not-allowed')}
-              disabled={isPartyGuest}
-              onClick={() => seek(-pf.seek)}
-              aria-label={`Back ${pf.seek} seconds`}
-              title={isPartyGuest ? 'Timestamp controlled by party host' : `Back ${pf.seek}s [J]`}
-            >
-              <RotateCcw />
-              <span className="zp-n">{pf.seek}</span>
-            </button>
-            <button className="zp-b zp-hero" data-tour="p-play" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} title="Play / pause [Space]">
-              <Play className={cx('zp-ic pl', playing && 'off')} fill="currentColor" />
-              <Pause className={cx('zp-ic', !playing && 'off')} fill="currentColor" />
-            </button>
-            <button
-              className={cx('zp-b zp-sd', isPartyGuest && 'opacity-40 cursor-not-allowed')}
-              disabled={isPartyGuest}
-              onClick={() => seek(pf.seek)}
-              aria-label={`Forward ${pf.seek} seconds`}
-              title={isPartyGuest ? 'Timestamp controlled by party host' : `Forward ${pf.seek}s [L]`}
-            >
-              <RotateCw />
-              <span className="zp-n">{pf.seek}</span>
-            </button>
-            <button
-              className={cx('zp-b zp-pn', isPartyGuest && 'opacity-40 cursor-not-allowed')}
-              disabled={isPartyGuest || !hasNextEpisode}
-              onClick={() => onNextEpisode?.()}
-              aria-label="Next episode"
-              title={isPartyGuest ? 'Episode changes controlled by party host' : 'Next episode'}
-            >
-              <SkipForward />
-            </button>
-          </div>
+          {!err && (
+            <div className="zp-mid">
+              {!isMovie && (
+                <button
+                  className={cx('zp-b zp-pn', isPartyGuest && 'opacity-40 cursor-not-allowed')}
+                  disabled={isPartyGuest || !hasPrevEpisode}
+                  onClick={() => onPrevEpisode?.()}
+                  aria-label="Previous episode"
+                  title={isPartyGuest ? 'Episode changes controlled by party host' : 'Previous episode'}
+                >
+                  <SkipBack />
+                </button>
+              )}
+              <button
+                className={cx('zp-b zp-sd', isPartyGuest && 'opacity-40 cursor-not-allowed')}
+                disabled={isPartyGuest}
+                onClick={() => seek(-pf.seek)}
+                aria-label={`Back ${pf.seek} seconds`}
+                title={isPartyGuest ? 'Timestamp controlled by party host' : `Back ${pf.seek}s [J]`}
+              >
+                <RotateCcw />
+                <span className="zp-n">{pf.seek}</span>
+              </button>
+              <button className="zp-b zp-hero" data-tour="p-play" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} title="Play / pause [Space]">
+                <Play className={cx('zp-ic pl', playing && 'off')} fill="currentColor" />
+                <Pause className={cx('zp-ic', !playing && 'off')} fill="currentColor" />
+              </button>
+              <button
+                className={cx('zp-b zp-sd', isPartyGuest && 'opacity-40 cursor-not-allowed')}
+                disabled={isPartyGuest}
+                onClick={() => seek(pf.seek)}
+                aria-label={`Forward ${pf.seek} seconds`}
+                title={isPartyGuest ? 'Timestamp controlled by party host' : `Forward ${pf.seek}s [L]`}
+              >
+                <RotateCw />
+                <span className="zp-n">{pf.seek}</span>
+              </button>
+              {!isMovie && (
+                <button
+                  className={cx('zp-b zp-pn', isPartyGuest && 'opacity-40 cursor-not-allowed')}
+                  disabled={isPartyGuest || !hasNextEpisode}
+                  onClick={() => onNextEpisode?.()}
+                  aria-label="Next episode"
+                  title={isPartyGuest ? 'Episode changes controlled by party host' : 'Next episode'}
+                >
+                  <SkipForward />
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="zp-bot">
             <div className="zp-sr">
@@ -2379,6 +2548,20 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   )}
                 </button>
               )}
+              {downloadUrl && (
+                <a
+                  href={downloadUrl}
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  className="zp-b"
+                  aria-label="Download MP4"
+                  title="Download video file"
+                  onClick={() => flash('ok', 'Download started')}
+                >
+                  <Download />
+                </a>
+              )}
               <button className="zp-b" data-tour="p-set" onClick={() => (closePop(), setSheet('set'))} aria-label="Settings" title="Settings">
                 <Settings />
               </button>
@@ -2466,7 +2649,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                       <span>Auto</span>
                       {lvl === -1 && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
                     </motion.button>
-                    {levels.map((l, i) => (
+                    {levels.map((l: any, i: number) => (
                       <motion.button
                         key={l.i}
                         type="button"
@@ -2476,10 +2659,32 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                         className={cx('zp-row', lvl === l.i && 'on')}
                         onClick={() => (setQuality(l.i), closePop())}
                       >
-                        <span>{l.label}</span>
+                        <div className="flex items-center justify-between w-full pr-1">
+                          <span>{l.label}</span>
+                          {l.sub && <span className="text-[11px] opacity-60 font-mono ml-2">({l.sub})</span>}
+                        </div>
                         {lvl === l.i && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
                       </motion.button>
                     ))}
+                    {downloadUrl && (
+                      <div className="mt-2 pt-2 border-t border-white/10">
+                        <a
+                          href={downloadUrl}
+                          download
+                          target="_blank"
+                          rel="noreferrer"
+                          className="zp-row flex items-center justify-between text-accent font-semibold hover:bg-white/10 rounded-lg px-2 py-1.5 transition text-xs"
+                          onClick={() => {
+                            flash('ok', 'Download started')
+                            closePop()
+                          }}
+                        >
+                          <span className="flex items-center gap-2">
+                            <Download className="size-3.5" /> Download MP4
+                          </span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -2789,16 +2994,50 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
 
         {err && (
           <div className="zp-er">
-            <p>This stream couldn't be loaded.</p>
-            <div className="zp-two" style={{ pointerEvents: 'auto' }}>
-              <button className="zp-b pill" onClick={() => setRetry((n) => n + 1)}>
-                Try again
-              </button>
+            <p className="text-sm font-medium">This stream could not be loaded directly on this network.</p>
+            <div className="zp-two" style={{ pointerEvents: 'auto', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {(() => {
+                const best = servers?.find((s) => s.id === 'vidzee' || s.id === 'videasy' || s.id === 'vidup');
+                if (best && onServer) {
+                  return (
+                    <button
+                      className="zp-b pill"
+                      style={{ background: 'var(--accent, #e50914)', color: '#fff', fontWeight: 700 }}
+                      onClick={() => onServer(best.id)}
+                    >
+                      ⚡ Switch to {best.name}
+                    </button>
+                  );
+                }
+                return null;
+              })()}
               {servers && servers.length > 0 && (
                 <button className="zp-b pill" onClick={(e) => setPop('srv', e.currentTarget)}>
-                  Switch server
+                  All Servers ({servers.length})
                 </button>
               )}
+              {!isCompanionActive() && (
+                <a
+                  href="/extension"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="zp-b pill"
+                  style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}
+                >
+                  ⚡ Get Extension
+                </a>
+              )}
+              <button
+                className="zp-b pill"
+                style={{ opacity: 0.85 }}
+                onClick={() => {
+                  setErr(false)
+                  setBusy(true)
+                  setRetry((n) => n + 1)
+                }}
+              >
+                Try again
+              </button>
             </div>
           </div>
         )}
@@ -3304,8 +3543,8 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   const sName = servers?.find((s) => s.id === serverId)?.name ?? serverId ?? 'Auto'
                   const res = await submitStreamReport({
                     anime_id: animeId ? String(animeId) : undefined,
-                    anime_title: title || 'Anime Episode',
-                    episode: String(episode || '1'),
+                    anime_title: title || (isMovie ? 'Movie' : 'Anime Episode'),
+                    episode: isMovie ? 'Movie' : String(episode || '1'),
                     server: sName,
                     audio_type: audioMode,
                     issue_type: reportIssue,
@@ -3325,8 +3564,8 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '4px' }}
             >
               <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', fontSize: '11px', color: 'rgba(255,255,255,0.75)', lineHeight: '1.4' }}>
-                <div><strong>Anime:</strong> {title}</div>
-                <div><strong>Episode:</strong> {episode} &bull; <strong>Server:</strong> {servers?.find((s) => s.id === serverId)?.name ?? serverId ?? 'Auto'} &bull; <strong>Audio:</strong> {audioMode.toUpperCase()} &bull; <strong>Time:</strong> {fmt(shown)}</div>
+                <div><strong>{isMovie ? 'Title:' : 'Anime:'}</strong> {title}</div>
+                <div>{!isMovie && <><strong>Episode:</strong> {episode} &bull; </>}<strong>Server:</strong> {servers?.find((s) => s.id === serverId)?.name ?? serverId ?? 'Auto'} &bull; <strong>Audio:</strong> {audioMode.toUpperCase()} &bull; <strong>Time:</strong> {fmt(shown)}</div>
               </div>
 
               <div>

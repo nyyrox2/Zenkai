@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, ChevronDown, Info, Languages, Server } from 'lucide-react'
+import { Check, ChevronDown, Info, Languages, Server, Zap } from 'lucide-react'
 import { cn } from '../lib/utils'
 import type { Provider } from '../services/movies'
 
 const MULTI = 'Multi audio'
+const DIRECT = 'Direct'
 
 function Tag({ label }: { label: string }) {
   return (
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-        label === MULTI ? 'bg-accent text-accent-fg' : 'border border-border bg-card-2 text-muted',
+        label === DIRECT ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : label === MULTI ? 'bg-accent text-accent-fg' : 'border border-border bg-card-2 text-muted',
       )}
     >
       {label === MULTI && <Languages className="size-3" />}
+      {label === DIRECT && <Zap className="size-3" />}
       {label}
     </span>
   )
@@ -47,8 +49,9 @@ export function ServerMenu({
   }, [open])
 
   const sections = [
-    { title: 'Multi audio', hint: 'Switch the audio track inside the player', items: providers.filter((p) => p.tags.includes(MULTI)) },
-    { title: 'More servers', hint: 'If one is slow or empty, try the next', items: providers.filter((p) => !p.tags.includes(MULTI)) },
+    { title: 'Direct Streams', hint: 'Native player with multi-audio dub switcher', items: providers.filter((p) => p.tags.includes(DIRECT)) },
+    { title: 'Multi audio', hint: 'Switch the audio track inside the player', items: providers.filter((p) => !p.tags.includes(DIRECT) && p.tags.includes(MULTI)) },
+    { title: 'More servers', hint: 'If one is slow or empty, try the next', items: providers.filter((p) => !p.tags.includes(DIRECT) && !p.tags.includes(MULTI)) },
   ].filter((s) => s.items.length > 0)
 
   return (

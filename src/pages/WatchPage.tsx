@@ -66,6 +66,7 @@ import { cn, formatLabel, formatStatus, pickTitle, stripHtml } from '../lib/util
 import { requestMicrophoneStream } from '../lib/microphone'
 import CinePlayer from '../components/CinePlayer'
 import { EpisodeList } from '../components/EpisodeList'
+import { SupportCard } from '../components/SupportAds'
 import { ErrorState } from '../components/ErrorState'
 import { Skeleton } from '../components/Skeleton'
 import { LoadingGrid } from '../components/LoadingGrid'
@@ -196,10 +197,13 @@ export default function WatchPage() {
   const anime = useAsync(() => fetchAnimeLite(id), [id])
   const a = anime.data
   const title = a ? pickTitle(a.title) : ''
-  const { total, available } = a ? episodeCounts(a) : { total: 0, available: 0 }
+  const counts = a ? episodeCounts(a) : { total: 0, available: 0 }
 
   const rawEp = Number(sp.get('ep')) || lastEpisode(id) || 1
-  const ep = a ? Math.min(Math.max(1, rawEp), Math.max(available, 1)) : rawEp
+  const maxEp = a ? (a.status === 'RELEASING' && !a.episodes ? Math.max(counts.available, rawEp) : Math.max(counts.available, 1)) : rawEp
+  const ep = a ? Math.min(Math.max(1, rawEp), maxEp) : rawEp
+  const total = Math.max(counts.total, ep)
+  const available = Math.max(counts.available, ep)
   // URL wins, then what this title last used, then the last server/audio used anywhere
   const saved = useMemo(() => ({ ...getPrefs(), ...getHistory(id) }), [id])
   const acdn = useAsync(() => acdnMapped(id), [id]).data
@@ -1360,6 +1364,8 @@ export default function WatchPage() {
                 </div>
                 {serverBusy && <LoadingGrid label={`Loading ${server.name}`} />}
               </section>
+
+              <SupportCard className="mt-5" />
 
               <div data-tour="w-more" className="mt-5 space-y-4">
                 {[

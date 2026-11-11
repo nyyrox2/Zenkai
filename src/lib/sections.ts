@@ -19,7 +19,7 @@ export function sectionOf(pathname: string): Section {
 export const isReaderPath = (pathname: string) => /^\/(novel|manga)\/[^/]+(\/[^/]+)?\/read\//.test(pathname)
 
 /** The anime watch page is a full-bleed player: no navbar, dock or footer. */
-export const isWatchPath = (pathname: string) => /^\/watch\/\d+/.test(pathname)
+export const isWatchPath = (pathname: string) => /^\/(watch\/\d+|movies\/watch\/)/.test(pathname)
 
 /** Details pages drop the navbar and keep their own Back button. */
 export const isDetailsPath = (pathname: string) =>

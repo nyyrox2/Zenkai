@@ -4,6 +4,7 @@
 import { tmdbFor, mapOf } from "./handler.js";
 
 const BOT = /meta-external|instagram|facebook|bot|crawl|spider|facebookexternalhit|facebot|whatsapp|telegram|discord|slack|twitter|linkedin|pinterest|skype|vkshare|embedly|preview|iMessage|applebot|redditbot|mastodon|signal|viber|line\//i;
+import { tmdbFetch } from "./tmdb.js";
 const TMDB = "https://aniversee.vercel.app/api/tmdb";
 const TMDB_IMG = "https://image.tmdb.org/t/p/w1280";
 const UA = "Mozilla/5.0 (compatible; ZenkaiShare/1.0)";
@@ -109,7 +110,7 @@ async function animeCard(kind, id) {
 async function movieCard(type, id, hint) {
   const kind = type === "tv" ? "tv" : "movie";
   try {
-    const d = await getJson(`${TMDB}/${kind}/${id}?language=en-US`);
+    const d = await tmdbFetch(`${kind}/${id}?language=en-US`);
     const title = d.title || d.name;
     if (!title) throw new Error("tmdb empty");
     const year = (d.release_date || d.first_air_date || "").slice(0, 4);

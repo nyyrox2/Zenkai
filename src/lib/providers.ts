@@ -2,7 +2,7 @@
 type SearchType  = 'tmdb' | 'anilist';
 type ContentType = 'movie' | 'tv' | 'anime';
 
-type Tag = 'Multi audio' | '4K';
+type Tag = 'Multi audio' | '4K' | 'Direct';
 
 interface ProviderDef {
   id:             string;
@@ -18,6 +18,14 @@ interface ProviderDef {
 }
 
 const PROVIDER_DEFS: ProviderDef[] = [
+  // ── MovieBox (Direct stream player with multi-audio dubs) ──
+  {
+    id: 'moviebox', label: 'MovieBox',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 0,
+    tags: ['Direct', 'Multi audio'],
+    movieUrl: (id) => `/api/movies/stream?id=${id}&type=movie`,
+    tvUrl:    (id, s, e) => `/api/movies/stream?id=${id}&type=tv&s=${s}&e=${e}`,
+  },
   // ── Top three (multi audio: the audio track is switched inside the player itself) ──
   // Order shown in the UI: Scarlet Witch, Captain America, Iron Man, then the rest.
   // ── Videasy (4K, Netflix overlay, built-in episode selector) ──

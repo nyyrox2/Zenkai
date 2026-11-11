@@ -63,7 +63,15 @@ const ALLOWED_STREAM_DOMAINS = [
   "demonicscans.org",
   "demoniclibs.com",
   "mangafifth.org",
-  "readermc.org"
+  "readermc.org",
+  "aoneroom.com",
+  "hakunaymatata.com",
+  "inmoviebox.com",
+  "moviebox.ph",
+  "movie-box.co",
+  "movieboxonline.net",
+  "123moviesfree.club",
+  "sflix.film"
 ];
 export function validateProxyUrl(rawUrl) {
   if (!rawUrl || typeof rawUrl !== "string") {

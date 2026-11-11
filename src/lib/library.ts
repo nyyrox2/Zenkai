@@ -209,6 +209,7 @@ export function touchHistory(m: Meta, p: { ep: number; server: string; audio: Au
 export function removeHistory(id: number) {
   const nid = Number(id)
   history.set(hist().filter((h) => Number(h.id) !== nid))
+  autoSyncWatchlist()
 }
 
 /** Episode finished: queue up the next one, or finish the series. */

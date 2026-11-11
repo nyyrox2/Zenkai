@@ -2,21 +2,28 @@
  * Zenkai Universal Streaming Proxy for Lovable (TanStack Start / Full-Stack Edge)
  * Target route: /api/public/proxy (also supports /proxy and /api/proxy)
  * 
- * - Full CORS support for https://zenkaii.pages.dev, *.pages.dev, custom domains, and localhost
+ * - Full CORS & client support for Android APK, https://zenkaii.pages.dev, *.pages.dev, custom domains, and localhost
  * - Proxies all HLS playlists (.m3u8), video segments (.ts, .m4s), and AES-128 encryption keys (.key)
- * - Spoofs appropriate Referer headers for all anime CDNs (MegaPlay, FlixCloud, AnimeSalt, ACDN, etc.)
+ * - Intelligent Referer spoofing for all CDNs:
+ *     - MovieBox TV Series: bcdnxw.hakunaymatata.com -> Referer: https://123moviesfree.club/
+ *     - MovieBox Movies: bcdn.hakunaymatata.com -> No Referer
+ *     - FlixCloud / ReAnime: https://flixcloud.cc/
+ *     - MegaPlay / RabbitStream / Vidstreaming: https://megaplay.buzz/
+ *     - AnimeSalt / ACDN: https://animesalt.cx/
  * - Full HTTP Range request and 206 Partial Content streaming support
  */
 
 import { createFileRoute } from '@tanstack/react-router';
 
-function getCorsHeaders(request: Request): Headers {
-  const origin = request.headers.get('Origin') || '*';
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+export function getCorsHeaders(request: Request): Headers {
+  const origin = request.headers.get('Origin');
   const h = new Headers();
-  // Allow all web origins for media playback
-  h.set('Access-Control-Allow-Origin', origin === 'null' ? '*' : origin);
+  // Allow all web origins and native apps for media playback
+  h.set('Access-Control-Allow-Origin', origin && origin !== 'null' ? origin : '*');
   h.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-  h.set('Access-Control-Allow-Headers', 'Content-Type, Range, Authorization, X-Requested-With, Origin, Accept');
+  h.set('Access-Control-Allow-Headers', 'Content-Type, Range, Authorization, X-Requested-With, Origin, Accept, X-Zenkai-Client, X-Zenkai-Barrier, X-Zenkai-Shield, X-Zenkai-Embed');
   h.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Content-Type, Accept-Ranges');
   h.set('Access-Control-Max-Age', '86400');
   h.set('Vary', 'Origin');
@@ -33,7 +40,7 @@ const FORBIDDEN_HOSTS = new Set([
   'instance-data',
 ]);
 
-function isAllowedTarget(parsed: URL): { valid: boolean; error?: string } {
+export function isAllowedTarget(parsed: URL): { valid: boolean; error?: string } {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return { valid: false, error: 'Only HTTP and HTTPS protocols permitted' };
   }
@@ -54,13 +61,55 @@ function isAllowedTarget(parsed: URL): { valid: boolean; error?: string } {
   return { valid: true };
 }
 
-function refererFor(hostname: string, customReferer?: string | null): string {
-  if (customReferer) return customReferer;
+export function refererFor(hostname: string, customReferer?: string | null): { referer: string | null; origin: string | null } {
+  if (customReferer) {
+    const trimmed = customReferer.trim();
+    if (trimmed === 'none' || trimmed === 'null' || trimmed === 'strip') {
+      return { referer: null, origin: null };
+    }
+    return { referer: trimmed, origin: trimmed.replace(/\/+$/, '') };
+  }
+
   const h = hostname.toLowerCase();
-  if (h.includes('flixcloud') || h.includes('reanime') || h.includes('enc-dec')) return 'https://flixcloud.cc/';
-  if (h.includes('animesalt') || h.includes('acdn') || /^as-cdn\d*\.top$/.test(h)) return 'https://animesalt.cx/';
-  if (h.includes('megaplay') || h.includes('rabbitstream') || h.includes('megacloud') || h.includes('rapid-cloud') || h.includes('vidstreaming')) return 'https://megaplay.buzz/';
-  return `https://${hostname}/`;
+
+  // MovieBox TV series CDN (strictly requires 123moviesfree.club)
+  if (h.includes('bcdnxw.hakunaymatata.com')) {
+    return { referer: 'https://123moviesfree.club/', origin: 'https://123moviesfree.club' };
+  }
+
+  // MovieBox Movies CDN (rejects referer, requires direct/no referer)
+  if (h.includes('bcdn.hakunaymatata.com') || h.includes('hakunaymatata.com')) {
+    return { referer: null, origin: null };
+  }
+
+  // FlixCloud / ReAnime / enc-dec
+  if (h.includes('flixcloud') || h.includes('reanime') || h.includes('enc-dec')) {
+    return { referer: 'https://flixcloud.cc/', origin: 'https://flixcloud.cc' };
+  }
+
+  // AnimeSalt / ACDN
+  if (h.includes('animesalt') || h.includes('acdn') || /^as-cdn\d*\.top$/.test(h) || h.includes('ravok.buzz')) {
+    return { referer: 'https://animesalt.cx/', origin: 'https://animesalt.cx' };
+  }
+
+  // MegaPlay / Rabbitstream / Vidstreaming
+  if (
+    h.includes('megaplay') ||
+    h.includes('rabbitstream') ||
+    h.includes('megacloud') ||
+    h.includes('rapid-cloud') ||
+    h.includes('vidstreaming') ||
+    h.includes('dokicloud')
+  ) {
+    return { referer: 'https://megaplay.buzz/', origin: 'https://megaplay.buzz' };
+  }
+
+  // Subtitles
+  if (h.includes('opensubtitles') || h.includes('strem.io')) {
+    return { referer: 'https://opensubtitles.org/', origin: 'https://opensubtitles.org' };
+  }
+
+  return { referer: `https://${hostname}/`, origin: `https://${hostname}` };
 }
 
 export async function handleProxyRequest(request: Request): Promise<Response> {
@@ -93,25 +142,34 @@ export async function handleProxyRequest(request: Request): Promise<Response> {
     });
   }
 
-  const referer = refererFor(parsedTarget.hostname, reqUrl.searchParams.get('referer'));
+  const { referer, origin } = refererFor(parsedTarget.hostname, reqUrl.searchParams.get('referer') || reqUrl.searchParams.get('ref'));
+
   const fetchHeaders = new Headers({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    Referer: referer,
-    Origin: referer.replace(/\/+$/, ''),
+    'User-Agent': UA,
     Accept: '*/*',
   });
+
+  if (referer) fetchHeaders.set('Referer', referer);
+  if (origin) fetchHeaders.set('Origin', origin);
 
   const range = request.headers.get('Range');
   if (range) fetchHeaders.set('Range', range);
 
   let up: Response;
   try {
-    up = await fetch(parsedTarget.href, { headers: fetchHeaders, redirect: 'follow' });
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: 'Proxy fetch failed: ' + (err?.message || err) }), {
-      status: 502,
-      headers: { ...Object.fromEntries(corsHeaders), 'Content-Type': 'application/json' },
+    up = await fetch(parsedTarget.href, {
+      method: request.method === 'HEAD' ? 'HEAD' : 'GET',
+      headers: fetchHeaders,
+      redirect: 'follow',
     });
+  } catch (err: unknown) {
+    return new Response(
+      JSON.stringify({ error: 'Proxy fetch failed: ' + (err instanceof Error ? err.message : String(err)) }),
+      {
+        status: 502,
+        headers: { ...Object.fromEntries(corsHeaders), 'Content-Type': 'application/json' },
+      }
+    );
   }
 
   const outHeaders = new Headers(corsHeaders);
@@ -122,40 +180,35 @@ export async function handleProxyRequest(request: Request): Promise<Response> {
     parsedTarget.pathname.includes('parse-flixcloud') ||
     (parsedTarget.searchParams.get('url') || '').includes('.m3u8');
 
-  // HLS Playlist rewriting: ensures sub-playlists, video segments, and AES keys all route through this proxy
-  if (up.ok && isPlaylist) {
+  // HLS Playlist rewriting: routes sub-playlists, segments, and keys back through this proxy
+  if (up.ok && isPlaylist && request.method !== 'HEAD') {
     const text = await up.text();
     if (/^\s*</.test(text)) {
       return new Response(text, { status: up.status, headers: outHeaders });
     }
 
     const proxyBase = `${reqUrl.origin}${reqUrl.pathname}`;
-    const base = parsedTarget.hostname.includes('enc-dec.app') && parsedTarget.searchParams.get('url')
-      ? new URL(parsedTarget.searchParams.get('url')!)
-      : parsedTarget;
+    const nestedTarget = parsedTarget.searchParams.get('url');
+    const base = parsedTarget.hostname.includes('enc-dec.app') && nestedTarget ? new URL(nestedTarget) : parsedTarget;
 
     const wrap = (u: string) => {
       try {
         const abs = new URL(u, base);
         if (!abs.search && base.search && !u.includes('?')) abs.search = base.search;
-        // Always route segments, playlists, and keys through the proxy to prevent CORS blocks
-        return `${proxyBase}?url=${encodeURIComponent(abs.href)}&referer=${encodeURIComponent(referer)}`;
+        return `${proxyBase}?url=${encodeURIComponent(abs.href)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`;
       } catch {
         return u;
       }
     };
 
-    let variant = false;
     const body = text
       .split(/\r?\n/)
       .map((l) => {
         const s = l.trim();
         if (!s) return l;
         if (s.startsWith('#')) {
-          variant = s.startsWith('#EXT-X-STREAM-INF');
           return s.replace(/URI=["']([^"']+)["']/g, (_, u) => `URI="${wrap(u)}"`);
         }
-        variant = false;
         return wrap(s);
       })
       .join('\n');
@@ -167,10 +220,12 @@ export async function handleProxyRequest(request: Request): Promise<Response> {
 
   if (contentType) outHeaders.set('Content-Type', contentType);
   if (/\.(bin|key)$/i.test(parsedTarget.pathname)) outHeaders.set('Content-Type', 'application/octet-stream');
+
   for (const h of ['Content-Length', 'Content-Range', 'Accept-Ranges']) {
     const v = up.headers.get(h);
     if (v) outHeaders.set(h, v);
   }
+
   if (up.ok && /\.(ts|m4s|mp4|aac|key|bin|png|webp|vtt|srt)$/i.test(parsedTarget.pathname)) {
     outHeaders.set('Cache-Control', 'public, max-age=3600');
   }
@@ -195,15 +250,3 @@ export const Route = createFileRoute('/api/public/proxy')({
     },
   },
 });
-
-// 2. Direct HTTP handler exports
-export const GET = ({ request }: { request: Request }) => handleProxyRequest(request);
-export const HEAD = ({ request }: { request: Request }) => handleProxyRequest(request);
-export const OPTIONS = ({ request }: { request: Request }) => handleOptionsRequest(request);
-
-export default {
-  fetch(request: Request) {
-    if (request.method === 'OPTIONS') return handleOptionsRequest(request);
-    return handleProxyRequest(request);
-  },
-};

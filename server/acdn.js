@@ -447,9 +447,15 @@ export function resolveCandidate({ anilistId, episode = 1, title = "", isMovie =
 }
 
 export function getCandidateSlugsForAcdn({ saltId, season = 1, episode = 1, slug, isMovie = false }) {
-  if (slug) return [slug];
-  if (isMovie) return [saltId];
-  return [`${saltId}-${season}x${episode}`];
+  if (slug) return [slug, `private-${slug}`];
+  if (isMovie) return [saltId, `private-${saltId}`];
+  const base = `${saltId}-${season}x${episode}`;
+  return [
+    base,
+    `private-${base}`,
+    `${saltId}-episode-${episode}`,
+    `private-${saltId}-episode-${episode}`,
+  ];
 }
 
 /**

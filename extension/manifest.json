@@ -1,0 +1,65 @@
+{
+  "manifest_version": 3,
+  "name": "Zenkai Stream Companion",
+  "version": "1.0.1",
+  "description": "Direct zero-proxy high-speed streaming for Zenkai Web. Intercepts and unlocks MovieBox, Hakunaymatata, and BCDNXW CDNs.",
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.hakunaymatata.com/*",
+    "*://*.aoneroom.com/*",
+    "*://*.inmoviebox.com/*",
+    "*://*.bcdnxw.com/*",
+    "*://bcdnxw.hakunaymatata.com/*",
+    "*://*.123moviesfree.club/*",
+    "*://*.sflix.film/*",
+    "*://*.movieboxonline.net/*",
+    "*://zenkai.cfd/*",
+    "*://*.zenkai.cfd/*",
+    "*://*.pages.dev/*",
+    "*://localhost/*",
+    "*://127.0.0.1/*",
+    "<all_urls>"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "zenkai_rules",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://zenkai.cfd/*",
+        "*://*.zenkai.cfd/*",
+        "*://*.pages.dev/*",
+        "*://localhost/*",
+        "*://127.0.0.1/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "Zenkai Stream Companion",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

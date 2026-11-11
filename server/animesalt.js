@@ -90,9 +90,15 @@ export function getCandidateSlugs({
   // Direct Mapping via anime-mapping.json (using slug if present, or saltId + season + episode)
   const mapped = pickMapping(mapping, anilistId, episode, isMovie);
   if (!mapped || !mapped.saltId) return [];
-  if (mapped.slug) return [mapped.slug];
-  if (mapped.isMovie || isMovie) return [mapped.saltId];
-  return [`${mapped.saltId}-${mapped.season || 1}x${mapped.finalEp || episode}`];
+  if (mapped.slug) return [mapped.slug, `private-${mapped.slug}`];
+  if (mapped.isMovie || isMovie) return [mapped.saltId, `private-${mapped.saltId}`];
+  const base = `${mapped.saltId}-${mapped.season || 1}x${mapped.finalEp || episode}`;
+  return [
+    base,
+    `private-${base}`,
+    `${mapped.saltId}-episode-${mapped.finalEp || episode}`,
+    `private-${mapped.saltId}-episode-${mapped.finalEp || episode}`,
+  ];
 }
 
 function extractIframeSrc(snippet) {
@@ -249,7 +255,8 @@ export async function extractAnimeSaltPlayer({
         if (selectedPlayer) {
           // Attempt direct HLS stream extraction if video hash is present
           let directStreamUrl = null;
-          const hashMatch = selectedPlayer.match(/\/video\/([a-zA-Z0-9_-]+)/i);
+          const videoPlayerWithHash = [selectedPlayer, myStreamUrl, ...allIframes].find(u => u && u.includes("/video/")) || selectedPlayer;
+          const hashMatch = (videoPlayerWithHash || "").match(/\/video\/([a-zA-Z0-9_-]+)/i);
           if (hashMatch) {
             try {
               const hash = hashMatch[1];
@@ -282,7 +289,7 @@ export async function extractAnimeSaltPlayer({
             success: true,
             slug,
             pageUrl,
-            embedUrl: selectedPlayer,
+            embedUrl: (isServer2 && abyssUrl && (abyssUrl.includes("enc-dec") || abyssUrl.includes("abyssplayer"))) ? (myStreamUrl || selectedPlayer) : selectedPlayer,
             server: isServer2 ? "2" : "1",
             myStreamUrl,
             abyssUrl,
