@@ -6,29 +6,22 @@ import { cn } from '../lib/utils'
 
 const watch = () => (openAd(), toast('Thank you for supporting Zenkai ❤', 'success'))
 
-/** Small "Support Zenkai" card shown under the server picker on the players. */
+/** Minimal "Support Zenkai" row shown under the server picker on the players. */
 export function SupportCard({ className }: { className?: string }) {
   return (
-    <div className={cn('relative overflow-hidden rounded-3xl border border-border bg-card/60 p-4 backdrop-blur', className)}>
-      <span aria-hidden className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-accent/20 blur-2xl" />
-      <div className="relative flex items-center gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent text-accent-fg shadow-[0_0_24px_var(--glow)]">
-          <Heart className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">Support Zenkai</p>
-          <p className="text-sm font-semibold leading-snug">Fund us or watch a short ad. Both keep Zenkai free</p>
-        </div>
-      </div>
-      <div className="relative mt-3 grid grid-cols-2 gap-2">
-        <Link to="/support" className="inline-flex items-center justify-center gap-1.5 rounded-full bg-accent py-2.5 text-xs font-bold text-accent-fg transition active:scale-95">
-          <Heart className="size-3.5" /> Fund
+    <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-2.5 border-t border-border pt-4', className)}>
+      <Heart className="size-4 shrink-0 fill-accent text-accent" />
+      <p className="min-w-0 flex-1 text-sm">
+        <span className="font-semibold">Support Zenkai.</span> <span className="text-muted">No funds? No worries, watch an ad.</span>
+      </p>
+      <div className="flex items-center gap-2">
+        <Link to="/support" className="rounded-full bg-accent px-4 py-2 text-xs font-bold text-accent-fg transition active:scale-95">
+          Fund
         </Link>
-        <button type="button" onClick={watch} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-foreground py-2.5 text-xs font-bold text-background transition active:scale-95">
+        <button type="button" onClick={watch} className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-bold transition hover:bg-foreground/[0.06] active:scale-95">
           <Play className="size-3.5 fill-current" /> Watch ad
         </button>
       </div>
-      <p className="relative mt-2.5 text-[11px] text-muted">No funds? No worries, watching an ad helps too</p>
     </div>
   )
 }
