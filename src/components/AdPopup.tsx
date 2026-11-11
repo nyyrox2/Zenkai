@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Heart, Play, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { openAd, popupShown, popupSnoozed, shouldShowPopup } from '../lib/ads'
 import { toast } from '../lib/toast'
 
@@ -71,8 +71,11 @@ export function AdPopup({ enabled }: { enabled: boolean }) {
             <h2 id="ad-title" className="relative mt-1.5 font-display text-xl font-extrabold tracking-tight">
               Enjoying Zenkai?
             </h2>
-            <p className="relative mt-2 text-sm leading-relaxed text-white/55">Zenkai is free. Watching a short ad takes a few seconds and helps cover the servers.</p>
+            <p className="relative mt-2 text-sm leading-relaxed text-white/55">Zenkai is free. Fund the servers with crypto, or just watch a short ad. No funds? No worries.</p>
             <div className="relative mt-5 grid gap-2">
+              <Link to="/support" onClick={() => setOpen(false)} className="inline-flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-bold text-black transition active:scale-95">
+                <Heart className="size-4" /> Fund Zenkai
+              </Link>
               <button type="button" onClick={watch} className="inline-flex items-center justify-center gap-2 rounded-full bg-accent py-3 text-sm font-bold text-accent-fg shadow-lg shadow-accent/30 transition active:scale-95">
                 <Play className="size-4 fill-current" /> Watch ad
               </button>

@@ -34,6 +34,8 @@ export const SERVERS: ServerDef[] = [
   { id: 'acdn', name: 'ACDN', note: 'Direct HLS · Multi audio', kind: 'direct', audio: false, multi: true },
   { id: 'animesalt-1', name: 'AnimeSalt 1', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '1' },
   { id: 'animesalt-2', name: 'AnimeSalt 2', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '2' },
+  { id: 'megaplay-ani', name: 'MegaPlay Embed', note: 'Embed · AniList · Sub / Dub', kind: 'embed', audio: true, url: (c) => `https://megaplay.buzz/stream/ani/${c.anilistId}/${c.episode}/${c.audio}` },
+  { id: 'megaplay-mal', name: 'MegaPlay Embed 2', note: 'Embed · MAL · Sub / Dub', kind: 'embed', audio: true, url: (c) => (c.malId ? `https://megaplay.buzz/stream/mal/${c.malId}/${c.episode}/${c.audio}` : null) },
   { id: 'reanime', name: 'ReAnime', note: 'Embed · AniList', kind: 'embed', audio: true, url: (c) => `/api/embed/reanime?id=${c.anilistId}&ep=${c.episode}&audio=${c.audio}` },
   { id: 'zokoanime', name: 'ZokoAnime', note: 'Embed · MAL', kind: 'embed', audio: true, url: (c) => (c.malId ? `https://zokoanime.video/stream/mal/${c.malId}/${c.episode}/${c.audio}?color=dc143c` : null) },
   { id: 'tryembed', name: 'TryEmbed', note: 'Embed · MAL', kind: 'embed', audio: true, url: (c) => (c.malId ? `https://tryembed.us.cc/embed/anime/mal/${c.malId}/${c.episode}/${c.audio}?skin=silicon&autoSkip=true` : null) },

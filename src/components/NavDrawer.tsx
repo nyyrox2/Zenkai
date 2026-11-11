@@ -24,6 +24,7 @@ import {
   Users,
   MonitorPlay,
   ArrowRight,
+  Heart,
 } from 'lucide-react'
 import { getWatchRoom } from '../lib/watchRooms'
 import { toast } from '../lib/toast'
@@ -145,6 +146,7 @@ export function NavDrawer({
       items: [
         { label: 'Android App', to: '/app', icon: Download, badge: 'APK' },
         { label: 'API & Embed Docs', to: '/docs', icon: Code2 },
+        { label: 'Support Zenkai', to: '/support', icon: Heart },
       ],
     },
   ]

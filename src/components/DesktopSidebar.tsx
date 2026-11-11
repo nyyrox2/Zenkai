@@ -13,6 +13,7 @@ import {
   Tv,
   Users,
   MessageSquare,
+  Heart,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
@@ -43,6 +44,7 @@ const MORE: Item[] = [
   { label: 'WatchParty', to: '/watchparty', icon: Tv, match: (p) => p.startsWith('/watchparty') || p.startsWith('/watchtogether') },
   { label: 'Community', to: '/community', icon: Users, match: (p) => p.startsWith('/community') },
   { label: 'Messages', to: '/messages', icon: MessageSquare, match: (p) => p.startsWith('/messages') },
+  { label: 'Support', to: '/support', icon: Heart, match: (p) => p === '/support' },
 ]
 
 const iconBtn = 'grid place-items-center text-muted hover:text-foreground hover:bg-foreground/[0.06] transition-colors active:scale-95'

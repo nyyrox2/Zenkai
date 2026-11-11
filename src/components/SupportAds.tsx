@@ -1,4 +1,5 @@
 import { Heart, Play } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { openAd } from '../lib/ads'
 import { toast } from '../lib/toast'
 import { cn } from '../lib/utils'
@@ -16,13 +17,18 @@ export function SupportCard({ className }: { className?: string }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">Support Zenkai</p>
-          <p className="text-sm font-semibold leading-snug">Watch a short ad to keep Zenkai free</p>
+          <p className="text-sm font-semibold leading-snug">Fund us or watch a short ad. Both keep Zenkai free</p>
         </div>
-        <button type="button" onClick={watch} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-xs font-bold text-background transition active:scale-95">
+      </div>
+      <div className="relative mt-3 grid grid-cols-2 gap-2">
+        <Link to="/support" className="inline-flex items-center justify-center gap-1.5 rounded-full bg-accent py-2.5 text-xs font-bold text-accent-fg transition active:scale-95">
+          <Heart className="size-3.5" /> Fund
+        </Link>
+        <button type="button" onClick={watch} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-foreground py-2.5 text-xs font-bold text-background transition active:scale-95">
           <Play className="size-3.5 fill-current" /> Watch ad
         </button>
       </div>
-      <p className="relative mt-2.5 text-[11px] text-muted">Opens in a new tab · totally optional</p>
+      <p className="relative mt-2.5 text-[11px] text-muted">No funds? No worries, watching an ad helps too</p>
     </div>
   )
 }
