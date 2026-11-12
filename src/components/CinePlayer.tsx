@@ -297,6 +297,9 @@ export interface CinePlayerProps {
   hasSub?: boolean
   preview?: boolean
   onAudio?: (m: 'sub' | 'dub') => void
+  /** separate MP4 audio versions (language dubs) of a movie; each is its own stream */
+  dubs?: { id: string; label: string; selected?: boolean }[]
+  onDub?: (id: string) => void
   /** reports the stream's audio renditions (and the active one) so the page can list them; [] when the player goes away */
   onAudioTracks?: (tracks: { i: number; label: string; lang: string }[], active: number) => void
   /** page asks for a rendition; pass a fresh object per request */
@@ -787,7 +790,7 @@ const readPos = (id: number, ep: number) => {
 
 export default function CinePlayer({
   streamUrl, intro, outro, title, episode, episodeTitle = '', totalEpisodes, availableEpisodes, animeId, format,
-  directSubtitles = [], audioMode = 'sub', hasDub = true, hasSub = true, preview = false, onAudio, onAudioTracks, audioSel, tourReady = true, servers, serverId, onServer,
+  directSubtitles = [], audioMode = 'sub', hasDub = true, hasSub = true, preview = false, onAudio, dubs, onDub, onAudioTracks, audioSel, tourReady = true, servers, serverId, onServer,
   hasNextEpisode = false, hasPrevEpisode = false, onNextEpisode, onPrevEpisode, onSelectEpisode, onPlay, onEnded, onProgress,
   autoNext = true, onAutoNext, autoSkip = false, onAutoSkip,
   nextEpisode, episodeKind, skipFiller = false, onSkipFiller, switching = false,
@@ -2357,6 +2360,12 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               )}
             </div>
             <div className="zp-ac">
+              {dubs && dubs.length > 1 && audioTracks.length < 2 && (
+                <button className="zp-b pill" data-tour="p-audio" onClick={(e) => setPop('aud', e.currentTarget)} title="Audio" aria-label="Audio">
+                  <Languages />
+                  <em>{dubs.find((d) => d.selected)?.label ?? 'Audio'}</em>
+                </button>
+              )}
               {audioTracks.length > 1 && (
                 <button className="zp-b pill" data-tour="p-audio" onClick={(e) => setPop('aud', e.currentTarget)} title="Audio track" aria-label="Audio track">
                   <Languages />
@@ -2692,7 +2701,26 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                 <>
                   <p className="zp-ph">Audio</p>
                   <div className="flex flex-col gap-0.5">
-                    {audioTracks.map((t, i) => (
+                    {audioTracks.length < 2 && dubs?.map((d, i) => (
+                      <motion.button
+                        key={d.id}
+                        type="button"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.03 + i * 0.02, duration: 0.18 }}
+                        className={cx('zp-row', d.selected && 'on')}
+                        onClick={() => {
+                          closePop()
+                          if (d.selected) return
+                          flash('load', `Switching to ${d.label}…`)
+                          onDub?.(d.id)
+                        }}
+                      >
+                        <span>{d.label}</span>
+                        {d.selected && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
+                      </motion.button>
+                    ))}
+                    {(audioTracks.length > 1 ? audioTracks : []).map((t, i) => (
                       <motion.button
                         key={t.i}
                         type="button"
@@ -3025,6 +3053,11 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}
                 >
                   ⚡ Get Extension
+                </a>
+              )}
+              {!isCompanionActive() && (
+                <a href="/extension/how-to" target="_blank" rel="noreferrer" className="zp-b pill" title="How to install the extension" aria-label="How to install the extension" style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}>
+                  ?
                 </a>
               )}
               <button

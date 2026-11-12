@@ -11,7 +11,8 @@ import {
   Copy,
   Check,
   Sparkles,
-  Layers
+  Layers,
+  CircleHelp
 } from 'lucide-react'
 import { useCompanion, LATEST_EXTENSION_VERSION } from '../lib/useCompanion'
 import { toast } from '../lib/toast'
@@ -120,6 +121,9 @@ export default function ExtensionPage() {
               {copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
               Copy chrome://extensions
             </button>
+            <Link to="/extension/how-to" className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-5 py-3.5 text-xs font-semibold text-muted backdrop-blur transition hover:text-foreground active:scale-95">
+              <CircleHelp className="size-4" /> How to install
+            </Link>
           </div>
           <span className="mt-2.5 block text-[11px] text-muted">
             Version {LATEST_EXTENSION_VERSION} • Size ~43 KB • Compatible with Chrome, Edge, Brave, Opera & Vivaldi

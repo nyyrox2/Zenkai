@@ -2,11 +2,12 @@ import { toast } from '../lib/toast'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
-import { ChevronLeft, ChevronRight, Loader2, Lock, TriangleAlert, Languages, SlidersHorizontal, Download, Zap } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Lock, TriangleAlert, Zap } from 'lucide-react'
 import { ErrorState } from '../components/ErrorState'
 import { ServerPopup } from '../components/ServerPopup'
 import { EpisodeList } from '../components/EpisodeList'
 import { SupportCard } from '../components/SupportAds'
+import { InstallHelp } from '../components/InstallHelp'
 import { Skeleton } from '../components/Skeleton'
 import { Tabs } from '../components/Tabs'
 import { useAsync } from '../hooks/useAsync'
@@ -21,12 +22,14 @@ import {
   movieHref,
   resolveProvider,
   type MediaType,
+  type MovieDub,
 } from '../services/movies'
 import { useShieldVerified, useShield, getToken } from '../lib/shield'
 import CinePlayer from '../components/CinePlayer'
 
 const pill = 'rounded-full border px-4 py-2 text-sm font-semibold transition active:scale-95'
 const PREF = 'zk:movie-server:v1'
+const DUB = 'moviebox::'
 const readPref = () => {
   try {
     return localStorage.getItem(PREF)
@@ -93,6 +96,14 @@ export default function MovieWatchPage() {
     [sessionVerified, isMovieBox, type, id, season, episode, details.data?.title, details.data?.year, selectedDub, details.data?.imdbId]
   )
 
+  const [dubCache, setDubCache] = useState<{ id: number; dubs: MovieDub[] } | null>(null)
+  useEffect(() => {
+    if (mbStream.data?.dubs?.length) setDubCache({ id, dubs: mbStream.data.dubs })
+  }, [mbStream.data, id])
+  // audio versions live on MovieBox only; remember them so they stay listed while another server is open
+  const dubs = mbStream.data?.dubs ?? (dubCache?.id === id ? dubCache.dubs : [])
+  const curDub = dubs.find((d) => d.selected)?.id ?? dubs[0]?.id
+
   const companion = useCompanion()
   const availableStreams = mbStream.data?.streams || []
   const activeStream = useMemo(() => {
@@ -148,6 +159,21 @@ export default function MovieWatchPage() {
     toast(`Switched audio to ${dubObj?.label ?? 'dub'}`)
   }
 
+  // each MovieBox audio version is its own entry in the server list
+  function pickAny(sid: string) {
+    if (!sid.startsWith(DUB)) return pick(sid)
+    const dub = sid.slice(DUB.length)
+    if (providerId === 'moviebox') return pickDub(dub)
+    try {
+      localStorage.setItem(PREF, 'moviebox')
+    } catch {
+      /* private mode */
+    }
+    setSelectedDub(dub)
+    go({ p: 'moviebox', dub })
+    toast(`Switched to MovieBox · ${dubs.find((d) => d.id === dub)?.label ?? 'audio'}`)
+  }
+
   const seasons = details.data?.seasons ?? []
   const seasonInfo = seasons.find((s) => s.n === season)
   const lastEp = eps.data?.length || seasonInfo?.episodes || episode
@@ -167,6 +193,11 @@ export default function MovieWatchPage() {
   if (!Number.isFinite(id) || id <= 0) return <ErrorState className="mt-40" message="That title doesn't exist." />
 
   const title = details.data?.title ?? 'Loading…'
+  const expand = (p: (typeof list)[number]) =>
+    p.id === 'moviebox' && dubs.length > 1
+      ? dubs.map((d) => ({ id: DUB + d.id, name: `${p.label} · ${d.label}`, label: p.tags.join(' · '), note: p.tags.join(' · '), tags: p.tags }))
+      : [{ id: p.id, name: p.label, label: p.tags.join(' · '), note: p.tags.join(' · '), tags: p.tags }]
+  const serverValue = providerId === 'moviebox' && dubs.length > 1 && curDub ? DUB + curDub : providerId ?? ''
   const direct = list.filter((p) => p.tags.includes('Direct'))
   const groups = [
     { label: 'Multi audio', items: list.filter((p) => !p.tags.includes('Direct') && p.tags.includes('Multi audio')) },
@@ -230,14 +261,11 @@ export default function MovieWatchPage() {
                 currentQuality={activeStream?.quality || mbStream.data?.quality}
                 onQualityChange={(q: { label: string }) => setSelectedQuality(q.label)}
                 downloadUrl={activeDownloadUrl}
-                servers={list.map((p) => ({
-                  id: p.id,
-                  name: p.label,
-                  note: p.tags.join(' · '),
-                  tags: p.tags,
-                }))}
-                serverId={providerId}
-                onServer={pick}
+                servers={list.flatMap(expand)}
+                serverId={serverValue}
+                onServer={pickAny}
+                dubs={dubs}
+                onDub={pickDub}
                 hasNextEpisode={!!nextTarget}
                 hasPrevEpisode={!!prevTarget}
                 onNextEpisode={() => nextTarget && go({ s: nextTarget.s, e: nextTarget.e })}
@@ -375,6 +403,7 @@ export default function MovieWatchPage() {
               <span>Get Extension</span>
             </Link>
           )}
+          {!companion.installed && <InstallHelp />}
           {type === 'tv' && (
             <>
               <button type="button" disabled={!prevTarget} onClick={() => prevTarget && go({ s: prevTarget.s, e: prevTarget.e })} className={cn(pill, 'inline-flex items-center gap-1.5 border-border bg-card/60 disabled:opacity-35')}>
@@ -388,95 +417,6 @@ export default function MovieWatchPage() {
         </div>
       </div>
 
-      {/* MovieBox Controls: Audio Dubs, Quality Selector & Direct MP4 Downloads */}
-      {isMovieBox && mbStream.data && (
-        <div className="mt-4 flex flex-col gap-3 px-3 sm:px-6 lg:px-0">
-          {/* Audio options: always shows Original, language dubs, and unverified tracks */}
-          {mbStream.data.dubs && mbStream.data.dubs.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card/40 p-3 backdrop-blur">
-              <span className="flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-wider text-muted">
-                <Languages className="size-3.5 text-accent" /> Audio:
-              </span>
-              {mbStream.data.dubs.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => pickDub(d.id)}
-                  className={cn(
-                    'rounded-full px-3.5 py-1.5 text-xs font-semibold transition active:scale-95',
-                    d.selected
-                      ? 'bg-accent text-accent-fg shadow-md shadow-accent/20'
-                      : 'border border-border bg-card/70 text-muted hover:border-accent hover:text-foreground'
-                  )}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Quality switcher & Direct MP4 Download bar */}
-          {availableStreams.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card/40 p-3 backdrop-blur">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-wider text-muted">
-                  <SlidersHorizontal className="size-3.5 text-accent" /> Quality:
-                </span>
-                {availableStreams.map((s) => {
-                  const isCur = (activeStream?.quality || mbStream.data?.quality) === s.quality
-                  return (
-                    <button
-                      key={s.quality}
-                      type="button"
-                      onClick={() => {
-                        setSelectedQuality(s.quality)
-                        toast(`Quality switched to ${s.quality}${s.sizeLabel ? ` (${s.sizeLabel})` : ''}`)
-                      }}
-                      className={cn(
-                        'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition active:scale-95',
-                        isCur
-                          ? 'bg-accent text-accent-fg shadow-md shadow-accent/20'
-                          : 'border border-border bg-card/70 text-muted hover:border-accent hover:text-foreground'
-                      )}
-                    >
-                      <span>{s.quality}</span>
-                      {s.sizeLabel && (
-                        <span className={cn('text-[10px] font-mono opacity-80', isCur ? 'text-accent-fg' : 'text-muted')}>
-                          {s.sizeLabel}
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Direct download button */}
-              <div className="flex items-center gap-2">
-                {activeStream && (
-                  <a
-                    href={activeStream.downloadUrl}
-                    download={activeStream.downloadFileName || `${title} (${activeStream.quality}).mp4`}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => toast(`Starting download: ${title} (${activeStream.quality})`)}
-                    className="inline-flex items-center gap-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 px-4 py-1.5 text-xs font-bold text-white transition active:scale-95 shadow-sm"
-                  >
-                    <Download className="size-3.5 text-accent" />
-                    <span>Download MP4</span>
-                    {activeStream.sizeLabel && (
-                      <span className="rounded bg-black/40 px-1.5 py-0.5 text-[10px] font-mono text-muted">
-                        {activeStream.sizeLabel}
-                      </span>
-                    )}
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-
       {/* Direct server */}
       <section className="mt-5 flex flex-wrap items-center gap-3 px-3 sm:px-6 lg:px-0" aria-label="Source">
         {providers.loading ? (
@@ -484,9 +424,9 @@ export default function MovieWatchPage() {
         ) : (
           direct.length > 0 && (
             <ServerPopup
-              servers={direct.map((p) => ({ id: p.id, name: p.label, label: p.tags.join(' · '), tags: p.tags }))}
-              value={providerId ?? ''}
-              onPick={pick}
+              servers={direct.flatMap(expand)}
+              value={serverValue}
+              onPick={pickAny}
             />
           )
         )}

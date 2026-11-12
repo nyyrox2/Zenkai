@@ -62,6 +62,7 @@ const BustedPage = lazy(() => import('./pages/BustedPage'))
 const EmbedPage = lazy(() => import('./pages/EmbedPage'))
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const CallPage = lazy(() => import('./pages/CallPage'))
+const ExtensionGuidePage = lazy(() => import('./pages/ExtensionGuidePage'))
 const SupportPage = lazy(() => import('./pages/SupportPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
@@ -169,6 +170,7 @@ export default function App() {
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/app" element={<AppPage />} />
               <Route path="/extension" element={<ExtensionPage />} />
+              <Route path="/extension/how-to" element={<ExtensionGuidePage />} />
               <Route path="/companion" element={<ExtensionPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/u/:username" element={<PublicProfilePage />} />
