@@ -15,6 +15,18 @@ const DEKHO_COOKIE = "toronites_server=vidstream";
 const SALT_MIRRORS = ["https://animesalt.cx", "https://animesalt.ac", "https://animesalt.ro"];
 const MAX_DEPTH = 3; // guards nested iframe -> iframe -> iframe chains
 
+// ravok / as-cdn tokens (md5 + expires) are bound to the IP that called getVideo, and the stream is later fetched
+// by the launchpad proxy. So getVideo has to be called THROUGH that same proxy. Set per resolveAcdn() call.
+let viaBase = "";
+function viaProxy(url, init, referer, origin) {
+  if (!viaBase) return fetch(url, init);
+  const p = new URL(viaBase);
+  p.searchParams.set("url", url);
+  if (referer) p.searchParams.set("referer", referer);
+  if (origin) p.searchParams.set("origin", origin);
+  return fetch(p.href, init);
+}
+
 /* ---------------- HTTP helpers ---------------- */
 async function httpGet(url, referer, cookie) {
   try {
@@ -84,7 +96,28 @@ async function decryptAbyss(encrypted) {
         best = s.url;
       }
     }
-    return best ? direct(best, "https://abyssplayer.com/", "file") : null;
+        if (!best) return null;
+
+    // sssrr.org URLs 302-redirect to trycloudflare.com tunnels.
+    // Cloudflare Workers CANNOT fetch trycloudflare.com (Cloudflare blocks Worker->tunnel).
+    // Pre-resolve the redirect server-side so we cache the final trycloudflare.com URL.
+    // The Lovable proxy (non-Worker) and the browser can both reach trycloudflare.com directly.
+    if (best.includes('sssrr.org')) {
+      try {
+        const redir = await fetch(best, {
+          method: 'GET',
+          headers: { 'User-Agent': UA, Referer: 'https://abyssplayer.com/' },
+          redirect: 'manual',
+          signal: AbortSignal.timeout(8000),
+        });
+        const loc = redir.headers.get('location');
+        if (loc && loc.includes('trycloudflare.com')) best = loc;
+      } catch {
+        // If pre-resolve fails, keep sssrr.org URL; APK (ExoPlayer) can still play it directly
+      }
+    }
+
+    return direct(best, 'https://abyssplayer.com/', 'file');
   } catch {
     return null;
   }
@@ -153,11 +186,11 @@ function extractSubtitlesFromPlayer(html, domain = "ravok.buzz") {
 async function resolveAsCdn(domain, hash) {
   try {
     const [pageRes, r] = await Promise.all([
-      fetch(`https://${domain}/video/${hash}`, {
+      viaProxy(`https://${domain}/video/${hash}`, {
         headers: { "User-Agent": UA, Referer: "https://animesalt.cx/" },
         signal: AbortSignal.timeout(10000),
-      }).catch(() => null),
-      fetch(`https://${domain}/player/index.php?data=${hash}&do=getVideo`, {
+      }, "https://animesalt.cx/").catch(() => null),
+      viaProxy(`https://${domain}/player/index.php?data=${hash}&do=getVideo`, {
         method: "POST",
         headers: {
           "User-Agent": UA,
@@ -168,7 +201,7 @@ async function resolveAsCdn(domain, hash) {
         },
         body: new URLSearchParams({ hash, r: "https://animesalt.cx/" }).toString(),
         signal: AbortSignal.timeout(14000),
-      }).catch(() => null),
+      }, `https://${domain}/video/${hash}`, `https://${domain}`).catch(() => null),
     ]);
 
     if (!r || !r.ok) return null;
@@ -177,6 +210,9 @@ async function resolveAsCdn(domain, hash) {
     const j = JSON.parse(body);
     const m3u8 = j.videoSource || j.securedLink || j.hls;
     if (!m3u8) return null;
+    // NOTE: No health-probe. ravok.buzz uses nginx secure_link (IP-bound md5 tokens).
+    // HEAD probe from a different Cloudflare egress IP causes 403 and kills ACDN when it is fine.
+    // The player handles real CDN outages via CinePlayer fallback logic.
 
     let subtitles = [];
     if (pageRes && pageRes.ok) {
@@ -281,16 +317,16 @@ async function resolvePlayer(iframeUrl, referer, lang = "", depth = 0) {
     if (r) return r;
   }
 
-  // 2. as-cdn / ravok / any /video/<hash> CDN player
-  const cdn = url.match(/https?:\/\/([a-zA-Z0-9_.-]+)\/video\/([a-zA-Z0-9_-]+)/i);
-  if (cdn) {
-    const r = await resolveAsCdn(cdn[1], cdn[2]);
+  // 2. Multi-language player.php (checked first when audio language is requested)
+  if (/player\.php|multi-lang-plyr\.php/i.test(url)) {
+    const r = await resolveMultiLang(url, lang, depth);
     if (r) return r;
   }
 
-  // 3. Multi-language player.php
-  if (/player\.php|multi-lang-plyr\.php/i.test(url)) {
-    const r = await resolveMultiLang(url, lang, depth);
+  // 3. as-cdn / ravok / any /video/<hash> CDN player (with health probe)
+  const cdn = url.match(/https?:\/\/([a-zA-Z0-9_.-]+)\/video\/([a-zA-Z0-9_-]+)/i);
+  if (cdn) {
+    const r = await resolveAsCdn(cdn[1], cdn[2]);
     if (r) return r;
   }
 
@@ -412,7 +448,8 @@ async function fromAnimeSalt({ saltId, slugs = [], isMovie }, lang) {
         const html = await httpGet(`${mirror}${path}`, `${mirror}/`);
         if (!html) continue;
 
-        for (const opt of ["options-0", "options-1"]) {
+        const optList = lang ? ["options-1", "options-0"] : ["options-0", "options-1"];
+        for (const opt of optList) {
           const u = optionIframe(html, opt, mirror);
           if (!u) continue;
           const r = await resolvePlayer(u, `${mirror}/`, lang);
@@ -462,7 +499,8 @@ export function getCandidateSlugsForAcdn({ saltId, season = 1, episode = 1, slug
  * Resolves the ACDN multi-audio stream for one episode.
  * Returns { streamUrl, referer, kind: 'hls' | 'file', mapped, slug } or null.
  */
-export async function resolveAcdn({ anilistId, episode = 1, title = "", isMovie = false, lang = "" }) {
+export async function resolveAcdn({ anilistId, episode = 1, title = "", isMovie = false, lang = "", proxyBase = "" }) {
+  viaBase = /^https?:\/\//i.test(proxyBase) ? proxyBase : ""; // "/proxy" (local dev) can't be called server-side
   const cand = resolveCandidate({ anilistId, episode, title, isMovie });
   if (!cand || !cand.saltId) return null;
   const slugs = getCandidateSlugsForAcdn({
@@ -486,4 +524,68 @@ export async function resolveAcdn({ anilistId, episode = 1, title = "", isMovie 
 
   const hit = (await fromAnimeSalt(ctx, lang)) || (await fromAnimeDekho(ctx, lang));
   return hit ? { ...hit, mapped: true, slug: hit.slug || slug } : null;
+}
+
+
+/**
+ * resolveAbyssOnly: same mapping lookup as resolveAcdn but ONLY tries AbyssPlayer iframes.
+ * Never falls back to ravok/as-cdn HLS - returns a direct MP4 file stream or null.
+ */
+export async function resolveAbyssOnly({ anilistId, episode = 1, title = '', isMovie = false }) {
+  const cand = resolveCandidate({ anilistId, episode, title, isMovie });
+  if (!cand || !cand.saltId) return null;
+  const slugs = getCandidateSlugsForAcdn({
+    saltId: cand.saltId,
+    season: cand.season,
+    episode: cand.episode,
+    slug: cand.slug,
+    isMovie: cand.isMovie,
+  });
+  const slug = cand.slug || slugs[0];
+  const ctx = { title, season: cand.season, episode: cand.episode, finalEp: cand.episode, isMovie: cand.isMovie, saltId: cand.saltId, slug, slugs };
+
+  // Helper: scan a page's iframes and resolve only AbyssPlayer ones
+  async function abyssFromPage(pageUrl, referer) {
+    const html = await httpGet(pageUrl, referer);
+    if (!html) return null;
+    const frames = [...html.matchAll(/<iframe[^>]+(?:data-src|src)=["']([^"']+)["']/gi)]
+      .map(m => m[1].trim()).filter(usable);
+    for (const src of frames) {
+      const absUrl = abs(src, pageUrl);
+      if (/abyssplayer.com/i.test(absUrl)) {
+        const r = await resolveAbyss(absUrl);
+        if (r) return r;
+      }
+    }
+    return null;
+  }
+
+  // AnimeSalt: check option-0 (AbyssPlayer slot) across mirrors + slugs
+  for (const mirror of SALT_MIRRORS) {
+    for (const s of slugs) {
+      try {
+        const pageUrl = mirror + '/episode/' + s + '/';
+        const html = await httpGet(pageUrl, mirror + '/');
+        if (!html || html.length < 500) continue;
+        const opt0 = optionIframe(html, 'option-0', pageUrl);
+        if (opt0 && /abyssplayer.com/i.test(opt0)) {
+          const r = await resolveAbyss(opt0);
+          if (r) return { ...r, mapped: true, slug: s };
+        }
+        const r = await abyssFromPage(pageUrl, mirror + '/');
+        if (r) return { ...r, mapped: true, slug: s };
+      } catch (_) { /* try next */ }
+    }
+  }
+
+  // AnimeDekho fallback
+  try {
+    const epUrl = await findDekhoEpisodePage(title, cand.season, cand.episode, isMovie);
+    if (epUrl) {
+      const r = await abyssFromPage(epUrl, DEKHO + '/');
+      if (r) return { ...r, mapped: true, slug: slug };
+    }
+  } catch (_) { /* ignore */ }
+
+  return null;
 }

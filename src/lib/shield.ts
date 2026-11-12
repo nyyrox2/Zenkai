@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { toast } from './toast'
+import { SECURITY_DISABLED } from './securityToggle'
 
 /**
  * Zenkai Shield (client): solves the server's proof-of-work once, then adds the token to every
@@ -234,7 +235,7 @@ const looksAutomated = () =>
 
 let slowHits = 0
 function checkDevTools() {
-  if (state.bot || import.meta.env.DEV) return // DEV: never stall or lock the dev's own DevTools
+  if (SECURITY_DISABLED || state.bot || import.meta.env.DEV) return // DEV: never stall or lock the dev's own DevTools
   const inIframe = typeof window !== 'undefined' && window.self !== window.top;
   const path = typeof window !== 'undefined' ? window.location.pathname : '';
   const isExcluded = inIframe || path === '/embed' || path.startsWith('/embed/');

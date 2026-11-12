@@ -23,7 +23,7 @@ async function loadLocalMediaModules() {
 import { resolveDirectStreamWorker, checkEpisodeAudioAvailability } from "./direct-stream.js";
 import { resolveFlixCloud, resolveReanimeEmbed } from "./flixcloud.js";
 import { extractAnimeSaltPlayer } from "./animesalt.js";
-import { resolveAcdn } from "./acdn.js";
+import { resolveAcdn, resolveAbyssOnly } from "./acdn.js";
 import { resolveMovieBoxStream } from "./moviebox.js";
 import { validateProxyUrl } from "./ssrf.js";
 import novelEngine from "./novel.js";
@@ -239,12 +239,15 @@ async function proxy(request, url, proxyBase = "/proxy", env = null) {
   const host = t.hostname.toLowerCase();
   const isWebMirrorCdn = host.includes("bcdnxw") || host.includes("123moviesfree") || host.includes("sflix");
   const isDirectAppCdn = !isWebMirrorCdn && (/aoneroom/.test(host) || host === "bcdn.hakunaymatata.com");
+  const isAbyssStream = host.includes("sssrr.org") || host.includes("trycloudflare.com") || host.includes("abyssplayer.com");
 
   let referer = null;
   if (isDirectAppCdn) {
     referer = null;
   } else if (isWebMirrorCdn) {
     referer = url.searchParams.get("referer") || "https://123moviesfree.club/";
+  } else if (isAbyssStream) {
+    referer = "https://abyssplayer.com/";
   } else {
     referer = refererFor(host, url.searchParams.get("referer")) || `${t.origin}/`;
   }
@@ -252,7 +255,7 @@ async function proxy(request, url, proxyBase = "/proxy", env = null) {
   const headers = new Headers({ Accept: "*/*" });
   if (referer) {
     headers.set("Referer", referer);
-    if (!isWebMirrorCdn) {
+    if (!isWebMirrorCdn && !isAbyssStream) {
       headers.set("Origin", referer.replace(/\/$/, ""));
     }
   }
@@ -678,18 +681,27 @@ export async function handle(request, env) {
     // ACDN: multi-audio direct stream (anime-mapping.json + AnimeDekho / AnimeSalt), audio is picked inside the player
     if (server === "acdn") {
       const isMovie = q("format").toUpperCase() === "MOVIE" || q("isMovie") === "true";
-      const lang = q("lang");
+      const lang = q("lang") || (audio === "dub" ? "English" : audio === "sub" ? "Japanese" : "");
       try {
-        const r = await cached(`acdn:${anilistId}:${episode}:${isMovie}:${lang}:${title}`, 10 * 60e3, () =>
-          resolveAcdn({ anilistId, episode, title, isMovie, lang }),
+        const r = await cached(`acdn:v3:${anilistId}:${episode}:${isMovie}:${lang}:${title}`, 10 * 60e3, () =>
+          resolveAcdn({ anilistId, episode, title, isMovie, lang, proxyBase }),
         );
         if (!r?.streamUrl) return json({ error: "No multi-audio stream found on ACDN for this episode" }, 404);
+        const isFile = r.format === "file" || r.streamUrl.includes(".mp4") || r.streamUrl.includes("/sora/");
+        // ravok.buzz uses nginx secure_link (IP-bound md5 tokens): ALL HLS segments must route through proxy.
+        // seg=1 would let the browser fetch segments directly (different IP => 403). Never use seg=1 for ACDN.
+        // For sssrr.org/AbyssPlayer file streams, use Zenkai own /proxy (Lovable lacks the Origin-strip fix).
+        // trycloudflare.com (pre-resolved from sssrr.org) is unreachable from Cloudflare Workers.
+        // Use Lovable proxy (proxyBase) for ALL ACDN streams - it is NOT a Worker and can fetch trycloudflare.com.
+        const acdnProxy = proxyBase;
         return json({
           success: true,
           server: "ACDN",
           audio: "multi",
           multiAudio: true,
-          streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}&seg=1${audio ? '&audio=' + encodeURIComponent(audio) : ''}`,
+          format: isFile ? "file" : "hls",
+          streamUrl: `${acdnProxy}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}${audio ? '&audio=' + encodeURIComponent(audio) : ''}`,
+          fallbackStreamUrl: `/proxy?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}`,
           rawStreamUrl: r.streamUrl,
           referer: r.referer || "https://animesalt.cx/",
           subtitles: (r.subtitles || []).map((s) => ({
@@ -703,6 +715,38 @@ export async function handle(request, env) {
         });
       } catch (e) {
         return json({ error: e.message || "ACDN resolution failed" }, 502);
+      }
+    }
+
+        // AbyssPlayer: direct MP4 file stream - AbyssPlayer iframes ONLY (never ravok/HLS)
+    if (server === "abyss") {
+      const isMovie = q("format").toUpperCase() === "MOVIE" || q("isMovie") === "true";
+      try {
+        const r = await cached(
+          `abyss:${anilistId}:${episode}:${isMovie}:${title}`,
+          10 * 60e3,
+          () => resolveAbyssOnly({ anilistId, episode, title, isMovie }),
+        );
+        if (!r?.streamUrl) return json({ error: "No AbyssPlayer stream found for this episode" }, 404);
+        // AbyssPlayer is extension-only: return raw sssrr.org URL for the browser + extension
+        // to fetch directly (browser natively follows 302 → trycloudflare.com, extension sets Referer).
+        // No proxy needed — avoids Cloudflare Worker → trycloudflare.com Cdn-Loop block entirely.
+        return json({
+          success: true,
+          server: "AbyssPlayer",
+          audio: "multi",
+          multiAudio: true,
+          format: "file",
+          requiresExtension: true,
+          streamUrl: r.streamUrl,
+          rawStreamUrl: r.streamUrl,
+          referer: r.referer || "https://abyssplayer.com/",
+          subtitles: [],
+          intro: null,
+          outro: null,
+        });
+      } catch (e) {
+        return json({ error: e.message || "AbyssPlayer resolution failed" }, 502);
       }
     }
 

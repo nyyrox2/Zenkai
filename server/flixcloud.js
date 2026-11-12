@@ -4,7 +4,7 @@
 import { resolveMegaPlay } from "./direct-stream.js";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const BASE = "https://reanime.to";
+const BASE = "https://reanime.cz";
 const FLIX = "https://flixcloud.cc";
 const ENC_DEC = "https://enc-dec.app";
 

@@ -12,7 +12,6 @@ import { ScrollToTop } from './components/ScrollToTop'
 import { TopLoader } from './components/TopLoader'
 import { PageLoader } from './components/PageLoader'
 import { ShieldGate } from './components/ShieldGate'
-import { AdPopup } from './components/AdPopup'
 import { ApiIntro } from './components/ApiIntro'
 import { WelcomeNotes } from './components/WelcomeNotes'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
@@ -226,7 +225,6 @@ export default function App() {
       <Toaster />
       <ShortcutsHelp />
       <ShieldGate />
-      <AdPopup enabled={!bare && !isApi} />
       <ChangelogModal />
       <ChooseUsernameModal />
       <WelcomeNotes enabled={!isApi && !isEmbed && !reader && !isWatchPath(pathname) && !isCall && !isMessages && pathname !== '/busted'} />

@@ -192,11 +192,13 @@ export async function fetchStream(p: { id: number; ep: number; server: string; a
   let activeUrl = proxyUrl
 
   // FlixCloud manifests rely on enc-dec parser and require server-side key rewriting (resolving relative key.bin).
-  // With the companion active, FlixCloud segments are still fetched directly from rundowncdn with zero proxy overhead!
+  // ACDN streams (both ravok.buzz IP-bound manifests and AbyssPlayer sssrr.org files) require server proxying.
+  // In both cases, streams route through the proxy with zero requirement for the extension!
   const isFlixCloud = r.server?.toLowerCase().includes('flixcloud') || r.rawStreamUrl?.includes('parse-flixcloud')
+  const isAcdn = r.server?.toLowerCase().includes('acdn') || r.rawStreamUrl?.includes('ravok.buzz') || r.rawStreamUrl?.includes('as-cdn') || r.rawStreamUrl?.includes('sssrr')
 
-  // If Zenkai Companion extension is active, stream DIRECTLY from original CDN with zero proxy overhead!
-  if (hasCompanion && !isFlixCloud) {
+  // Only direct CDNs (VidStream / MegaPlay) bypass the proxy when Zenkai Companion is active
+  if (hasCompanion && !isFlixCloud && !isAcdn) {
     let directUrl = r.rawStreamUrl
     if (!directUrl && r.streamUrl && r.streamUrl.includes('url=')) {
       try {
@@ -212,7 +214,7 @@ export async function fetchStream(p: { id: number; ep: number; server: string; a
   return {
     ...r,
     streamUrl: activeUrl,
-    fallbackStreamUrl: proxyUrl,
+    fallbackStreamUrl: (r as any).fallbackStreamUrl ? apiUrl((r as any).fallbackStreamUrl) : proxyUrl,
     rawStreamUrl: r.rawStreamUrl,
     subtitles: (r.subtitles || []).map((s) => ({
       ...s,

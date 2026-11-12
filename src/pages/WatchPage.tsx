@@ -67,7 +67,6 @@ import { cn, formatLabel, formatStatus, pickTitle, stripHtml } from '../lib/util
 import { requestMicrophoneStream } from '../lib/microphone'
 import CinePlayer from '../components/CinePlayer'
 import { EpisodeList } from '../components/EpisodeList'
-import { SupportCard } from '../components/SupportAds'
 import { ErrorState } from '../components/ErrorState'
 import { Skeleton } from '../components/Skeleton'
 import { LoadingGrid } from '../components/LoadingGrid'
@@ -1400,7 +1399,6 @@ export default function WatchPage() {
                 {serverBusy && <LoadingGrid label={`Loading ${server.name}`} />}
               </section>
 
-              <SupportCard className="mt-5" />
 
               <div data-tour="w-more" className="mt-5 space-y-4">
                 {[

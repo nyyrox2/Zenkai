@@ -335,7 +335,7 @@ export async function checkEpisodeAudioAvailability(anilistId, episode, title) {
   const p1 = (async () => {
     if (!anilistId) return;
     try {
-      const res = await fetch(`https://reanime.to/api/flix/${anilistId}/${episode}`, {
+      const res = await fetch(`https://reanime.cz/api/flix/${anilistId}/${episode}`, {
         headers: { "User-Agent": UA, Accept: "application/json" },
         signal: AbortSignal.timeout(4000)
       });

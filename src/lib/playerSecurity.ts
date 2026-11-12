@@ -3,13 +3,15 @@
  * Scoped exclusively to the CinePlayer component.
  */
 
+import { SECURITY_DISABLED } from './securityToggle';
+
 export function attachPlayerSecurity(
   container: HTMLElement | null,
   video: HTMLVideoElement | null,
   options?: { isPreview?: boolean }
 ): () => void {
   // If in preview mode (e.g. developer docs configurator), do not activate security listeners
-  if (options?.isPreview) return () => {};
+  if (options?.isPreview || SECURITY_DISABLED) return () => {};
 
   // 1. Keyboard Shortcut Blocking (F12, View Source, DevTools Shortcuts)
   const onKeyDown = (e: KeyboardEvent) => {

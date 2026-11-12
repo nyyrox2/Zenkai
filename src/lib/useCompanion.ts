@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-export const LATEST_EXTENSION_VERSION = '1.0.8'
+export const LATEST_EXTENSION_VERSION = '1.1.0'
 
 export interface CompanionInfo {
   installed: boolean

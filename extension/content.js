@@ -4,7 +4,7 @@
 (function () {
   const meta = {
     installed: true,
-    version: '1.0.8',
+    version: '1.1.0',
     name: 'Zenkai Stream Companion',
     active: true,
     capabilities: [

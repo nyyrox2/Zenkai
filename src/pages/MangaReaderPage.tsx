@@ -9,7 +9,6 @@ import { cn } from '../lib/utils'
 import { fetchMangaChapters, fetchMangaPages, proxiedImage, type MangaChapterRef } from '../services/manga'
 import { ErrorState } from '../components/ErrorState'
 import { Skeleton } from '../components/Skeleton'
-import { SupportRow } from '../components/SupportAds'
 import NotFoundPage from './NotFoundPage'
 
 const PREFS_KEY = 'zk:manga-prefs:v1'
@@ -636,7 +635,6 @@ function ReaderSettings({ prefs, update, onReset }: { prefs: MangaPrefs; update:
   const paged = prefs.mode !== 'webtoon'
   return (
     <div className="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-contain px-5 pb-12 pt-2">
-      <SupportRow />
 
       <div className="space-y-2.5">
         <p className={lab}>Reading mode</p>

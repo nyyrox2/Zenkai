@@ -67,6 +67,10 @@ export function refererFor(hostname: string, customReferer?: string | null): { r
     if (trimmed === 'none' || trimmed === 'null' || trimmed === 'strip') {
       return { referer: null, origin: null };
     }
+    const h = hostname.toLowerCase();
+    if (h.includes('sssrr.org') || h.includes('trycloudflare.com') || h.includes('abyssplayer.com') || h.includes('playhydrax.com')) {
+      return { referer: trimmed, origin: null };
+    }
     return { referer: trimmed, origin: trimmed.replace(/\/+$/, '') };
   }
 
@@ -87,9 +91,14 @@ export function refererFor(hostname: string, customReferer?: string | null): { r
     return { referer: 'https://flixcloud.cc/', origin: 'https://flixcloud.cc' };
   }
 
-  // AnimeSalt / ACDN
+  // AnimeSalt / ACDN (ravok & as-cdn)
   if (h.includes('animesalt') || h.includes('acdn') || /^as-cdn\d*\.top$/.test(h) || h.includes('ravok.buzz')) {
     return { referer: 'https://animesalt.cx/', origin: 'https://animesalt.cx' };
+  }
+
+  // AbyssPlayer / sssrr.org / trycloudflare: NEVER send Origin (causes 404)
+  if (h.includes('sssrr.org') || h.includes('trycloudflare.com') || h.includes('abyssplayer.com') || h.includes('playhydrax.com')) {
+    return { referer: 'https://abyssplayer.com/', origin: null };
   }
 
   // MegaPlay / Rabbitstream / Vidstreaming

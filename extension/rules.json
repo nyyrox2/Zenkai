@@ -429,6 +429,8 @@
         "akirax.space",
         "imgnex.top",
         "imgnex.space",
+        "silentforge.top",
+        "silentforge.space",
         "megacloud.tv",
         "rabbitstream.net",
         "dokicloud.one"
@@ -1705,9 +1707,13 @@
       "type": "modifyHeaders",
       "requestHeaders": [
         {
+          "header": "Origin",
+          "operation": "remove"
+        },
+        {
           "header": "Referer",
           "operation": "set",
-          "value": "https://animesalt.cx/"
+          "value": "https://ravok.buzz/"
         }
       ],
       "responseHeaders": [
@@ -1931,6 +1937,221 @@
         "pages.dev",
         "zenkai.cfd"
       ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 32,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*silentforge*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 33,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://abyssplayer.com/"
+        },
+        {
+          "header": "Origin",
+          "operation": "remove"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*sssrr.org*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 34,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://abyssplayer.com/"
+        },
+        {
+          "header": "Origin",
+          "operation": "remove"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*trycloudflare.com*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 35,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://abyssplayer.com/"
+        },
+        {
+          "header": "Origin",
+          "operation": "remove"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*abyssplayer.com*",
       "resourceTypes": [
         "main_frame",
         "sub_frame",

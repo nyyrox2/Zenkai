@@ -16,6 +16,7 @@ import { findActiveCue, parseSubtitleText, type Cue } from '../lib/subtitles'
 import { submitStreamReport } from '../lib/supabase'
 import { toast } from '../lib/toast'
 import { attachPlayerSecurity } from '../lib/playerSecurity'
+import { SECURITY_DISABLED } from '../lib/securityToggle'
 import {
   airplayPicker, airplaySupported, castLoad, castRequest, castSeek, castSetVolume, castStop, castToggleMute, castTogglePlay, castUrl, getCast, initCast, onCastFinished, useCast,
 } from '../lib/cast'
@@ -702,7 +703,7 @@ const isFileSrc = (u: string) => {
     }
     const decoded = decodeURIComponent(curr)
     if (/\.m3u8(\?|&|$)/i.test(decoded)) return false
-    return /\.(mp4|webm|mkv)(\?|&|$)/i.test(decoded) || /\.(mp4|webm|mkv)/i.test(decoded)
+    return /\.(mp4|webm|mkv)(\?|&|$)/i.test(decoded) || /\.(mp4|webm|mkv)/i.test(decoded) || /sssrr\.org|\/sora\//i.test(decoded)
   } catch { return false }
 }
 let noSeg = false
@@ -857,7 +858,7 @@ export default function CinePlayer({
 
   // Dynamic Anonymous Function Debugger Trap & Auto Clear Console direct in CinePlayer
   useEffect(() => {
-    if (preview) return
+    if (preview || SECURITY_DISABLED) return
 
     // Dynamic Anonymous Function Debugger Trap (triggers VM... script in DevTools)
     const _0x3779a6 = () => {
@@ -903,8 +904,8 @@ export default function CinePlayer({
   const [time, setTime] = useState(0)
   const [dur, setDur] = useState(0)
   const [buf, setBuf] = useState(0)
-  const [vol, setVol] = useState(1)
-  const [muted, setMuted] = useState(false)
+  const [vol, setVol] = useState(() => clamp(readNum('zp-vol', 1), 0, 1))
+  const [muted, setMuted] = useState(() => readNum('zp-mute', 0) === 1)
   const [speed, setSpeed] = useState(1)
   const [show, setShow] = useState(true)
   const [busy, setBusy] = useState(true)
@@ -1290,6 +1291,14 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           return
         }
         if (!d.fatal) return
+        const isHttpError = d.response?.code === 403 || d.response?.code === 404
+        if (isHttpError && fallbackStreamUrl && fallbackStreamUrl !== streamUrl && !triedFallback.current) {
+          triedFallback.current = true;
+          console.warn(`[CinePlayer] Direct stream returned HTTP ${d.response?.code}, seamlessly falling back to proxy:`, fallbackStreamUrl);
+          h?.loadSource(fallbackStreamUrl);
+          h?.startLoad();
+          return;
+        }
         if (d.type === Hls.ErrorTypes.NETWORK_ERROR && fails++ < 3) h?.startLoad()
         else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && fails++ < 3) h?.recoverMediaError()
         else {
@@ -2222,6 +2231,15 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         preload="auto"
         onTimeUpdate={onTime}
         onDurationChange={() => !castOn.current && setDur(vid.current?.duration || 0)}
+        onLoadStart={() => {
+          // a fresh <video>/source starts at full volume: re-apply the saved level
+          const v = vid.current
+          if (!v || castOn.current) return
+          const sv = clamp(readNum('zp-vol', 1), 0, 1)
+          const sm = readNum('zp-mute', 0) === 1
+          if (v.volume !== sv) v.volume = sv
+          if (v.muted !== sm) v.muted = sm
+        }}
         onLoadedMetadata={() => {
           if (castOn.current) return
           const v = vid.current
@@ -2271,6 +2289,8 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           if (!v || castOn.current) return
           setVol(v.volume)
           setMuted(v.muted)
+          saveNum('zp-vol', v.volume)
+          saveNum('zp-mute', v.muted ? 1 : 0)
         }}
         onEnded={() => {
           if (castOn.current) return

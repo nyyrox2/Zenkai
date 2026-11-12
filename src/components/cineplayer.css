@@ -13,7 +13,7 @@
 .zp-ui{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:space-between;padding:var(--st) var(--sr) 0 var(--sl)}
 .zp-sc{position:absolute;inset:0;z-index:-1;opacity:0;transition:opacity .35s;background:linear-gradient(rgba(0,0,0,.8),transparent 36%),linear-gradient(to top,rgba(0,0,0,.88),transparent 48%)}
 .show .zp-sc{opacity:1}
-.show .zp-ui button,.show .zp-seek,.show .zp-vol{pointer-events:auto}
+.show .zp-ui button,.show .zp-seek,.show .zp-vol,.show .zp-vg{pointer-events:auto}
 .zp-top,.zp-bot,.zp-mid{opacity:0;transition:opacity .3s,transform .4s cubic-bezier(.2,.8,.2,1),scale .4s cubic-bezier(.2,.8,.2,1)}
 .show .zp-top,.show .zp-bot,.show .zp-mid{opacity:1}
 

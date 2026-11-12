@@ -6,7 +6,6 @@ import { ChevronLeft, ChevronRight, Loader2, Lock, TriangleAlert, Download, Zap 
 import { ErrorState } from '../components/ErrorState'
 import { ServerPopup } from '../components/ServerPopup'
 import { EpisodeList } from '../components/EpisodeList'
-import { SupportCard } from '../components/SupportAds'
 import { InstallHelp } from '../components/InstallHelp'
 import { Skeleton } from '../components/Skeleton'
 import { Tabs } from '../components/Tabs'
@@ -446,7 +445,6 @@ export default function MovieWatchPage() {
       </section>
 
       <div className="mt-5 px-3 sm:px-6 lg:px-0">
-        <SupportCard />
       </div>
 
       {/* Multi audio + embeds */}
