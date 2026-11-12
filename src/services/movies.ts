@@ -435,7 +435,7 @@ export async function fetchMovieBoxStream(p: {
     ...data,
     proxyStreamUrl: resolveProxyStreamUrl(data.streamUrl, data.rawStreamUrl),
     streamUrl: resolveStreamUrl(data.streamUrl, data.rawStreamUrl),
-    downloadUrl: data.downloadUrl ? resolveStreamUrl(data.downloadUrl, data.rawStreamUrl) : undefined,
+    downloadUrl: data.downloadUrl ? resolveProxyStreamUrl(data.downloadUrl, data.rawStreamUrl) : undefined,
     streams: (data.streams || []).map((s: MovieStream) => {
       const direct = s.url || s.rawStreamUrl || ''
       const proxied = resolveProxyStreamUrl(s.streamUrl, s.url)
@@ -444,7 +444,7 @@ export async function fetchMovieBoxStream(p: {
         rawStreamUrl: direct,
         proxyStreamUrl: proxied,
         streamUrl: resolveStreamUrl(s.streamUrl, s.url),
-        downloadUrl: s.downloadUrl ? resolveStreamUrl(s.downloadUrl, s.url) : undefined,
+        downloadUrl: s.downloadUrl ? resolveProxyStreamUrl(s.downloadUrl, s.url) : undefined,
       }
     }),
     subtitles: (data.subtitles || []).map((s: { id: string; label: string; language: string; lang: string; url: string; source: string }) => ({

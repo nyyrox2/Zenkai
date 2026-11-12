@@ -119,9 +119,8 @@ export default function MovieWatchPage() {
     ? (activeStream?.rawStreamUrl || activeStream?.url || activeStream?.streamUrl || '')
     : (activeStream?.proxyStreamUrl || activeStream?.streamUrl || mbStream.data?.streamUrl || '')
   const fallbackStreamUrl = activeStream?.proxyStreamUrl || mbStream.data?.proxyStreamUrl || ''
-  const activeDownloadUrl = companion.installed
-    ? (activeStream?.rawStreamUrl || activeStream?.downloadUrl || activeStream?.url || '')
-    : (activeStream?.downloadUrl || mbStream.data?.downloadUrl || '')
+  // always the proxied attachment link (dl=1); raw CDN urls just play in the browser instead of downloading
+  const activeDownloadUrl = activeStream?.downloadUrl || mbStream.data?.downloadUrl || ''
 
   // Standard embed iframe stream resolution (Videasy, Vidzee, etc.)
   const src = useAsync(
@@ -195,8 +194,8 @@ export default function MovieWatchPage() {
   const title = details.data?.title ?? 'Loading…'
   const expand = (p: (typeof list)[number]) =>
     p.id === 'moviebox' && dubs.length > 1
-      ? dubs.map((d) => ({ id: DUB + d.id, name: `${p.label} · ${d.label}`, label: p.tags.join(' · '), note: p.tags.join(' · '), tags: p.tags }))
-      : [{ id: p.id, name: p.label, label: p.tags.join(' · '), note: p.tags.join(' · '), tags: p.tags }]
+      ? dubs.map((d) => ({ id: DUB + d.id, name: `${p.label} · ${d.label}`, label: '', note: '', tags: [] as string[] }))
+      : [{ id: p.id, name: p.label, label: '', note: '', tags: [] as string[] }]
   const serverValue = providerId === 'moviebox' && dubs.length > 1 && curDub ? DUB + curDub : providerId ?? ''
   const direct = list.filter((p) => p.tags.includes('Direct'))
   const groups = [
@@ -256,7 +255,7 @@ export default function MovieWatchPage() {
                   url: companion.installed ? (s.rawStreamUrl || s.url || s.streamUrl) : (s.proxyStreamUrl || s.streamUrl),
                   size: s.size,
                   sizeLabel: s.sizeLabel,
-                  downloadUrl: companion.installed ? (s.rawStreamUrl || s.downloadUrl || s.url) : s.downloadUrl,
+                  downloadUrl: s.downloadUrl,
                 }))}
                 currentQuality={activeStream?.quality || mbStream.data?.quality}
                 onQualityChange={(q: { label: string }) => setSelectedQuality(q.label)}

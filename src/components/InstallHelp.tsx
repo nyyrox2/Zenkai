@@ -16,8 +16,8 @@ export function InstallHelp() {
       <AnimatePresence>
         {open && (
           <>
-            <button type="button" aria-label="Close" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
-            <motion.div initial={{ opacity: 0, y: -6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.96 }} transition={{ duration: 0.15 }} className="absolute left-0 top-9 z-50 w-72 max-w-[calc(100vw-2.5rem)] rounded-2xl border border-border bg-background p-4 shadow-2xl">
+            <button type="button" aria-label="Close" className="fixed inset-0 z-40 cursor-default bg-black/50 sm:bg-transparent" onClick={() => setOpen(false)} />
+            <motion.div initial={{ opacity: 0, y: -6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.96 }} transition={{ duration: 0.15 }} className="fixed inset-x-4 top-[28%] z-50 mx-auto max-w-sm rounded-2xl border border-border bg-background p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-9 sm:mx-0 sm:w-72">
               <p className="text-sm font-bold">Install the extension</p>
               <ol className="mt-2.5 space-y-1.5">
                 {STEPS.map((s, i) => (
