@@ -16,7 +16,7 @@ Free, fast and beautifully simple. Responsive on phone, tablet and desktop, with
 [**Download the Android app**](https://github.com/Nyyrox/zenkai/releases/latest) ·
 [Releases](https://github.com/Nyyrox/zenkai/releases) ·
 [Report a bug](https://github.com/Nyyrox/zenkai/issues) ·
-[Discord](https://discord.gg/kHxHzZtH7) ·
+[Discord](https://discord.gg/ndKGCks6v) ·
 [Telegram](https://t.me/StreamverseOfc)
 
 <img src="docs/banner.jpg" alt="Zenkai: watch anime and movies, read manga and novels" width="720" />
@@ -213,7 +213,7 @@ Contributions are welcome.
 2. Run `npm run build` before you push. It type-checks, so it catches most mistakes.
 3. Open a pull request that says what changed and why.
 
-Found a bug or want a feature? [Open an issue](https://github.com/Nyyrox/zenkai/issues) or ask in the [Discord](https://discord.gg/kHxHzZtH7).
+Found a bug or want a feature? [Open an issue](https://github.com/Nyyrox/zenkai/issues) or ask in the [Discord](https://discord.gg/ndKGCks6v).
 
 ## 📜 License
 

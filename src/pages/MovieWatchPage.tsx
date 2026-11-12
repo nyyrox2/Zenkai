@@ -232,7 +232,7 @@ export default function MovieWatchPage() {
           </div>
         ) : isMovieBox ? (
           <>
-            {mbStream.data && (
+            {mbStream.data && (mbStream.data.streams?.length || 0) > 0 && (
               <CinePlayer
                 streamUrl={activeStreamUrl}
                 fallbackStreamUrl={fallbackStreamUrl}
@@ -288,11 +288,11 @@ export default function MovieWatchPage() {
                 </span>
               </div>
             )}
-            {mbStream.error && (
+            {(mbStream.error || (mbStream.data && (!mbStream.data.success || !mbStream.data.streams?.length))) && !mbStream.loading && (
               <div role="alert" className="absolute inset-0 grid place-items-center bg-black p-6 text-center text-white">
                 <div className="flex max-w-sm flex-col items-center gap-3">
                   <TriangleAlert className="size-7 text-amber-400" />
-                  <p className="text-sm text-white/80">{mbStream.error.message || 'MovieBox stream not available for this title.'}</p>
+                  <p className="text-sm text-white/80">{mbStream.error?.message || mbStream.data?.error || 'MovieBox stream not available for this title.'}</p>
                   {nextServer && nextServer.id !== providerId ? (
                     <button type="button" onClick={() => pick(nextServer.id)} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition active:scale-95">
                       Try {nextServer.label}

@@ -57,7 +57,7 @@ export default function ExtensionPage() {
             Zenkai Stream Companion
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-            Unlock authentic 4K and 1080p high-bitrate streaming with zero proxy latency. Stream directly from the original MovieBox, Hakunaymatata, and BCDNXW CDNs from your residential IP.
+            Unlock authentic 4K and 1080p high-bitrate streaming with zero proxy latency. Stream directly from original Anime (MegaPlay, FlixCloud, AnimeSalt) and Movies (MovieBox, Hakunaymatata, BCDNXW) CDNs from your residential IP.
           </p>
 
           {/* Live status banner */}

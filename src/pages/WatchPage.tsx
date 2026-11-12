@@ -49,6 +49,7 @@ import { useProfile } from '../lib/profile'
 import { submitStreamReport } from '../lib/supabase'
 import { fetchAnimeLite } from '../services/anilist'
 import { acdnMapped, fetchAnimeSalt, fetchStream, fetchEpisodeServers, type ServerAudioMap, tmdbImg } from '../services/api'
+import { useCompanion, LATEST_EXTENSION_VERSION } from '../lib/useCompanion'
 import { useAsync } from '../hooks/useAsync'
 import { useTmdb } from '../hooks/useTmdb'
 import { useEpisodes } from '../hooks/useEpisodes'
@@ -122,6 +123,7 @@ export default function WatchPage() {
   const [autoNext, setAutoNext] = useFlag('zk:autonext', true)
   const [autoSkip, setAutoSkip] = useFlag('zk:autoskip', false)
   const [skipFiller, setSkipFiller] = useFlag('zk:skipfiller', false)
+  const companion = useCompanion()
 
   // Watch Together State (WebRTC + Supabase Broadcast Signaling)
   const { user } = useAuth()
@@ -725,6 +727,7 @@ export default function WatchPage() {
                   hasDub={hasDub}
                   switching={stream.loading}
                   streamUrl={cur.d.streamUrl}
+                  fallbackStreamUrl={cur.d.fallbackStreamUrl}
                   intro={cur.d.intro}
                   outro={cur.d.outro}
                   title={title}
@@ -828,7 +831,39 @@ export default function WatchPage() {
                 <Skeleton className="h-9 w-72" />
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {companion.installed ? (
+                companion.isOutdated ? (
+                  <Link
+                    to="/extension"
+                    className="group inline-flex items-center gap-2 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300 backdrop-blur-sm transition-all hover:border-amber-500/40 hover:bg-amber-500/15 hover:text-amber-200"
+                    title={`Your extension is v${companion.version || '1.0.0'}. Click to update to v${LATEST_EXTENSION_VERSION}.`}
+                  >
+                    <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    <span>Update Extension</span>
+                    <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[10px] font-mono text-amber-200">v{LATEST_EXTENSION_VERSION}</span>
+                  </Link>
+                ) : (
+                  <Link
+                    to="/extension"
+                    className="group inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/70 backdrop-blur-sm transition-all hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                    title={`Zenkai Extension v${companion.version || LATEST_EXTENSION_VERSION} active.`}
+                  >
+                    <span className="size-1.5 rounded-full bg-emerald-400/90 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                    <span>Extension Active</span>
+                    {companion.version && (
+                      <span className="text-[10px] text-white/35 font-mono">v{companion.version}</span>
+                    )}
+                  </Link>
+                )
+              ) : (
+                <Link
+                  to="/extension"
+                  className="group inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/60 backdrop-blur-sm transition-all hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                >
+                  <span>Get Extension</span>
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => setWatchModalOpen(true)}

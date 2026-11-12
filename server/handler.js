@@ -313,6 +313,7 @@ async function proxy(request, url, proxyBase = "/proxy", env = null) {
     const text = await up.text();
     if (/^\s*</.test(text)) return new Response(text, { status: up.status, headers: out });
     const direct = url.searchParams.get("seg") === "1"; // segments straight from the CDN, only playlists/keys use the Worker
+    const audio = (url.searchParams.get("audio") || "").toLowerCase();
     const base = t.hostname.includes("enc-dec.app") && t.searchParams.get("url")
       ? new URL(t.searchParams.get("url"))
       : t;
@@ -321,14 +322,58 @@ async function proxy(request, url, proxyBase = "/proxy", env = null) {
         const abs = new URL(u, base);
         if (!abs.search && base.search && !u.includes("?")) abs.search = base.search;
         if (direct && keep && !/rundowncdn|flixcloud|vividcdn|fallencdn/.test(abs.hostname)) return abs.href;
-        return `${proxyBase}?url=${encodeURIComponent(abs.href)}&referer=${encodeURIComponent(referer)}${direct ? "&seg=1" : ""}`;
+        return `${proxyBase}?url=${encodeURIComponent(abs.href)}&referer=${encodeURIComponent(referer)}${direct ? "&seg=1" : ""}${audio ? `&audio=${encodeURIComponent(audio)}` : ""}`;
       } catch {
         return u;
       }
     };
     let variant = false;
-    const body = text
-      .split(/\r?\n/)
+    let lines = text.split(/\r?\n/);
+
+    // Filter audio tracks for downloads and playback when sub or dub is explicitly chosen
+    if (audio === "dub" || audio === "sub") {
+      const audioLines = lines.filter((l) => l.trim().startsWith("#EXT-X-MEDIA") && l.includes("TYPE=AUDIO"));
+      const hasEng = audioLines.some((l) => /language=["']?eng/i.test(l) || /name=["']?english/i.test(l) || /name=["']?dub/i.test(l));
+      const hasJpn = audioLines.some((l) => /language=["']?(jpn|ja)/i.test(l) || /name=["']?(native|japanese)/i.test(l));
+
+      if (audio === "dub" && hasEng) {
+        // User requested DUB: strip Japanese/Native audio renditions so downloaders and players only get the English track
+        lines = lines
+          .filter((l) => {
+            const s = l.trim();
+            if (s.startsWith("#EXT-X-MEDIA") && s.includes("TYPE=AUDIO")) {
+              return !(/language=["']?(jpn|ja)/i.test(s) || /name=["']?(native|japanese)/i.test(s));
+            }
+            return true;
+          })
+          .map((l) => {
+            const s = l.trim();
+            if (s.startsWith("#EXT-X-MEDIA") && s.includes("TYPE=AUDIO")) {
+              return l.replace(/DEFAULT=NO/i, "DEFAULT=YES");
+            }
+            return l;
+          });
+      } else if (audio === "sub" && hasJpn) {
+        // User requested SUB: strip English/dub audio renditions so downloaders and players only get the Native track
+        lines = lines
+          .filter((l) => {
+            const s = l.trim();
+            if (s.startsWith("#EXT-X-MEDIA") && s.includes("TYPE=AUDIO")) {
+              return !(/language=["']?eng/i.test(s) || /name=["']?english/i.test(s) || /name=["']?dub/i.test(s));
+            }
+            return true;
+          })
+          .map((l) => {
+            const s = l.trim();
+            if (s.startsWith("#EXT-X-MEDIA") && s.includes("TYPE=AUDIO")) {
+              return l.replace(/DEFAULT=NO/i, "DEFAULT=YES");
+            }
+            return l;
+          });
+      }
+    }
+
+    const body = lines
       .map((l) => {
         const s = l.trim();
         if (!s) return l;
@@ -601,13 +646,20 @@ export async function handle(request, env) {
   if (path === "/api/stream") {
     // Direct stream extraction is private. Only Zenkai Player embed is provided.
     const referer = request.headers.get("Referer") || "";
-    const isEmbedPlayer = referer.includes("/embed") || referer.includes("/watch") || request.headers.has("X-Zenkai-Embed");
+    let isLocal = false;
+    try {
+      const reqUrl = new URL(request.url);
+      isLocal = reqUrl.hostname === "localhost" || reqUrl.hostname === "127.0.0.1" || reqUrl.hostname.endsWith(".zenkai.cfd") || reqUrl.hostname === "zenkai.cfd";
+    } catch {}
+    const isEmbedPlayer = isLocal || referer.includes("/embed") || referer.includes("/watch") || referer.includes("localhost") || referer.includes("127.0.0.1") || referer.includes("zenkai.cfd") || request.headers.has("X-Zenkai-Embed");
     const secSite = request.headers.get("Sec-Fetch-Site");
     const originHdr = request.headers.get("Origin");
     if (!isEmbedPlayer) {
       if (originHdr) {
         try {
-          if (new URL(originHdr).host !== new URL(request.url).host) {
+          const originHost = new URL(originHdr).host;
+          const reqHost = new URL(request.url).host;
+          if (originHost !== reqHost && !originHost.includes("localhost") && !originHost.includes("127.0.0.1") && !originHost.includes("zenkai.cfd") && !originHost.includes("pages.dev")) {
             return json({ error: "Direct stream extraction is private. Please use the Zenkai Player embed at /embed." }, 403);
           }
         } catch {}
@@ -637,7 +689,9 @@ export async function handle(request, env) {
           server: "ACDN",
           audio: "multi",
           multiAudio: true,
-          streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}&seg=1`,
+          streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}&seg=1${audio ? '&audio=' + encodeURIComponent(audio) : ''}`,
+          rawStreamUrl: r.streamUrl,
+          referer: r.referer || "https://animesalt.cx/",
           subtitles: (r.subtitles || []).map((s) => ({
             ...s,
             file: s.file && !s.file.startsWith("/proxy") && !s.file.startsWith("http://localhost")
@@ -663,7 +717,9 @@ export async function handle(request, env) {
           success: true,
           server: "FlixCloud",
           audio: r.audio,
-          streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://flixcloud.cc/")}`,
+          streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://flixcloud.cc/")}&audio=${encodeURIComponent(audio)}`,
+          rawStreamUrl: r.streamUrl,
+          referer: r.referer || "https://flixcloud.cc/",
           subtitles: (r.subtitles || []).map((s) => ({
           ...s,
           file: s.file && !s.file.startsWith("/proxy") && !s.file.startsWith("http://localhost")
@@ -685,7 +741,9 @@ export async function handle(request, env) {
         success: true,
         server: r.server,
         audio: r.audio,
-        streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://megaplay.buzz/")}&seg=1`,
+        streamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://megaplay.buzz/")}&seg=1&audio=${encodeURIComponent(audio)}`,
+        rawStreamUrl: r.streamUrl,
+        referer: r.referer || "https://megaplay.buzz/",
         subtitles: (r.subtitles || []).map((s) => ({
         ...s,
         file: s.file && !s.file.startsWith("/proxy") && !s.file.startsWith("http://localhost")
@@ -813,7 +871,10 @@ export async function handle(request, env) {
             if (extResp.ok) {
               const extData = await extResp.json().catch(() => null);
               if (extData && extData.success === true && extData.streams?.length > 0) {
-                res = extData;
+                const validStreams = extData.streams.filter((s) => !/ailok\.pe/.test(s.url || s.streamUrl || ''));
+                if (validStreams.length > 0) {
+                  res = { ...extData, streams: validStreams };
+                }
               }
             }
           } catch (extErr) {

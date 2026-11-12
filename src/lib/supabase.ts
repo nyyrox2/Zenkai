@@ -1,13 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+export const DEFAULT_SUPABASE_URL = 'https://wcvazatblggnbnrguopj.supabase.co'
+export const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_xzKcoko5kNSxTC8r3y3vUw_7vBUv0_3'
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn('[Supabase] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set; community and reports are disabled.')
-}
+const envUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
-export const supabase = createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_ANON_KEY || 'placeholder')
+// Filter out literal 'placeholder' strings that may have been baked into environment
+export const SUPABASE_URL = (envUrl && !envUrl.includes('placeholder')) ? envUrl : DEFAULT_SUPABASE_URL
+export const SUPABASE_ANON_KEY = (envKey && !envKey.includes('placeholder')) ? envKey : DEFAULT_SUPABASE_ANON_KEY
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 export interface CommunityPost {
   id: string

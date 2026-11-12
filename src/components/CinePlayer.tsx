@@ -358,6 +358,8 @@ export interface CinePlayerProps {
   downloadUrl?: string
   fallbackStreamUrl?: string
   isTmdb?: boolean
+  /** called when the direct stream fails to load (e.g. dead URL, CORS, DNS error) */
+  onStreamError?: () => void
 }
 
 const PLAYER_TOUR: TourStep[] = [
@@ -797,7 +799,7 @@ export default function CinePlayer({
   episodesInfo, fallbackImg, defaultRuntime, kinds,
   onVideoRef, onPlayerAction, externalControl, onWatchTogetherClick, watchPartyActive, watchPartyPeersCount,
   isPartyGuest = false,
-  qualities, currentQuality, onQualityChange, downloadUrl, fallbackStreamUrl, isTmdb = false,
+  qualities, currentQuality, onQualityChange, downloadUrl, fallbackStreamUrl, isTmdb = false, onStreamError,
 }: CinePlayerProps) {
   const isMovie = format === 'MOVIE' || (totalEpisodes <= 1 && format !== 'TV')
   const cleanEpTitle = episodeTitle?.trim()
@@ -1291,9 +1293,17 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         if (d.type === Hls.ErrorTypes.NETWORK_ERROR && fails++ < 3) h?.startLoad()
         else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && fails++ < 3) h?.recoverMediaError()
         else {
+          if (fallbackStreamUrl && fallbackStreamUrl !== streamUrl && !triedFallback.current) {
+            triedFallback.current = true;
+            console.warn('[CinePlayer] HLS direct stream failed, seamlessly falling back to proxy:', fallbackStreamUrl);
+            h?.loadSource(fallbackStreamUrl);
+            h?.startLoad();
+            return;
+          }
           h?.destroy()
           setErr(true)
           setBusy(false)
+          onStreamError?.()
         }
       })
     } else if (isFileSrc(streamUrl) || v.canPlayType('application/vnd.apple.mpegurl')) {
@@ -1356,6 +1366,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       }
       setErr(true)
       setBusy(false)
+      onStreamError?.()
     }
 
     const onHalt = () => {
@@ -1593,6 +1604,21 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
         } catch {
           /* OpenSubtitles is optional */
         }
+      } else if (all.length === 0) {
+        try {
+          const q = new URLSearchParams({
+            id: String(animeId),
+            type: format === 'MOVIE' ? 'movie' : 'tv',
+            s: String(episode || 1),
+            e: String(episode || 1),
+            title: title || ''
+          })
+          const res = await fetch(apiUrl(`/api/movies/stream?${q}`))
+          if (res.ok) {
+            const data = (await res.json()) as { subtitles?: Track[] }
+            for (const s of data.subtitles ?? []) if (!all.some((c) => c.url === s.url)) all.push(s)
+          }
+        } catch {}
       }
       if (dead) return
       setTracks(all)

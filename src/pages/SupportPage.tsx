@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
-import { ArrowUpRight, Bug, Check, ChevronDown, Copy, Heart, Play, Server, Share2, Smartphone, Sparkles, Wifi } from 'lucide-react'
+import { ArrowUpRight, Bug, Check, Copy, Heart, Play, Server, Share2, ShieldCheck, Smartphone, Sparkles, Wallet, Wifi } from 'lucide-react'
 import { openAd } from '../lib/ads'
 import { toast } from '../lib/toast'
 import { cn } from '../lib/utils'
@@ -40,148 +40,292 @@ const ICONS: Record<string, React.ReactNode> = {
   ),
 }
 
-// BTC here is BTCB (BEP20): the address is an EVM address, so it only receives tokens on EVM chains.
 const COINS = [
   { id: 'btc', name: 'Bitcoin', ticker: 'BTCB', network: 'BNB Smart Chain (BEP20)', note: 'Send BTCB on BSC. Contract ends in ead9c. Native Bitcoin will not arrive.' },
   { id: 'eth', name: 'Ethereum', ticker: 'ETH', network: 'Ethereum (ERC20)', note: 'Send ETH on the Ethereum mainnet only.' },
   { id: 'usdt', name: 'Tether', ticker: 'USDT', network: 'BNB Smart Chain (BEP20)', note: 'Send USDT on BSC. Contract ends in 97955.' },
 ]
 
-const STEPS = ['Pick a coin and its network', 'Copy the address or scan the QR', 'Send. Every bit helps']
-const GOES = [
-  { icon: Server, t: 'Servers & bandwidth', d: 'Keeping streams fast and online' },
-  { icon: Wifi, t: 'Proxies & uptime', d: 'Fewer dead links, quicker fixes' },
-  { icon: Smartphone, t: 'Android app', d: 'Updates and new releases' },
-  { icon: Sparkles, t: 'New features', d: 'More of what you ask for' },
+const STEPS = [
+  { n: '01', t: 'Pick coin & network', d: 'Choose BTC, ETH, or USDT and double-check network' },
+  { n: '02', t: 'Copy address or QR', d: 'Scan the QR code with your wallet or copy the address' },
+  { n: '03', t: 'Send any amount', d: 'Every bit directly powers our servers and proxies' },
 ]
-const FREE: { icon: React.ReactNode; t: string; d: string; run?: () => void; href?: string }[] = [
-  { icon: <Share2 className="size-4" />, t: 'Share Zenkai', d: 'Send it to a friend', run: () => shareLink(window.location.origin, 'Zenkai') },
-  { icon: <DiscordIcon className="size-4" />, t: 'Join Discord', d: 'Hang out, give feedback', href: DISCORD_URL },
-  { icon: <TelegramIcon className="size-4" />, t: 'Join Telegram', d: 'Updates and announcements', href: TELEGRAM_URL },
-  { icon: <Bug className="size-4" />, t: 'Report a bug', d: 'Help us fix things faster', href: ISSUES_URL },
-]
-const fade = { initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-40px' }, transition: { duration: 0.45 } }
 
-function Row({ c, open, onToggle }: { c: (typeof COINS)[number]; open: boolean; onToggle: () => void }) {
-  const [done, setDone] = useState(false)
-  const copy = async () => {
+const GOES = [
+  { icon: Server, t: 'Servers & bandwidth', d: 'High-speed CDN nodes and master streams' },
+  { icon: Wifi, t: 'Proxies & uptime', d: 'Zero-proxy mirrors and instant stream unblocking' },
+  { icon: Smartphone, t: 'Android app updates', d: 'Continuous bug fixes, APK releases and features' },
+  { icon: Sparkles, t: 'New features', d: '4K MovieBox, manga readers, subtitles and sync' },
+]
+
+const FREE: { icon: React.ReactNode; t: string; d: string; run?: () => void; href?: string }[] = [
+  { icon: <Share2 className="size-4" />, t: 'Share Zenkai', d: 'Send it to a friend or group', run: () => shareLink(window.location.origin, 'Zenkai') },
+  { icon: <DiscordIcon className="size-4" />, t: 'Join Discord', d: 'Voice chats, community & support', href: DISCORD_URL },
+  { icon: <TelegramIcon className="size-4" />, t: 'Join Telegram', d: 'Instant updates & releases', href: TELEGRAM_URL },
+  { icon: <Bug className="size-4" />, t: 'Report a bug', d: 'Help us fix issues and broken links', href: ISSUES_URL },
+]
+
+const fade = { initial: { opacity: 0, y: 16 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-40px' }, transition: { duration: 0.4 } }
+
+export default function SupportPage() {
+  const [selectedCoin, setSelectedCoin] = useState<string>('btc')
+  const [copied, setCopied] = useState(false)
+
+  const activeCoin = COINS.find((c) => c.id === selectedCoin) || COINS[0]
+
+  const copyAddress = async () => {
     try {
       await navigator.clipboard.writeText(ADDRESS)
-      setDone(true)
-      toast(`${c.ticker} address copied`, 'success')
-      setTimeout(() => setDone(false), 1800)
+      setCopied(true)
+      toast(`${activeCoin.ticker} address copied`, 'success')
+      setTimeout(() => setCopied(false), 2000)
     } catch {
       toast('Copy failed. Select the address manually.', 'error')
     }
   }
-  return (
-    <li>
-      <button type="button" onClick={onToggle} aria-expanded={open} className="group flex w-full items-center gap-4 py-4 text-left">
-        <motion.svg viewBox="0 0 32 32" className="size-10 shrink-0" whileHover={{ rotate: 12, scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-          {ICONS[c.id]}
-        </motion.svg>
-        <span className="min-w-0 flex-1">
-          <span className="block font-display text-base font-bold leading-tight">{c.name}</span>
-          <span className="block truncate text-xs text-muted">{c.ticker} · {c.network}</span>
-        </span>
-        <ChevronDown className={cn('size-4 text-muted transition-transform duration-300', open && 'rotate-180')} />
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 30 }} className="overflow-hidden">
-            <div className="flex flex-col items-center gap-5 pb-6 pl-0 sm:flex-row sm:pl-14">
-              <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 18 }} className="shrink-0 rounded-xl bg-white p-2.5">
-                <QRCodeSVG value={ADDRESS} size={132} level="M" />
-              </motion.div>
-              <div className="min-w-0 flex-1 text-center sm:text-left">
-                <code className="block break-all font-mono text-[12px] leading-snug">{ADDRESS}</code>
-                <button type="button" onClick={copy} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-accent transition active:scale-95">
-                  {done ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {done ? 'Copied' : 'Copy address'}
-                </button>
-                <p className="mt-2 text-[11px] leading-snug text-muted">{c.note}</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </li>
-  )
-}
 
-export default function SupportPage() {
-  const [open, setOpen] = useState<string | null>('btc')
   return (
-    <main className="mx-auto w-full max-w-xl px-5 pb-28 pt-12 md:pb-16">
-      <motion.header initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <motion.span animate={{ scale: [1, 1.15, 1, 1.15, 1] }} transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 1.6 }} className="inline-block text-accent">
-          <Heart className="size-7 fill-current" />
+    <main className="relative mx-auto w-full max-w-6xl px-4 pb-28 pt-10 sm:px-6 lg:px-8 lg:pt-14">
+      {/* Ambient decorative glow */}
+      <div className="pointer-events-none absolute -top-12 left-1/2 h-72 w-96 -translate-x-1/2 rounded-full bg-accent/15 blur-3xl" />
+
+      {/* Hero Header */}
+      <motion.header initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="relative text-center">
+        <motion.span
+          animate={{ scale: [1, 1.15, 1, 1.15, 1] }}
+          transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 1.8 }}
+          className="inline-flex size-12 items-center justify-center rounded-2xl bg-accent/15 text-accent shadow-lg shadow-accent/20"
+        >
+          <Heart className="size-6 fill-current" />
         </motion.span>
-        <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">Fund Zenkai</h1>
-        <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">Zenkai is free. Donations pay for the servers and keep it that way.</p>
+        <h1 className="mt-4 font-display text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">
+          Fund Zenkai
+        </h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
+          Zenkai is 100% free with zero paywalls. Donations pay directly for high-speed servers, proxies, and ongoing development.
+        </p>
       </motion.header>
 
-      <motion.ul initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="mt-8 divide-y divide-border border-y border-border">
-        {COINS.map((c) => (
-          <Row key={c.id} c={c} open={open === c.id} onToggle={() => setOpen(open === c.id ? null : c.id)} />
-        ))}
-      </motion.ul>
-      <p className="mt-3 text-[11px] text-muted">Double-check the network before sending. Crypto transfers can't be reversed.</p>
-
-      <motion.ol {...fade} className="mt-10 grid gap-4 sm:grid-cols-3">
-        {STEPS.map((t, i) => (
-          <li key={t} className="flex items-start gap-3 sm:block">
-            <span className="font-display text-2xl font-extrabold leading-none text-accent">0{i + 1}</span>
-            <span className="block text-sm text-muted sm:mt-2">{t}</span>
-          </li>
-        ))}
-      </motion.ol>
-
-      <motion.section {...fade} className="mt-14">
-        <h2 className="font-display text-lg font-extrabold tracking-tight">Where it goes</h2>
-        <ul className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2">
-          {GOES.map(({ icon: Icon, t, d }) => (
-            <li key={t} className="flex items-start gap-3">
-              <Icon className="mt-0.5 size-4 shrink-0 text-accent" />
-              <span>
-                <span className="block text-sm font-semibold">{t}</span>
-                <span className="block text-xs text-muted">{d}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </motion.section>
-
-      <motion.section {...fade} className="mt-14">
-        <h2 className="font-display text-lg font-extrabold tracking-tight">No funds? No worries.</h2>
-        <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">Watch a short ad. It opens in a new tab and helps just as much.</p>
-        <ShimmerButton className="mt-4" icon={<Play className="size-4 fill-current" />} onClick={() => (openAd(), toast('Thank you for supporting Zenkai ❤', 'success'))}>
-          Watch ad
-        </ShimmerButton>
-        <ul className="mt-8 divide-y divide-border border-y border-border">
-          {FREE.map((f) => {
-            const body = (
-              <>
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-foreground/[0.06]">{f.icon}</span>
-                <span className="min-w-0 flex-1 text-left">
-                  <span className="block text-sm font-semibold">{f.t}</span>
-                  <span className="block text-xs text-muted">{f.d}</span>
+      {/* Main 2-Column Desktop Layout */}
+      <div className="mt-10 grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-10">
+        
+        {/* Left Column: Crypto Donation Card & Steps (7 Cols on desktop) */}
+        <div className="space-y-6 lg:col-span-7">
+          
+          {/* Interactive Crypto Card */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.45 }} className="rounded-3xl border border-border/80 bg-card/70 p-5 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-7">
+            <div className="flex items-center justify-between border-b border-border/60 pb-5">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-9 place-items-center rounded-xl bg-accent/15 text-accent">
+                  <Wallet className="size-5" />
                 </span>
-                <ArrowUpRight className="size-4 text-muted transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-              </>
-            )
-            const cls = 'group flex w-full items-center gap-3 py-3.5 transition active:scale-[0.99]'
-            return (
-              <li key={f.t}>
-                {f.href ? <a href={f.href} target="_blank" rel="noreferrer noopener" className={cls}>{body}</a> : <button type="button" onClick={f.run} className={cls}>{body}</button>}
-              </li>
-            )
-          })}
-        </ul>
-      </motion.section>
+                <div>
+                  <h2 className="font-display text-base font-bold sm:text-lg">Crypto Transfer</h2>
+                  <p className="text-xs text-muted">Instant & secure EVM address</p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
+                <ShieldCheck className="size-3.5" /> Direct to Wallets
+              </span>
+            </div>
 
-      <motion.p {...fade} className="mt-14 text-center text-sm text-muted">
-        Thank you for being here. <Heart className="inline size-3.5 fill-accent text-accent" />
-      </motion.p>
+            {/* Coin Picker Tabs */}
+            <div className="mt-6 grid grid-cols-3 gap-2.5">
+              {COINS.map((c) => {
+                const isSelected = c.id === selectedCoin
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedCoin(c.id)}
+                    className={cn(
+                      'group relative flex flex-col items-center gap-2 rounded-2xl border p-3.5 text-center transition-all sm:flex-row sm:items-center sm:text-left',
+                      isSelected
+                        ? 'border-accent bg-accent/10 shadow-md shadow-accent/10 ring-1 ring-accent/30'
+                        : 'border-border/60 bg-white/[0.02] hover:border-border hover:bg-white/[0.04]'
+                    )}
+                  >
+                    <div className="size-8 shrink-0 transition-transform group-hover:scale-105">
+                      <svg viewBox="0 0 32 32" className="size-full">
+                        {ICONS[c.id]}
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-bold leading-tight sm:text-sm text-foreground">
+                        {c.name}
+                      </span>
+                      <span className="block text-[11px] font-semibold text-muted">
+                        {c.ticker}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Active Coin QR & Address View */}
+            <div className="mt-6 rounded-2xl border border-border/60 bg-black/30 p-5 sm:p-6">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeCoin.id}
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col items-center gap-6 sm:flex-row sm:items-start"
+                >
+                  {/* QR Code Container */}
+                  <div className="relative shrink-0 rounded-2xl bg-white p-3 shadow-xl">
+                    <QRCodeSVG value={ADDRESS} size={138} level="M" />
+                  </div>
+
+                  {/* Coin Info & Copy */}
+                  <div className="min-w-0 flex-1 text-center sm:text-left">
+                    <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                      <span className="font-display text-base font-bold text-foreground">
+                        {activeCoin.name} ({activeCoin.ticker})
+                      </span>
+                      <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-[11px] font-semibold text-accent">
+                        {activeCoin.network}
+                      </span>
+                    </div>
+
+                    <p className="mt-2 text-xs leading-relaxed text-muted">
+                      {activeCoin.note}
+                    </p>
+
+                    {/* Address Field */}
+                    <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-border bg-black/50 p-2 sm:p-2.5">
+                      <code className="min-w-0 flex-1 select-all break-all font-mono text-[11px] leading-snug sm:text-xs text-foreground/90">
+                        {ADDRESS}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={copyAddress}
+                        className={cn(
+                          'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition active:scale-95',
+                          copied
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-accent text-accent-fg hover:bg-accent/90 shadow-md shadow-accent/20'
+                        )}
+                      >
+                        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                        <span>{copied ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+
+                    <p className="mt-2 text-[11px] text-amber-400/80">
+                      ⚠ Double-check the network before sending. Crypto transfers cannot be reversed.
+                    </p>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </motion.div>
+
+          {/* 3 Step Instruction Guide */}
+          <motion.div {...fade} className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+            {STEPS.map((s) => (
+              <div key={s.n} className="rounded-2xl border border-border/60 bg-card/40 p-4 backdrop-blur">
+                <span className="font-display text-2xl font-black text-accent">{s.n}</span>
+                <h3 className="mt-2 text-sm font-bold text-foreground">{s.t}</h3>
+                <p className="mt-1 text-xs text-muted leading-relaxed">{s.d}</p>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+
+        {/* Right Column: Where It Goes & Free Ways to Help (5 Cols on desktop) */}
+        <div className="space-y-6 lg:col-span-5">
+          
+          {/* Where It Goes Card */}
+          <motion.section {...fade} className="rounded-3xl border border-border/80 bg-card/70 p-6 shadow-xl shadow-black/30 backdrop-blur-xl">
+            <h2 className="font-display text-base font-extrabold tracking-tight sm:text-lg">
+              Where Your Support Goes
+            </h2>
+            <p className="mt-1 text-xs text-muted">
+              Everything donated directly covers infrastructure and maintenance:
+            </p>
+
+            <ul className="mt-5 space-y-3.5">
+              {GOES.map(({ icon: Icon, t, d }) => (
+                <li key={t} className="flex items-start gap-3 rounded-xl border border-border/40 bg-white/[0.02] p-3 transition hover:border-border">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent/10 text-accent">
+                    <Icon className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-bold sm:text-sm text-foreground">{t}</span>
+                    <span className="block text-[11px] text-muted sm:text-xs leading-snug">{d}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </motion.section>
+
+          {/* Free Ways to Support Card */}
+          <motion.section {...fade} className="rounded-3xl border border-border/80 bg-card/70 p-6 shadow-xl shadow-black/30 backdrop-blur-xl">
+            <h2 className="font-display text-base font-extrabold tracking-tight sm:text-lg">
+              No Funds? Support for $0
+            </h2>
+            <p className="mt-1 text-xs text-muted">
+              Watching a short ad opens in a new tab and generates revenue that keeps Zenkai servers online.
+            </p>
+
+            <ShimmerButton
+              className="mt-4 w-full justify-center py-2.5 text-sm"
+              icon={<Play className="size-4 fill-current" />}
+              onClick={() => {
+                openAd()
+                toast('Thank you for supporting Zenkai ❤', 'success')
+              }}
+            >
+              Watch a Short Ad
+            </ShimmerButton>
+
+            <div className="mt-6 border-t border-border/60 pt-4">
+              <span className="block text-xs font-bold uppercase tracking-wider text-muted">
+                Join our communities & share
+              </span>
+              <ul className="mt-3 divide-y divide-border/40">
+                {FREE.map((f) => {
+                  const body = (
+                    <>
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-foreground/[0.06] text-foreground">
+                        {f.icon}
+                      </span>
+                      <span className="min-w-0 flex-1 text-left">
+                        <span className="block text-xs font-bold sm:text-sm text-foreground">{f.t}</span>
+                        <span className="block text-[11px] text-muted">{f.d}</span>
+                      </span>
+                      <ArrowUpRight className="size-4 text-muted transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    </>
+                  )
+                  const cls = 'group flex w-full items-center gap-3 py-2.5 transition active:scale-[0.99] hover:bg-white/[0.03] rounded-xl px-2'
+                  return (
+                    <li key={f.t}>
+                      {f.href ? (
+                        <a href={f.href} target="_blank" rel="noreferrer noopener" className={cls}>
+                          {body}
+                        </a>
+                      ) : (
+                        <button type="button" onClick={f.run} className={cls}>
+                          {body}
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </motion.section>
+
+          {/* Footer note */}
+          <motion.p {...fade} className="text-center text-xs text-muted">
+            Thank you for being part of Zenkai. <Heart className="inline size-3.5 fill-accent text-accent" />
+          </motion.p>
+        </div>
+      </div>
     </main>
   )
 }

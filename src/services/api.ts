@@ -1,4 +1,5 @@
 import { tmdbDirect, tmdbEpisodesDirect } from './tmdbDirect'
+import { isCompanionActive } from '../lib/useCompanion'
 
 /** Client for the Zenkai API (Cloudflare Pages Functions in production, Vite middleware in dev). */
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? ''
@@ -19,8 +20,8 @@ async function getJson<T>(path: string, timeout = 20000): Promise<T> {
   const ctl = new AbortController()
   const t = window.setTimeout(() => ctl.abort(), timeout)
   try {
-    const isEmbed = typeof window !== 'undefined' && (window.self !== window.top || window.location.pathname.startsWith('/embed'))
-    const headers: Record<string, string> = isEmbed ? { 'X-Zenkai-Embed': '1' } : {}
+    const isZenkaiPlayer = typeof window !== 'undefined' && (window.self !== window.top || window.location.pathname.startsWith('/embed') || window.location.pathname.startsWith('/watch'))
+    const headers: Record<string, string> = isZenkaiPlayer ? { 'X-Zenkai-Embed': '1' } : {}
     const res = await fetch(apiUrl(path), { signal: ctl.signal, headers })
     const data = await res.json().catch(() => null)
     if (!res.ok) throw new Error(failMsg(res, data as { error?: string } | null))
@@ -173,6 +174,9 @@ export interface StreamResult {
   /** one stream with several audio tracks (ACDN) */
   multiAudio?: boolean
   streamUrl: string
+  rawStreamUrl?: string
+  fallbackStreamUrl?: string
+  referer?: string
   subtitles: { file: string; label: string; default?: boolean }[]
   intro: { start: number; end: number } | null
   outro: { start: number; end: number } | null
@@ -181,10 +185,35 @@ export interface StreamResult {
 export async function fetchStream(p: { id: number; ep: number; server: string; audio: string; title: string; format?: string | null }): Promise<StreamResult> {
   const q = new URLSearchParams({ id: String(p.id), ep: String(p.ep), server: p.server, audio: p.audio, title: p.title })
   if (p.format) q.set('format', p.format)
-  const r = await getJson<StreamResult & { success: boolean }>(`/api/stream?${q}`, 40000)
+  const r = await getJson<StreamResult & { success: boolean; rawStreamUrl?: string; referer?: string }>(`/api/stream?${q}`, 40000)
+
+  const proxyUrl = apiUrl(r.streamUrl)
+  const hasCompanion = isCompanionActive()
+  let activeUrl = proxyUrl
+
+  // FlixCloud manifests rely on enc-dec parser and require server-side key rewriting (resolving relative key.bin).
+  // With the companion active, FlixCloud segments are still fetched directly from rundowncdn with zero proxy overhead!
+  const isFlixCloud = r.server?.toLowerCase().includes('flixcloud') || r.rawStreamUrl?.includes('parse-flixcloud')
+
+  // If Zenkai Companion extension is active, stream DIRECTLY from original CDN with zero proxy overhead!
+  if (hasCompanion && !isFlixCloud) {
+    let directUrl = r.rawStreamUrl
+    if (!directUrl && r.streamUrl && r.streamUrl.includes('url=')) {
+      try {
+        const u = new URL(r.streamUrl, typeof window !== 'undefined' ? window.location.href : 'http://localhost')
+        directUrl = u.searchParams.get('url') || undefined
+      } catch {}
+    }
+    if (directUrl && (directUrl.startsWith('http://') || directUrl.startsWith('https://'))) {
+      activeUrl = directUrl
+    }
+  }
+
   return {
     ...r,
-    streamUrl: apiUrl(r.streamUrl),
+    streamUrl: activeUrl,
+    fallbackStreamUrl: proxyUrl,
+    rawStreamUrl: r.rawStreamUrl,
     subtitles: (r.subtitles || []).map((s) => ({
       ...s,
       file: apiUrl(s.file),

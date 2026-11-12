@@ -14,6 +14,7 @@ import { PageLoader } from './components/PageLoader'
 import { ShieldGate } from './components/ShieldGate'
 import { AdPopup } from './components/AdPopup'
 import { ApiIntro } from './components/ApiIntro'
+import { WelcomeNotes } from './components/WelcomeNotes'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { Toaster } from './components/Toaster'
 import { MovieSearchModal } from './components/MovieSearchModal'
@@ -228,6 +229,7 @@ export default function App() {
       <AdPopup enabled={!bare && !isApi} />
       <ChangelogModal />
       <ChooseUsernameModal />
+      <WelcomeNotes enabled={!isApi && !isEmbed && !reader && !isWatchPath(pathname) && !isCall && !isMessages && pathname !== '/busted'} />
       {!isApi && !isEmbed && !reader && !isWatchPath(pathname) && pathname !== '/busted' && <ApiIntro />}
     </div>
   )

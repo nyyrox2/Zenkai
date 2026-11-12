@@ -4,7 +4,7 @@
 (function () {
   const meta = {
     installed: true,
-    version: '1.0.1',
+    version: '1.0.8',
     name: 'Zenkai Stream Companion',
     active: true,
     capabilities: [
@@ -12,6 +12,10 @@
       'header-rewrite',
       'bcdnxw-direct',
       'hakunaymatata-direct',
+      'anime-direct',
+      'megaplay-direct',
+      'flixcloud-direct',
+      'animesalt-direct',
       'cors-bypass',
       'p2p-residential'
     ]

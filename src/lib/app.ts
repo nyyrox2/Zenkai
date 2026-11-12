@@ -13,7 +13,7 @@ export const WEB_REPO_CLONE = `${WEB_REPO_URL}.git`
 /** Page with the self-hosting guide. */
 export const SELF_HOST_PATH = '/self-host'
 /** Invite links as published in the app's GitHub README. */
-export const DISCORD_URL = 'https://discord.gg/kHxHzZtH7'
+export const DISCORD_URL = 'https://discord.gg/ndKGCks6v'
 export const TELEGRAM_URL = 'https://t.me/StreamverseOfc'
 
 export function formatBytes(n: number): string {

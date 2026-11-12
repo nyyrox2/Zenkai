@@ -47,6 +47,12 @@
         "media",
         "xmlhttprequest",
         "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
       ]
     }
   },
@@ -58,11 +64,13 @@
       "requestHeaders": [
         {
           "header": "Referer",
-          "operation": "remove"
+          "operation": "set",
+          "value": "https://123moviesfree.club/"
         },
         {
           "header": "Origin",
-          "operation": "remove"
+          "operation": "set",
+          "value": "https://123moviesfree.club"
         }
       ],
       "responseHeaders": [
@@ -89,13 +97,19 @@
       ]
     },
     "condition": {
-      "urlFilter": "*hakunaymatata.com*",
+      "urlFilter": "*bcdnxw.hakunaymatata.com*",
       "resourceTypes": [
         "main_frame",
         "sub_frame",
         "media",
         "xmlhttprequest",
         "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
       ]
     }
   },
@@ -106,9 +120,17 @@
       "type": "modifyHeaders",
       "requestHeaders": [
         {
-          "header": "Referer",
+          "header": "User-Agent",
           "operation": "set",
-          "value": "https://123moviesfree.club/"
+          "value": "ExoPlayerLib/2.19.1"
+        },
+        {
+          "header": "Referer",
+          "operation": "remove"
+        },
+        {
+          "header": "Origin",
+          "operation": "remove"
         }
       ],
       "responseHeaders": [
@@ -142,6 +164,12 @@
         "media",
         "xmlhttprequest",
         "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
       ]
     }
   },
@@ -183,6 +211,12 @@
         "media",
         "xmlhttprequest",
         "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
       ]
     }
   },
@@ -217,6 +251,12 @@
         "media",
         "xmlhttprequest",
         "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
       ]
     }
   },
@@ -245,6 +285,1652 @@
     },
     "condition": {
       "urlFilter": "*123moviesfree.club*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 7,
+    "priority": 2,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "User-Agent",
+          "operation": "set",
+          "value": "ExoPlayerLib/2.19.1"
+        },
+        {
+          "header": "Referer",
+          "operation": "remove"
+        },
+        {
+          "header": "Origin",
+          "operation": "remove"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*bcdn.hakunaymatata.com*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 8,
+    "priority": 2,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "megaplay.buzz",
+        "megap.buzz",
+        "nexabloom.top",
+        "nexabloom.space",
+        "stellarfrontier.top",
+        "stellarfrontier.space",
+        "phantomharbor.top",
+        "phantomharbor.space",
+        "shadowharbor.top",
+        "shadowharbor.space",
+        "hiddenvertex.top",
+        "hiddenvertex.space",
+        "emeralddrift.top",
+        "emeralddrift.space",
+        "eclipseharbor.top",
+        "eclipseharbor.space",
+        "shiora.top",
+        "shiora.space",
+        "akirax.top",
+        "akirax.space",
+        "imgnex.top",
+        "imgnex.space",
+        "megacloud.tv",
+        "rabbitstream.net",
+        "dokicloud.one"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 9,
+    "priority": 2,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://flixcloud.cc/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://flixcloud.cc"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "atomic4cdn.com",
+        "enc-dec.app",
+        "fallencdn.com",
+        "flixcloud.cc",
+        "rundowncdn.com",
+        "rundowncdn.top",
+        "vault-90.rundowncdn.top",
+        "vault-94.rundowncdn.top",
+        "vividcdn.com"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 10,
+    "priority": 2,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://animesalt.cx/"
+        },
+        {
+          "header": "Origin",
+          "operation": "remove"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "animesalt.cx",
+        "animesalt.ac",
+        "animesalt.ro",
+        "as-cdn.top",
+        "acdn.top",
+        "ravok.buzz"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 11,
+    "priority": 2,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://playeng.animeapps.top/"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "playeng.animeapps.top",
+        "animeapps.top",
+        "krussdomi.com",
+        "advancedairesearchlab.com"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 12,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*eclipseharbor*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 13,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*nexabloom*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 14,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*stellarfrontier*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 15,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*phantomharbor*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 16,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*shadowharbor*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 17,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*hiddenvertex*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 18,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*emeralddrift*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 19,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*shiora*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 20,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*akirax*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 21,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://megaplay.buzz/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://megaplay.buzz"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*imgnex*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 22,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://flixcloud.cc/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://flixcloud.cc"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*rundowncdn*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 23,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://flixcloud.cc/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://flixcloud.cc"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*atomic4cdn*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 24,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://flixcloud.cc/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://flixcloud.cc"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*vividcdn*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 25,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://flixcloud.cc/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://flixcloud.cc"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*fallencdn*",
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 26,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://flixcloud.cc/"
+        },
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://flixcloud.cc"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "flixcloud.cc"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 27,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Origin",
+          "operation": "remove"
+        },
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://ravok.buzz/"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*as-cdn*",
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 28,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://animesalt.cx/"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "ravok.buzz"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 29,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Origin",
+          "operation": "remove"
+        },
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://animesalt.cx/"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "acdn.top"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 30,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://opensubtitles.org/"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*strem.io*",
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 31,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://opensubtitles.org/"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*opensubtitles*",
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ],
       "resourceTypes": [
         "main_frame",
         "sub_frame",

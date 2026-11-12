@@ -302,6 +302,7 @@ export interface MovieStream {
 
 export interface MovieStreamResult {
   success: boolean
+  error?: string
   server: string
   title: string
   subjectId: string
@@ -319,6 +320,18 @@ export interface MovieStreamResult {
 }
 
 const MOVIEBOX_SERVICE_URL = ((import.meta.env.VITE_MOVIEBOX_PROXY_URL as string | undefined) || 'https://zenkai-movies-production.up.railway.app').replace(/\/+$/, '')
+
+// When the Zenkai extension is installed it injects window.__ZENKAI_COMPANION__.
+// We use that to send the correct Referer/Origin so the MovieBox CDN accepts direct requests.
+function getExtensionHeaders(): Record<string, string> {
+  if (typeof window !== 'undefined' && (window as any).__ZENKAI_COMPANION__) {
+    return {
+      Referer: 'https://123moviesfree.club/',
+      Origin: 'https://123moviesfree.club',
+    }
+  }
+  return {}
+}
 
 export async function fetchMovieBoxStream(p: {
   id: number
@@ -350,6 +363,7 @@ export async function fetchMovieBoxStream(p: {
     try {
       const res = await fetch(railwayUrl, {
         signal: AbortSignal.timeout(8000),
+        headers: getExtensionHeaders(),
       })
       if (res.ok) {
         const d = await res.json().catch(() => null)
@@ -370,8 +384,11 @@ export async function fetchMovieBoxStream(p: {
       if (res.ok) {
         const d = await res.json().catch(() => null)
         if (d && d.success === true && d.streams?.length > 0) {
-          data = d
-          resOk = true
+          const validStreams = d.streams.filter((s: MovieStream) => !/ailok\.pe/.test(s.url || s.streamUrl || ''))
+          if (validStreams.length > 0) {
+            data = { ...d, streams: validStreams }
+            resOk = true
+          }
         } else if (d?.embedServers?.length && !data) {
           data = d
         }
@@ -379,8 +396,52 @@ export async function fetchMovieBoxStream(p: {
     } catch {}
   }
 
-  if (!data?.success && !data?.embedServers?.length) {
+  if (!data?.success || !data?.streams?.length) {
     throw new Error(data?.error ?? 'MovieBox stream not available for this title')
+  }
+
+  // Ensure subtitles are populated even if primary midman did not return them
+  let rawSubs = data.subtitles || []
+  if (!rawSubs.length && (p.imdbId || p.id)) {
+    try {
+      let imdbId = p.imdbId
+      if (!imdbId && p.id) {
+        const ext = await get<{ imdb_id?: string }>(`movies/${p.type}/${p.id}/external_ids`).catch(() => null)
+        imdbId = ext?.imdb_id
+      }
+      if (imdbId) {
+        const osUrl = p.type === 'movie'
+          ? `https://opensubtitles-v3.strem.io/subtitles/movie/${imdbId}.json`
+          : `https://opensubtitles-v3.strem.io/subtitles/series/${imdbId}:${p.season ?? 1}:${p.episode ?? 1}.json`
+        const osResp = await fetch(osUrl, { signal: AbortSignal.timeout(5000) }).catch(() => null)
+        if (osResp?.ok) {
+          const osData = await osResp.json().catch(() => null)
+          const LANGS: Record<string, string> = {
+            eng: 'English', spa: 'Spanish', fre: 'French', fra: 'French', ger: 'German', deu: 'German',
+            ita: 'Italian', por: 'Portuguese', pob: 'Portuguese (BR)', ara: 'Arabic', rus: 'Russian',
+            hin: 'Hindi', jpn: 'Japanese', chi: 'Chinese', zho: 'Chinese', ind: 'Indonesian', tha: 'Thai',
+            vie: 'Vietnamese', kor: 'Korean', tur: 'Turkish', pol: 'Polish', dut: 'Dutch', nld: 'Dutch',
+            mal: 'Malayalam', ben: 'Bengali', tam: 'Tamil', tel: 'Telugu'
+          }
+          const count: Record<string, number> = {}
+          rawSubs = (osData?.subtitles || []).slice(0, 60).map((s: { id?: string; lang?: string; url: string }, idx: number) => {
+            const lKey = s.lang || 'eng'
+            const language = LANGS[lKey] || (lKey ? lKey[0].toUpperCase() + lKey.slice(1) : 'English')
+            count[language] = (count[language] || 0) + 1
+            return {
+              id: s.id || `os_${idx}`,
+              label: count[language] > 1 ? `${language} #${count[language]}` : language,
+              language,
+              lang: lKey,
+              url: s.url,
+              source: 'OpenSubtitles'
+            }
+          })
+        }
+      }
+    } catch (subErr) {
+      console.warn('[MovieBox] Client-side subtitles fallback failed:', subErr)
+    }
   }
 
   const hasCompanion = isCompanionActive()
@@ -447,7 +508,7 @@ export async function fetchMovieBoxStream(p: {
         downloadUrl: s.downloadUrl ? resolveProxyStreamUrl(s.downloadUrl, s.url) : undefined,
       }
     }),
-    subtitles: (data.subtitles || []).map((s: { id: string; label: string; language: string; lang: string; url: string; source: string }) => ({
+    subtitles: (rawSubs || []).map((s: { id: string; label: string; language: string; lang: string; url: string; source: string }) => ({
       ...s,
       url: resolveStreamUrl(s.url),
     })),
