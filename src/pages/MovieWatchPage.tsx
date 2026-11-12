@@ -2,7 +2,7 @@ import { toast } from '../lib/toast'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
-import { ChevronLeft, ChevronRight, Loader2, Lock, TriangleAlert, Zap } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Lock, TriangleAlert, Download, Zap } from 'lucide-react'
 import { ErrorState } from '../components/ErrorState'
 import { ServerPopup } from '../components/ServerPopup'
 import { EpisodeList } from '../components/EpisodeList'
@@ -428,6 +428,20 @@ export default function MovieWatchPage() {
               onPick={pickAny}
             />
           )
+        )}
+        {isMovieBox && activeDownloadUrl && (
+          <a
+            href={activeDownloadUrl}
+            download={activeStream?.downloadFileName || `${title}.mp4`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => toast(`Starting download${activeStream ? `: ${activeStream.quality}` : ''}`)}
+            className="ml-auto inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold transition hover:bg-foreground/[0.06] active:scale-95"
+          >
+            <Download className="size-4 text-accent" />
+            Download
+            {activeStream && <span className="text-xs text-muted">{activeStream.quality}{activeStream.sizeLabel ? ` · ${activeStream.sizeLabel}` : ''}</span>}
+          </a>
         )}
       </section>
 
