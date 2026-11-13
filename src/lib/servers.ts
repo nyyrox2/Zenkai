@@ -7,10 +7,28 @@ export interface EmbedCtx {
   isMovie: boolean
 }
 
+/** extension = needs the Zenkai extension, both = works with or without it, direct = plays directly, no extension needed */
+export type ServerAccess = 'extension' | 'both' | 'direct'
+
+export const ACCESS_TEXT: Record<ServerAccess, string> = {
+  extension: 'Extension required',
+  both: 'Extension + Normal both work',
+  direct: 'Direct',
+}
+
+/** badge colours, shared by the watch page and the player menu */
+export const ACCESS_CLASS: Record<ServerAccess, string> = {
+  extension: 'text-amber-300',
+  both: 'text-emerald-300',
+  direct: 'text-sky-300',
+}
+
 export interface ServerDef {
   id: string
   name: string
   note: string
+  /** how the server plays with respect to the Zenkai extension (shown under the server name) */
+  access?: ServerAccess
   /** direct = our HLS player, embed = iframe, animesalt = iframe resolved by the API (multi audio) */
   kind: 'direct' | 'embed' | 'animesalt'
   /** audio can be switched sub/dub for this server */
@@ -28,11 +46,11 @@ const tv = (c: EmbedCtx, movie: (id: number) => string, show: (id: number, s: nu
 }
 
 export const SERVERS: ServerDef[] = [
-  { id: 'megaplay', name: 'MegaPlay', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true },
-  { id: 'vidstream', name: 'Vidstream', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true },
-  { id: 'flixcloud', name: 'FlixCloud', note: 'Direct HLS · Sub / Dub', kind: 'direct', audio: true, multi: true },
-  { id: 'acdn', name: 'ACDN', note: 'Direct HLS · Multi audio', kind: 'direct', audio: false, multi: true },
-  { id: 'abyss', name: 'AbyssPlayer', note: 'Direct MP4 · Multi audio', kind: 'direct', audio: false, multi: true },
+  { id: 'megaplay', name: 'MegaPlay', note: 'Direct HLS · Sub / Dub', access: 'both', kind: 'direct', audio: true },
+  { id: 'vidstream', name: 'Vidstream', note: 'Direct HLS · Sub / Dub', access: 'both', kind: 'direct', audio: true },
+  { id: 'flixcloud', name: 'FlixCloud', note: 'Direct HLS · Sub / Dub', access: 'direct', kind: 'direct', audio: true, multi: true },
+  { id: 'acdn', name: 'ACDN', note: 'Direct HLS · Multi audio', access: 'extension', kind: 'direct', audio: false, multi: true },
+  { id: 'abyss', name: 'AbyssPlayer', note: 'Direct MP4 · Multi audio', access: 'extension', kind: 'direct', audio: false, multi: true },
   { id: 'animesalt-1', name: 'AnimeSalt 1', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '1' },
   { id: 'animesalt-2', name: 'AnimeSalt 2', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '2' },
   { id: 'megaplay-ani', name: 'MegaPlay Embed', note: 'Embed · AniList · Sub / Dub', kind: 'embed', audio: true, url: (c) => `https://megaplay.buzz/stream/ani/${c.anilistId}/${c.episode}/${c.audio}` },

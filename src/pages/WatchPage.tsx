@@ -55,7 +55,7 @@ import { useTmdb } from '../hooks/useTmdb'
 import { useEpisodes } from '../hooks/useEpisodes'
 import { useFiller } from '../hooks/useFiller'
 import { useFlag } from '../hooks/useFlag'
-import { SERVERS, DIRECT, serverById, type EmbedCtx } from '../lib/servers'
+import { SERVERS, DIRECT, ACCESS_TEXT, serverById, type EmbedCtx } from '../lib/servers'
 import { episodeCounts } from '../lib/episodes'
 import { lastEpisode, saveEpisode } from '../lib/progress'
 import { toast } from '../lib/toast'
@@ -589,6 +589,7 @@ export default function WatchPage() {
           id: s.id,
           name: s.name,
           note: tags.length ? tags.join(' · ') : s.note,
+          access: s.access,
           tags,
         }
       }),
@@ -665,7 +666,7 @@ export default function WatchPage() {
     return {
       id: s.id,
       name: s.name,
-      label: s.multi ? 'Zenkai player · Multi audio' : 'Zenkai player',
+      label: `${s.access ? ACCESS_TEXT[s.access] : 'Zenkai player'}${s.multi ? ' · Multi audio' : ''}`,
       tags,
     }
   })

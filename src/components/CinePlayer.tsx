@@ -21,6 +21,7 @@ import {
   airplayPicker, airplaySupported, castLoad, castRequest, castSeek, castSetVolume, castStop, castToggleMute, castTogglePlay, castUrl, getCast, initCast, onCastFinished, useCast,
 } from '../lib/cast'
 import { isCompanionActive } from '../lib/useCompanion'
+import { ACCESS_CLASS, ACCESS_TEXT, type ServerAccess } from '../lib/servers'
 import './cineplayer.css'
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -277,6 +278,8 @@ export interface PlayerServer {
   id: string
   name: string
   note: string
+  /** extension requirement shown under the server name */
+  access?: ServerAccess
   tags?: string[]
   disabled?: boolean
 }
@@ -2840,15 +2843,18 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                           closePop()
                         }}
                       >
-                        <span className="flex items-center gap-2">
-                          <span>{x.name}</span>
-                          {x.tags && x.tags.length > 0 && (
-                            <span className="flex items-center gap-1 text-[10px] text-white/50">
-                              {x.tags.map((t) => (
-                                <span key={t} className="rounded border border-white/15 px-1 text-[9px] font-bold uppercase leading-4 text-neutral-300">{t}</span>
-                              ))}
-                            </span>
-                          )}
+                        <span className="flex flex-col items-start gap-0.5">
+                          <span className="flex items-center gap-2">
+                            <span>{x.name}</span>
+                            {x.tags && x.tags.length > 0 && (
+                              <span className="flex items-center gap-1 text-[10px] text-white/50">
+                                {x.tags.map((t) => (
+                                  <span key={t} className="rounded border border-white/15 px-1 text-[9px] font-bold uppercase leading-4 text-neutral-300">{t}</span>
+                                ))}
+                              </span>
+                            )}
+                          </span>
+                          {x.access && <span className={cx('text-[10px] font-medium leading-none', ACCESS_CLASS[x.access])}>{ACCESS_TEXT[x.access]}</span>}
                         </span>
                         {x.id === serverId && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
                       </motion.button>

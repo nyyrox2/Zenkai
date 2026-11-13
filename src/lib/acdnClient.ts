@@ -32,6 +32,18 @@ const forFetch = (url: string) => {
   }
 }
 
+let lastTrace: string[] = []
+/** What went wrong in the last resolve (host + reason per failed step). Shown with ?debug=1 and logged to the console. */
+export const getResolveTrace = () => lastTrace.join(' | ')
+const short = (u: string) => {
+  try {
+    const x = new URL(u, 'http://local')
+    return (x.hostname === 'local' ? '' : x.hostname) + x.pathname.slice(0, 26)
+  } catch {
+    return u.slice(0, 40)
+  }
+}
+
 export interface ClientSub {
   file: string
   label: string
@@ -148,17 +160,30 @@ function createResolver(budgetMs: number) {
   const deadline = Date.now() + budgetMs
   const left = () => deadline - Date.now()
   const expired = () => left() <= 400
+  const trace: string[] = []
+  lastTrace = trace
+  const note = (m: string) => {
+    if (trace.length < 14 && !trace.includes(m)) trace.push(m)
+  }
 
   /** GET / POST text with a timeout; null on any failure. Never sends cookies (the extension sets what is needed). */
   async function fetchText(url: string, init: RequestInit = {}, ms = 14000): Promise<string | null> {
-    if (expired()) return null
+    if (expired()) {
+      note('time budget used up')
+      return null
+    }
     const ctl = new AbortController()
     const t = window.setTimeout(() => ctl.abort(), Math.max(1, Math.min(ms, left())))
     try {
       const r = await fetch(url, { redirect: 'follow', ...init, credentials: 'omit', signal: ctl.signal })
-      if (!r.ok) return null
+      if (!r.ok) {
+        note(`${short(url)} HTTP ${r.status}`)
+        return null
+      }
       return await r.text()
-    } catch {
+    } catch (e) {
+      // a CORS / blocked request shows up as a bare TypeError: usually the extension rules did not apply
+      note(`${short(url)} ${(e as Error)?.name === 'AbortError' ? 'timeout' : 'blocked (CORS / extension rules?)'}`)
       return null
     } finally {
       window.clearTimeout(t)
@@ -170,8 +195,45 @@ function createResolver(budgetMs: number) {
   }
 
   /* ----- AbyssPlayer ----- */
+  /** same scoring as server/acdn.js: 1080p h264 > 720p h264 > 1080p av1 > 720p av1 > 480p > 360p */
+  const bestSource = (sources: unknown): string | null => {
+    if (!Array.isArray(sources)) return null
+    let best: string | null = null
+    let top = -1
+    for (const s of sources as { status?: boolean; url?: string; type?: string; codec?: string }[]) {
+      if (!s || s.status === false || !s.url) continue
+      const type = String(s.type || '').toLowerCase()
+      const codec = String(s.codec || '').toLowerCase()
+      let score = type.includes('1080') ? 100 : type.includes('720') ? 70 : type.includes('480') ? 40 : 20
+      score += codec === 'h264' ? 30 : codec === 'av1' ? 10 : 0
+      if (score > top) {
+        top = score
+        best = s.url
+      }
+    }
+    return best
+  }
+
+  /** Plan B when the Zenkai API cannot decrypt: ask enc-dec.app from the browser (extension rule 41 sets the headers). */
+  async function decryptDirect(encrypted: string): Promise<string | null> {
+    const body = JSON.stringify({ text: encrypted })
+    // text/plain is a CORS "simple" request (no preflight); JSON needs the provider to answer OPTIONS
+    for (const ct of ['text/plain;charset=UTF-8', 'application/json']) {
+      const t = await fetchText('https://enc-dec.app/api/dec-abyss', { method: 'POST', headers: { 'Content-Type': ct }, body }, 14000)
+      if (!t) continue
+      try {
+        const u = bestSource(JSON.parse(t)?.result?.sources)
+        if (u) return u
+      } catch {
+        /* next content type */
+      }
+    }
+    return null
+  }
+
   async function decryptAbyss(encrypted: string): Promise<ClientStream | null> {
     if (expired()) return null
+    let url: string | null = null
     const ctl = new AbortController()
     const t = window.setTimeout(() => ctl.abort(), Math.max(1, Math.min(15000, left())))
     try {
@@ -181,19 +243,21 @@ function createResolver(budgetMs: number) {
         body: JSON.stringify({ text: encrypted }),
         signal: ctl.signal,
       })
-      if (!r.ok) return null
-      const j = (await r.json().catch(() => null)) as { url?: string } | null
-      // sssrr.org 302s to a trycloudflare.com tunnel: the <video> element follows that itself in the browser
-      return j?.url ? direct(j.url, 'https://abyssplayer.com/', 'file') : null
+      if (r.ok) url = ((await r.json().catch(() => null)) as { url?: string } | null)?.url ?? null
+      else note(`decrypt API HTTP ${r.status}`)
     } catch {
-      return null
+      note('decrypt API unreachable')
     } finally {
       window.clearTimeout(t)
     }
+    if (!url) url = await decryptDirect(encrypted)
+    // sssrr.org 302s to a trycloudflare.com tunnel: the <video> element follows that itself in the browser
+    return url ? direct(url, 'https://abyssplayer.com/', 'file') : null
   }
   async function resolveAbyss(url: string) {
     const html = await fetchText(url)
     const enc = html?.match(/const\s+datas\s*=\s*"([^"]*)"/)?.[1]
+    if (html && !enc) note('AbyssPlayer page has no datas blob')
     return enc ? decryptAbyss(enc) : null
   }
 
@@ -460,8 +524,13 @@ function createResolver(budgetMs: number) {
   /* ----- public flows ----- */
   async function candidate(q: ClientQuery) {
     const mapping = await loadMapping().catch(() => null)
-    if (!mapping) return null
-    return pickMapping(mapping, q.anilistId, q.episode, q.isMovie)
+    if (!mapping) {
+      note('anime-mapping.json not loaded')
+      return null
+    }
+    const c = pickMapping(mapping, q.anilistId, q.episode, q.isMovie)
+    if (!c) note('title not in anime-mapping.json')
+    return c
   }
 
   /** ACDN: AnimeSalt first, AnimeDekho second (same order as the server, which is what works on localhost). */
@@ -493,12 +562,14 @@ function createResolver(budgetMs: number) {
       return null
     }
 
+    let sawPage = false
     for (const mirror of SALT_MIRRORS) {
       for (const s of slugs) {
         if (expired()) return null
         const pageUrl = `${mirror}/${c.isMovie ? 'movies' : 'episode'}/${s}/`
         const html = await httpGet(pageUrl)
         if (!html || html.length < 500) continue
+        sawPage = true
         const opt0 = optionIframe(html, 'option-0', pageUrl) || optionIframe(html, 'options-0', pageUrl)
         if (opt0 && /abyssplayer\.com/i.test(opt0)) {
           const r = await resolveAbyss(opt0)
@@ -509,11 +580,12 @@ function createResolver(budgetMs: number) {
       }
     }
 
+    if (sawPage) note('AnimeSalt page loaded but it has no AbyssPlayer slot')
     const epUrl = await findDekhoEpisodePage(q.title, c.season, c.episode, c.isMovie)
     if (epUrl) {
       const r = await abyssFromPage(epUrl)
       if (r) return { ...r, slug: c.slug }
-    }
+    } else note('AnimeDekho: episode page not found')
     return null
   }
 

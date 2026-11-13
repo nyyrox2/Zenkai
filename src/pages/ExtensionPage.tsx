@@ -57,7 +57,7 @@ export default function ExtensionPage() {
             Zenkai Stream Companion
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-            Unlock authentic 4K and 1080p high-bitrate streaming with zero proxy latency. Stream directly from original Anime (MegaPlay, FlixCloud, AnimeSalt) and Movies (MovieBox, Hakunaymatata, BCDNXW) CDNs from your residential IP.
+            Unlock authentic 4K and 1080p high-bitrate streaming with zero proxy latency. Stream directly from original Anime (MegaPlay, FlixCloud, AnimeSalt, ACDN, AbyssPlayer) and Movies (MovieBox, Hakunaymatata, BCDNXW) CDNs from your residential IP. ACDN and AbyssPlayer require the extension; MegaPlay and Vidstream work with or without it.
           </p>
 
           {/* Live status banner */}

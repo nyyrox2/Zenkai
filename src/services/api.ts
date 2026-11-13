@@ -1,6 +1,6 @@
 import { tmdbDirect, tmdbEpisodesDirect } from './tmdbDirect'
 import { isCompanionActive, companionHas } from '../lib/useCompanion'
-import { resolveAcdnClient, resolveAbyssClient, type ClientStream } from '../lib/acdnClient'
+import { resolveAcdnClient, resolveAbyssClient, getResolveTrace, type ClientStream } from '../lib/acdnClient'
 import { toast } from '../lib/toast'
 
 /** Client for the Zenkai API (Cloudflare Pages Functions in production, Vite middleware in dev). */
@@ -226,6 +226,7 @@ export async function fetchStream(p: StreamParams): Promise<StreamResult> {
   if (hasClientResolver && (p.server === 'acdn' || p.server === 'abyss')) {
     const local = await resolveInBrowser(p).catch(() => null)
     if (local) return local
+    console.info('[zenkai] browser resolver found nothing, trying the API:', getResolveTrace() || 'no details')
   }
   try {
     const r = await fetchStreamFromApi(p)
@@ -236,6 +237,11 @@ export async function fetchStream(p: StreamParams): Promise<StreamResult> {
   } catch (e) {
     if (p.server === 'abyss' && !hasClientResolver) {
       throw new Error('AbyssPlayer needs the Zenkai extension v1.2 or newer. Install or update it, or pick another server.')
+    }
+    if (hasClientResolver && (p.server === 'acdn' || p.server === 'abyss')) {
+      const why = getResolveTrace()
+      if (why) toast(`${p.server === 'abyss' ? 'AbyssPlayer' : 'ACDN'}: ${why}`.slice(0, 160), 'error')
+      throw new Error(`${(e as Error)?.message ?? 'Stream failed'}${why ? ` [browser: ${why}]` : ''}`)
     }
     throw e
   }

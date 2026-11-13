@@ -7,6 +7,7 @@ import { StreamProblem } from '../components/StreamProblem'
 import { Loader2, Play, ShieldAlert } from 'lucide-react'
 import { opaqueOrigin, popupsBlocked, sameOriginParent } from '../lib/embedGuard'
 import { cn } from '../lib/utils'
+import { serverById } from '../lib/servers'
 
 const pill = 'rounded-full border px-4 py-2 text-xs sm:text-sm font-semibold transition active:scale-95'
 
@@ -157,6 +158,7 @@ export default function EmbedPage() {
         id: key,
         name: BASE_SERVER_NAMES[key] || key.toUpperCase(),
         note: tags.join(' · '),
+        access: serverById(key).access,
         tags,
       }
     })

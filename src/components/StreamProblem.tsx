@@ -84,6 +84,9 @@ export function StreamProblem({ reason, children }: { reason?: string; onReconne
       <div className="text-center">
         <h3 className="font-display text-sm font-bold tracking-tight text-white">Server not available</h3>
         <p className="text-[11px] text-white/55">Try another one</p>
+        {reason && typeof window !== 'undefined' && /[?&]debug\b/.test(window.location.search) && (
+          <p className="mx-auto mt-1 max-w-sm break-words text-[10px] leading-snug text-white/40">{reason}</p>
+        )}
         {children && <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2 sm:mt-3">{children}</div>}
       </div>
     </div>

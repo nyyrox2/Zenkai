@@ -12,6 +12,9 @@ All notable changes to the Zenkai Web application will be documented in this fil
   - Without the extension, ACDN keeps working through the server route; AbyssPlayer shows a clear "extension required" message.
 - **ACDN proxy routing fixed**: ravok / as-cdn streams use Zenkai's own `/proxy` (same egress as the resolver) instead of the external proxy; AbyssPlayer hosts keep the external proxy first. Each is the other's fallback.
 - **Stream type fix**: the API now reports `hls` / `file` correctly for ACDN (it read a field that did not exist).
+- **Server labels**: ACDN and AbyssPlayer now say "Extension required", MegaPlay and Vidstream say "Extension + Normal both work", FlixCloud says "Direct" (server list on the watch page and the in-player server menu).
+- **Diagnostics**: when the browser resolver fails it records the failing step (host + HTTP status / blocked) in the console and a toast; add `?debug=1` to the watch URL to see the raw reason on the "Server not available" screen.
+- **AbyssPlayer decrypt fallback**: if the API cannot reach enc-dec.app, the browser asks it directly (extension rule 41).
 - **New endpoint**: `POST /api/stream/decrypt` (AbyssPlayer decrypt helper used by the browser resolver).
 - **Extension 1.2.0**: new header/CORS rules for AnimeDekho, AbyssPlayer page requests, `getVideo` calls and a generic resolver marker; `zenkai-companion.zip` rebuilt with portable paths (forward slashes, no `_metadata`).
 

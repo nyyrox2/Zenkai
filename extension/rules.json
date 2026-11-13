@@ -2411,5 +2411,58 @@
         "xmlhttprequest"
       ]
     }
+  },
+  {
+    "id": 41,
+    "priority": 4,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://playhydrax.com"
+        },
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://playhydrax.com/"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, POST, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*enc-dec.app/api/dec-abyss*",
+      "initiatorDomains": [
+        "pages.dev",
+        "zenkai.cfd",
+        "localhost",
+        "127.0.0.1"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest"
+      ]
+    }
   }
 ]
