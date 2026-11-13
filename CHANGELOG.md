@@ -4,6 +4,9 @@ All notable changes to the Zenkai Web application will be documented in this fil
 
 ## [1.0.5] - 2026-11-13
 
+### Removed
+- **AbyssPlayer**: server, browser resolver, `POST /api/stream/decrypt`, extension host permissions and rules (33-35, 41), proxy referer handling.
+
 ### 🔧 ACDN & AbyssPlayer in production
 
 - **Browser-side resolving (extension v1.2.0)**:

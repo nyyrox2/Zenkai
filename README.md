@@ -171,7 +171,7 @@ All routes are served by `server/handler.js`.
 <details>
 <summary><b>ACDN (multi audio)</b></summary>
 
-A **Direct** server that only appears while **DUB** is selected, tagged *Multi audio*. `server/acdn.js` is a port of the Android `MultiAudioExtractor`: `public/anime-mapping.json` (AniList id to AnimeSalt id / season / episode offset), then AnimeDekho (search, episode page, `?trdekho=0..4` players), then an AnimeSalt fallback. Players are turned into a direct stream (as-cdn / ravok HLS, AbyssPlayer via enc-dec.app, `player.php`, Pixel, plain m3u8 / mp4) and played in Zenkai's own player, which lists the stream's audio tracks under the language button.
+A **Direct** server that only appears while **DUB** is selected, tagged *Multi audio*. `server/acdn.js` is a port of the Android `MultiAudioExtractor`: `public/anime-mapping.json` (AniList id to AnimeSalt id / season / episode offset), then AnimeDekho (search, episode page, `?trdekho=0..4` players), then an AnimeSalt fallback. Players are turned into a direct stream (as-cdn / ravok HLS, `player.php`, Pixel, plain m3u8 / mp4) and played in Zenkai's own player, which lists the stream's audio tracks under the language button.
 
 The mapping file is bundled into the API, so editing it needs a redeploy.
 

@@ -39,8 +39,6 @@ const ALLOWED_STREAM_DOMAINS = [
   "animesalt.ro",
   "ravok.buzz",
   "acdn.top",
-  "abyssplayer.com",
-  "playhydrax.com",
   "flixcloud.cc",
   "enc-dec.app",
   "reanime.to",
@@ -65,8 +63,6 @@ const ALLOWED_STREAM_DOMAINS = [
   "demoniclibs.com",
   "mangafifth.org",
   "readermc.org",
-  "sssrr.org",
-  "trycloudflare.com",
   "silentforge.top",
   "silentforge.space",
   "short.ink",
@@ -119,7 +115,7 @@ export function validateProxyUrl(rawUrl) {
   // 3. Domain validation: Host must match allowed streaming domains or media patterns
   const isMediaPattern =
     /\.(m3u8|ts|m4s|m3u|mp4|vtt|srt|key|jpg|jpeg|png|webp|avif|gif)(\?.*)?$/i.test(parsed.pathname) ||
-    /cdn|stream|video|m3u8|hls|media|chunk|segment|seg-|sub|caption|fetch|anime|harbor|drift|frontier|vertex|space|sssrr|sora/i.test(hostname) ||
+    /cdn|stream|video|m3u8|hls|media|chunk|segment|seg-|sub|caption|fetch|anime|harbor|drift|frontier|vertex|space|sora/i.test(hostname) ||
     /stream|anime|subtitles|sora/i.test(parsed.pathname) ||
     /^as-cdn\d*\.top$/i.test(hostname); // ACDN players (as-cdn26.top, ...)
 

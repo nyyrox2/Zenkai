@@ -1,6 +1,6 @@
 import { tmdbDirect, tmdbEpisodesDirect } from './tmdbDirect'
 import { isCompanionActive, companionHas } from '../lib/useCompanion'
-import { resolveAcdnClient, resolveAbyssClient, getResolveTrace, type ClientStream } from '../lib/acdnClient'
+import { resolveAcdnClient, getResolveTrace, type ClientStream } from '../lib/acdnClient'
 import { toast } from '../lib/toast'
 
 /** Client for the Zenkai API (Cloudflare Pages Functions in production, Vite middleware in dev). */
@@ -182,8 +182,6 @@ export interface StreamResult {
   subtitles: { file: string; label: string; default?: boolean }[]
   intro: { start: number; end: number } | null
   outro: { start: number; end: number } | null
-  /** the stream is only playable with the Zenkai extension (AbyssPlayer served by the API) */
-  requiresExtension?: boolean
   /** resolved in this browser (extension active): the token is bound to the viewer's own IP, play it directly */
   clientResolved?: boolean
 }
@@ -191,7 +189,7 @@ export interface StreamResult {
 type StreamParams = { id: number; ep: number; server: string; audio: string; title: string; format?: string | null }
 
 /**
- * ACDN / AbyssPlayer with the Zenkai extension: resolve in the browser so the IP-bound CDN token matches the IP
+ * ACDN with the Zenkai extension: resolve in the browser so the IP-bound CDN token matches the IP
  * that plays the stream (see src/lib/acdnClient.ts). Returns null when it cannot, the API route is the fallback.
  */
 async function resolveInBrowser(p: StreamParams): Promise<StreamResult | null> {
@@ -202,12 +200,11 @@ async function resolveInBrowser(p: StreamParams): Promise<StreamResult | null> {
     isMovie: (p.format ?? '').toUpperCase() === 'MOVIE',
     lang: p.audio === 'dub' ? 'English' : p.audio === 'sub' ? 'Japanese' : '',
   }
-  const abyss = p.server === 'abyss'
-  const c: ClientStream | null = abyss ? await resolveAbyssClient(q) : await resolveAcdnClient(q)
+  const c: ClientStream | null = await resolveAcdnClient(q)
   if (!c) return null
   const viaProxy = `/proxy?url=${encodeURIComponent(c.streamUrl)}&referer=${encodeURIComponent(c.referer)}`
   return {
-    server: abyss ? 'AbyssPlayer' : 'ACDN',
+    server: 'ACDN',
     audio: 'multi',
     multiAudio: true,
     streamUrl: c.streamUrl,
@@ -223,24 +220,17 @@ async function resolveInBrowser(p: StreamParams): Promise<StreamResult | null> {
 
 export async function fetchStream(p: StreamParams): Promise<StreamResult> {
   const hasClientResolver = isCompanionActive() && companionHas('acdn-client')
-  if (hasClientResolver && (p.server === 'acdn' || p.server === 'abyss')) {
+  if (hasClientResolver && p.server === 'acdn') {
     const local = await resolveInBrowser(p).catch(() => null)
     if (local) return local
     console.info('[zenkai] browser resolver found nothing, trying the API:', getResolveTrace() || 'no details')
   }
   try {
-    const r = await fetchStreamFromApi(p)
-    if (r.requiresExtension && !hasClientResolver) {
-      toast('AbyssPlayer needs the Zenkai extension v1.2 or newer. Install or update it from the Extension page.', 'info')
-    }
-    return r
+    return await fetchStreamFromApi(p)
   } catch (e) {
-    if (p.server === 'abyss' && !hasClientResolver) {
-      throw new Error('AbyssPlayer needs the Zenkai extension v1.2 or newer. Install or update it, or pick another server.')
-    }
-    if (hasClientResolver && (p.server === 'acdn' || p.server === 'abyss')) {
+    if (hasClientResolver && p.server === 'acdn') {
       const why = getResolveTrace()
-      if (why) toast(`${p.server === 'abyss' ? 'AbyssPlayer' : 'ACDN'}: ${why}`.slice(0, 160), 'error')
+      if (why) toast(`ACDN: ${why}`.slice(0, 160), 'error')
       throw new Error(`${(e as Error)?.message ?? 'Stream failed'}${why ? ` [browser: ${why}]` : ''}`)
     }
     throw e
@@ -257,11 +247,11 @@ async function fetchStreamFromApi(p: StreamParams): Promise<StreamResult> {
   let activeUrl = proxyUrl
 
   // FlixCloud manifests rely on enc-dec parser and require server-side key rewriting (resolving relative key.bin).
-  // Server-resolved ACDN streams (ravok.buzz IP-bound manifests, AbyssPlayer sssrr.org files) must keep going through
+  // Server-resolved ACDN streams (ravok.buzz IP-bound manifests) must keep going through
   // the proxy: the token belongs to the server's IP. With the extension (>= 1.2.0) they never get here, because
   // fetchStream() resolves them in the browser first (src/lib/acdnClient.ts) and plays them directly.
   const isFlixCloud = r.server?.toLowerCase().includes('flixcloud') || r.rawStreamUrl?.includes('parse-flixcloud')
-  const isAcdn = r.server?.toLowerCase().includes('acdn') || r.rawStreamUrl?.includes('ravok.buzz') || r.rawStreamUrl?.includes('as-cdn') || r.rawStreamUrl?.includes('sssrr')
+  const isAcdn = r.server?.toLowerCase().includes('acdn') || r.rawStreamUrl?.includes('ravok.buzz') || r.rawStreamUrl?.includes('as-cdn')
 
   // Only direct CDNs (VidStream / MegaPlay) bypass the proxy when Zenkai Companion is active
   if (hasCompanion && !isFlixCloud && !isAcdn) {

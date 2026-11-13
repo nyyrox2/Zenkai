@@ -21,6 +21,7 @@ import {
   airplayPicker, airplaySupported, castLoad, castRequest, castSeek, castSetVolume, castStop, castToggleMute, castTogglePlay, castUrl, getCast, initCast, onCastFinished, useCast,
 } from '../lib/cast'
 import { isCompanionActive } from '../lib/useCompanion'
+import { forFetch } from '../lib/acdnClient'
 import { ACCESS_CLASS, ACCESS_TEXT, type ServerAccess } from '../lib/servers'
 import './cineplayer.css'
 
@@ -706,7 +707,7 @@ const isFileSrc = (u: string) => {
     }
     const decoded = decodeURIComponent(curr)
     if (/\.m3u8(\?|&|$)/i.test(decoded)) return false
-    return /\.(mp4|webm|mkv)(\?|&|$)/i.test(decoded) || /\.(mp4|webm|mkv)/i.test(decoded) || /sssrr\.org|\/sora\//i.test(decoded)
+    return /\.(mp4|webm|mkv)(\?|&|$)/i.test(decoded) || /\.(mp4|webm|mkv)/i.test(decoded) || /\/sora\//i.test(decoded)
   } catch { return false }
 }
 let noSeg = false
@@ -1531,6 +1532,11 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     } else {
       const proxied = `${proxyBase}?url=${encodeURIComponent(url)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`
       candidates.push(proxied, url)
+    }
+    // ponytail: with the extension, fetch the caption straight from its host (it adds Referer + CORS); the proxy can't do it
+    if (isCompanionActive()) {
+      const raw = candidates.find((c) => /^https?:/i.test(c) && !c.includes('/proxy?'))
+      if (raw) candidates.unshift(forFetch(raw))
     }
     for (const u of candidates) {
       try {

@@ -1,5 +1,5 @@
 /**
- * Browser-side ACDN / AbyssPlayer resolver (needs the Zenkai Companion extension >= 1.2.0).
+ * Browser-side ACDN resolver (needs the Zenkai Companion extension >= 1.2.0).
  *
  * Why this exists: ravok.buzz / as-cdn hand out IP-bound `secure_link` tokens. When the Cloudflare Worker
  * resolves the stream and the browser (or another Worker) plays it, the IPs differ and the CDN answers 403.
@@ -10,21 +10,17 @@
  * The extension (extension/rules.json) supplies what a page cannot: Referer / Origin / Cookie / X-Requested-With
  * for the provider hosts and CORS headers on their responses.
  *
- * Only the AbyssPlayer decrypt call (pure compute, enc-dec.app) goes through the Zenkai API.
  * Everything here returns null on failure, the caller then falls back to the server-side resolver.
  */
-
-const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? ''
-const apiUrl = (path: string) => (path.startsWith('/') ? BASE + path : path)
 
 const DEKHO = 'https://animedekho.app'
 const SALT_MIRRORS = ['https://animesalt.cx', 'https://animesalt.ac', 'https://animesalt.ro']
 const MAX_DEPTH = 3
 
 /** hosts the extension has dedicated header + CORS rules for; every other host gets the `__zk=1` marker rule */
-const KNOWN_HOST = /(^|\.)(animesalt\.(cx|ac|ro)|animedekho\.app|ravok\.buzz|as-cdn\d*\.top|acdn\.top|abyssplayer\.com|playhydrax\.com)$/i
+const KNOWN_HOST = /(^|\.)(animesalt\.(cx|ac|ro)|animedekho\.app|ravok\.buzz|as-cdn\d*\.top|acdn\.top)$/i
 const mark = (url: string) => (url.includes('__zk=') ? url : url + (url.includes('?') ? '&' : '?') + '__zk=1')
-const forFetch = (url: string) => {
+export const forFetch = (url: string) => {
   try {
     return KNOWN_HOST.test(new URL(url).hostname) ? url : mark(url)
   } catch {
@@ -194,73 +190,6 @@ function createResolver(budgetMs: number) {
     return t && t.length > 50 ? t : null
   }
 
-  /* ----- AbyssPlayer ----- */
-  /** same scoring as server/acdn.js: 1080p h264 > 720p h264 > 1080p av1 > 720p av1 > 480p > 360p */
-  const bestSource = (sources: unknown): string | null => {
-    if (!Array.isArray(sources)) return null
-    let best: string | null = null
-    let top = -1
-    for (const s of sources as { status?: boolean; url?: string; type?: string; codec?: string }[]) {
-      if (!s || s.status === false || !s.url) continue
-      const type = String(s.type || '').toLowerCase()
-      const codec = String(s.codec || '').toLowerCase()
-      let score = type.includes('1080') ? 100 : type.includes('720') ? 70 : type.includes('480') ? 40 : 20
-      score += codec === 'h264' ? 30 : codec === 'av1' ? 10 : 0
-      if (score > top) {
-        top = score
-        best = s.url
-      }
-    }
-    return best
-  }
-
-  /** Plan B when the Zenkai API cannot decrypt: ask enc-dec.app from the browser (extension rule 41 sets the headers). */
-  async function decryptDirect(encrypted: string): Promise<string | null> {
-    const body = JSON.stringify({ text: encrypted })
-    // text/plain is a CORS "simple" request (no preflight); JSON needs the provider to answer OPTIONS
-    for (const ct of ['text/plain;charset=UTF-8', 'application/json']) {
-      const t = await fetchText('https://enc-dec.app/api/dec-abyss', { method: 'POST', headers: { 'Content-Type': ct }, body }, 14000)
-      if (!t) continue
-      try {
-        const u = bestSource(JSON.parse(t)?.result?.sources)
-        if (u) return u
-      } catch {
-        /* next content type */
-      }
-    }
-    return null
-  }
-
-  async function decryptAbyss(encrypted: string): Promise<ClientStream | null> {
-    if (expired()) return null
-    let url: string | null = null
-    const ctl = new AbortController()
-    const t = window.setTimeout(() => ctl.abort(), Math.max(1, Math.min(15000, left())))
-    try {
-      const r = await fetch(apiUrl('/api/stream/decrypt'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Zenkai-Embed': '1' },
-        body: JSON.stringify({ text: encrypted }),
-        signal: ctl.signal,
-      })
-      if (r.ok) url = ((await r.json().catch(() => null)) as { url?: string } | null)?.url ?? null
-      else note(`decrypt API HTTP ${r.status}`)
-    } catch {
-      note('decrypt API unreachable')
-    } finally {
-      window.clearTimeout(t)
-    }
-    if (!url) url = await decryptDirect(encrypted)
-    // sssrr.org 302s to a trycloudflare.com tunnel: the <video> element follows that itself in the browser
-    return url ? direct(url, 'https://abyssplayer.com/', 'file') : null
-  }
-  async function resolveAbyss(url: string) {
-    const html = await fetchText(url)
-    const enc = html?.match(/const\s+datas\s*=\s*"([^"]*)"/)?.[1]
-    if (html && !enc) note('AbyssPlayer page has no datas blob')
-    return enc ? decryptAbyss(enc) : null
-  }
-
   /* ----- as-cdn / ravok / AWSStream ----- */
   async function resolveAsCdn(domain: string, hash: string): Promise<ClientStream | null> {
     const body = new URLSearchParams({ hash, r: 'https://animesalt.cx/' }).toString()
@@ -323,7 +252,7 @@ function createResolver(budgetMs: number) {
     }
   }
 
-  /* ----- generic player page: nested iframe, as-cdn hash, Abyss blob, or a file:/source: config ----- */
+  /* ----- generic player page: nested iframe, as-cdn hash, or a file:/source: config ----- */
   async function resolveFromPage(pageUrl: string, lang: string, depth: number): Promise<ClientStream | null> {
     const html = await httpGet(pageUrl)
     if (!html) return null
@@ -353,12 +282,6 @@ function createResolver(budgetMs: number) {
       if (r) return r
     }
 
-    const datas = html.match(/const\s+datas\s*=\s*"([^"]*)"/)
-    if (datas) {
-      const r = await decryptAbyss(datas[1])
-      if (r) return r
-    }
-
     const file = html.match(/(?:file|source|src)\s*:\s*["'](https?:\/\/[^"']+\.(?:m3u8|mp4)[^"']*)["']/i)?.[1]
     if (file) return direct(file, pageUrl, undefined, extractSubtitles(html, domain))
     return null
@@ -368,11 +291,6 @@ function createResolver(budgetMs: number) {
   async function resolvePlayer(iframeUrl: string, referer: string, lang = '', depth = 0): Promise<ClientStream | null> {
     if (!usable(iframeUrl) || depth > MAX_DEPTH || expired()) return null
     const url = iframeUrl.trim()
-
-    if (/abyssplayer\.com/i.test(url)) {
-      const r = await resolveAbyss(url)
-      if (r) return r
-    }
 
     if (/player\.php|multi-lang-plyr\.php/i.test(url)) {
       const r = await resolveMultiLang(url, lang, depth)
@@ -542,54 +460,7 @@ function createResolver(budgetMs: number) {
     return hit ? { ...hit, slug: hit.slug || c.slug } : null
   }
 
-  /** AbyssPlayer only: never returns a ravok / as-cdn HLS stream. */
-  async function abyssOnly(q: ClientQuery): Promise<ClientStream | null> {
-    const c = await candidate(q)
-    if (!c) return null
-    const slugs = candidateSlugs(c)
-
-    const abyssFromPage = async (pageUrl: string) => {
-      const html = await httpGet(pageUrl)
-      if (!html) return null
-      const frames = [...html.matchAll(/<iframe[^>]+(?:data-src|src)=["']([^"']+)["']/gi)].map((m) => m[1].trim()).filter(usable)
-      for (const src of frames) {
-        const u = abs(src, pageUrl)
-        if (/abyssplayer\.com/i.test(u)) {
-          const r = await resolveAbyss(u)
-          if (r) return r
-        }
-      }
-      return null
-    }
-
-    let sawPage = false
-    for (const mirror of SALT_MIRRORS) {
-      for (const s of slugs) {
-        if (expired()) return null
-        const pageUrl = `${mirror}/${c.isMovie ? 'movies' : 'episode'}/${s}/`
-        const html = await httpGet(pageUrl)
-        if (!html || html.length < 500) continue
-        sawPage = true
-        const opt0 = optionIframe(html, 'option-0', pageUrl) || optionIframe(html, 'options-0', pageUrl)
-        if (opt0 && /abyssplayer\.com/i.test(opt0)) {
-          const r = await resolveAbyss(opt0)
-          if (r) return { ...r, slug: s }
-        }
-        const r = await abyssFromPage(pageUrl)
-        if (r) return { ...r, slug: s }
-      }
-    }
-
-    if (sawPage) note('AnimeSalt page loaded but it has no AbyssPlayer slot')
-    const epUrl = await findDekhoEpisodePage(q.title, c.season, c.episode, c.isMovie)
-    if (epUrl) {
-      const r = await abyssFromPage(epUrl)
-      if (r) return { ...r, slug: c.slug }
-    } else note('AnimeDekho: episode page not found')
-    return null
-  }
-
-  return { acdn, abyssOnly }
+  return { acdn }
 }
 
 /* ---------------- public API (with a short result cache) ---------------- */
@@ -609,6 +480,3 @@ async function cached(key: string, budgetMs: number, run: (r: ReturnType<typeof 
 
 export const resolveAcdnClient = (q: ClientQuery) =>
   cached(`acdn:${q.anilistId}:${q.episode}:${q.isMovie}:${q.lang}`, 25000, (r) => r.acdn(q)).catch(() => null)
-
-export const resolveAbyssClient = (q: ClientQuery) =>
-  cached(`abyss:${q.anilistId}:${q.episode}:${q.isMovie}`, 22000, (r) => r.abyssOnly(q)).catch(() => null)

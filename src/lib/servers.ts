@@ -50,7 +50,6 @@ export const SERVERS: ServerDef[] = [
   { id: 'vidstream', name: 'Vidstream', note: 'Direct HLS · Sub / Dub', access: 'both', kind: 'direct', audio: true },
   { id: 'flixcloud', name: 'FlixCloud', note: 'Direct HLS · Sub / Dub', access: 'direct', kind: 'direct', audio: true, multi: true },
   { id: 'acdn', name: 'ACDN', note: 'Direct HLS · Multi audio', access: 'extension', kind: 'direct', audio: false, multi: true },
-  { id: 'abyss', name: 'AbyssPlayer', note: 'Direct MP4 · Multi audio', access: 'extension', kind: 'direct', audio: false, multi: true },
   { id: 'animesalt-1', name: 'AnimeSalt 1', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '1' },
   { id: 'animesalt-2', name: 'AnimeSalt 2', note: 'Multi audio', kind: 'animesalt', audio: false, salt: '2' },
   { id: 'megaplay-ani', name: 'MegaPlay Embed', note: 'Embed · AniList · Sub / Dub', kind: 'embed', audio: true, url: (c) => `https://megaplay.buzz/stream/ani/${c.anilistId}/${c.episode}/${c.audio}` },

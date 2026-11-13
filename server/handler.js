@@ -23,7 +23,7 @@ async function loadLocalMediaModules() {
 import { resolveDirectStreamWorker, checkEpisodeAudioAvailability } from "./direct-stream.js";
 import { resolveFlixCloud, resolveReanimeEmbed } from "./flixcloud.js";
 import { extractAnimeSaltPlayer } from "./animesalt.js";
-import { resolveAcdn, resolveAbyssOnly, pickAbyssSource } from "./acdn.js";
+import { resolveAcdn } from "./acdn.js";
 import { resolveMovieBoxStream } from "./moviebox.js";
 import { validateProxyUrl } from "./ssrf.js";
 import novelEngine from "./novel.js";
@@ -239,15 +239,12 @@ async function proxy(request, url, proxyBase = "/proxy", env = null) {
   const host = t.hostname.toLowerCase();
   const isWebMirrorCdn = host.includes("bcdnxw") || host.includes("123moviesfree") || host.includes("sflix");
   const isDirectAppCdn = !isWebMirrorCdn && (/aoneroom/.test(host) || host === "bcdn.hakunaymatata.com");
-  const isAbyssStream = host.includes("sssrr.org") || host.includes("trycloudflare.com") || host.includes("abyssplayer.com");
 
   let referer = null;
   if (isDirectAppCdn) {
     referer = null;
   } else if (isWebMirrorCdn) {
     referer = url.searchParams.get("referer") || "https://123moviesfree.club/";
-  } else if (isAbyssStream) {
-    referer = "https://abyssplayer.com/";
   } else {
     referer = refererFor(host, url.searchParams.get("referer")) || `${t.origin}/`;
   }
@@ -255,7 +252,7 @@ async function proxy(request, url, proxyBase = "/proxy", env = null) {
   const headers = new Headers({ Accept: "*/*" });
   if (referer) {
     headers.set("Referer", referer);
-    if (!isWebMirrorCdn && !isAbyssStream) {
+    if (!isWebMirrorCdn) {
       headers.set("Origin", referer.replace(/\/$/, ""));
     }
   }
@@ -646,17 +643,6 @@ export async function handle(request, env) {
     );
     return json({ success: true, servers: result }, 200, 600);
   }
-  // AbyssPlayer decrypt helper: the browser (with the Zenkai extension) fetches the AbyssPlayer page itself and only
-  // sends the encrypted `datas` blob here. Pure compute, nothing in the answer is bound to this server's IP.
-  if (path === "/api/stream/decrypt") {
-    if (request.method !== "POST") return json({ error: "POST only" }, 405);
-    const body = await request.json().catch(() => null);
-    const text = typeof body?.text === "string" ? body.text : "";
-    if (!text || text.length > 400000) return json({ error: "Bad request" }, 400);
-    const url = await pickAbyssSource(text);
-    if (!url) return json({ error: "Could not decrypt the AbyssPlayer source" }, 502);
-    return json({ success: true, url });
-  }
   if (path === "/api/stream") {
     // Direct stream extraction is private. Only Zenkai Player embed is provided.
     const referer = request.headers.get("Referer") || "";
@@ -703,11 +689,6 @@ export async function handle(request, env) {
         // ravok.buzz / as-cdn use nginx secure_link (IP-bound md5 tokens): the token is minted here, so the
         // manifest and ALL segments must be fetched from the same egress IP. That is Zenkai's own /proxy
         // (same Pages Function that resolved the stream), never seg=1 and not a second Worker on another account.
-        // AbyssPlayer hosts (sssrr.org -> trycloudflare.com) are the exception: the external proxy handles
-        // those redirects, so it is primary for them. Each side is the other's fallback (the player retries once).
-        const isAbyssHost = /sssrr\.org|trycloudflare\.com|abyssplayer\.com|playhydrax\.com/i.test(r.streamUrl);
-        const primaryBase = isAbyssHost && proxyBase !== "/proxy" ? proxyBase : "/proxy";
-        const altBase = primaryBase === "/proxy" ? proxyBase : "/proxy";
         const viaProxy = (base) =>
           `${base}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}${audio ? "&audio=" + encodeURIComponent(audio) : ""}`;
         return json({
@@ -716,14 +697,14 @@ export async function handle(request, env) {
           audio: "multi",
           multiAudio: true,
           format: isFile ? "file" : "hls",
-          streamUrl: viaProxy(primaryBase),
-          fallbackStreamUrl: viaProxy(altBase),
+          streamUrl: viaProxy("/proxy"),
+          fallbackStreamUrl: viaProxy(proxyBase),
           rawStreamUrl: r.streamUrl,
           referer: r.referer || "https://animesalt.cx/",
           subtitles: (r.subtitles || []).map((s) => ({
             ...s,
             file: s.file && !s.file.startsWith("/proxy") && !s.file.startsWith("http://localhost")
-              ? `${primaryBase}?url=${encodeURIComponent(s.file)}&referer=${encodeURIComponent(r.referer || "https://ravok.buzz/")}`
+              ? `/proxy?url=${encodeURIComponent(s.file)}&referer=${encodeURIComponent(r.referer || "https://ravok.buzz/")}`
               : s.file,
           })),
           intro: null,
@@ -731,40 +712,6 @@ export async function handle(request, env) {
         });
       } catch (e) {
         return json({ error: e.message || "ACDN resolution failed" }, 502);
-      }
-    }
-
-        // AbyssPlayer: direct MP4 file stream - AbyssPlayer iframes ONLY (never ravok/HLS)
-    if (server === "abyss") {
-      const isMovie = q("format").toUpperCase() === "MOVIE" || q("isMovie") === "true";
-      try {
-        const r = await cached(
-          `abyss:${anilistId}:${episode}:${isMovie}:${title}`,
-          10 * 60e3,
-          () => resolveAbyssOnly({ anilistId, episode, title, isMovie }),
-        );
-        if (!r?.streamUrl) return json({ error: "No AbyssPlayer stream found for this episode" }, 404);
-        // AbyssPlayer is extension-only: return raw sssrr.org URL for the browser + extension
-        // to fetch directly (browser natively follows 302 → trycloudflare.com, extension sets Referer).
-        // No proxy needed — avoids Cloudflare Worker → trycloudflare.com Cdn-Loop block entirely.
-        return json({
-          success: true,
-          server: "AbyssPlayer",
-          audio: "multi",
-          multiAudio: true,
-          format: "file",
-          requiresExtension: true,
-          streamUrl: r.streamUrl,
-          // Without the extension the raw url cannot play; this proxied copy is a best-effort second try.
-          fallbackStreamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://abyssplayer.com/")}`,
-          rawStreamUrl: r.streamUrl,
-          referer: r.referer || "https://abyssplayer.com/",
-          subtitles: [],
-          intro: null,
-          outro: null,
-        });
-      } catch (e) {
-        return json({ error: e.message || "AbyssPlayer resolution failed" }, 502);
       }
     }
 

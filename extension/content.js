@@ -18,9 +18,8 @@
       'animesalt-direct',
       'cors-bypass',
       'p2p-residential',
-      // 1.2.0: the web app resolves IP-bound ACDN / AbyssPlayer streams in this browser (see rules 36-40)
-      'acdn-client',
-      'abyss-client'
+      // 1.2.0: the web app resolves IP-bound ACDN streams in this browser (see rules 36-40)
+      'acdn-client'
     ]
   };
 
