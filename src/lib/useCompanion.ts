@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-export const LATEST_EXTENSION_VERSION = '1.1.0'
+export const LATEST_EXTENSION_VERSION = '1.2.0'
 
 export interface CompanionInfo {
   installed: boolean
@@ -20,6 +20,15 @@ export function isVersionOlder(current?: string, latest: string = LATEST_EXTENSI
     if (c > l) return false
   }
   return false
+}
+
+/** Capability announced by the extension: via window.__ZENKAI_COMPANION__, or the data attribute when inline scripts are blocked. */
+export function companionHas(cap: string): boolean {
+  if (typeof window === 'undefined') return false
+  const fromWindow = (window as any).__ZENKAI_COMPANION__?.capabilities
+  if (Array.isArray(fromWindow) && fromWindow.includes(cap)) return true
+  const attr = document.documentElement.dataset.zenkaiCompanionCaps
+  return !!attr && attr.split(',').includes(cap)
 }
 
 export function isCompanionActive(): boolean {

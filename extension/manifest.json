@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Zenkai Stream Companion",
-  "version": "1.1.0",
-  "description": "Direct zero-proxy high-speed streaming for Zenkai. Intercepts and unlocks Anime (MegaPlay, FlixCloud, AnimeSalt) and Movies (MovieBox, Hakunaymatata, BCDNXW) CDNs.",
+  "version": "1.2.0",
+  "description": "Direct zero-proxy high-speed streaming for Zenkai. Unlocks Anime (MegaPlay, FlixCloud, AnimeSalt, ACDN, AbyssPlayer) and Movies (MovieBox, Hakunaymatata, BCDNXW) CDNs, and resolves IP-bound ACDN/Abyss streams in your own browser.",
   "permissions": [
     "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess",
@@ -71,7 +71,8 @@
     "*://*.sssrr.org/*",
     "*://*.trycloudflare.com/*",
     "*://*.abyssplayer.com/*",
-    "*://*.playhydrax.com/*"
+    "*://*.playhydrax.com/*",
+    "*://*.animedekho.app/*"
   ],
   "declarative_net_request": {
     "rule_resources": [

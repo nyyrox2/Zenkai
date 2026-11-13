@@ -15,18 +15,6 @@ const DEKHO_COOKIE = "toronites_server=vidstream";
 const SALT_MIRRORS = ["https://animesalt.cx", "https://animesalt.ac", "https://animesalt.ro"];
 const MAX_DEPTH = 3; // guards nested iframe -> iframe -> iframe chains
 
-// ravok / as-cdn tokens (md5 + expires) are bound to the IP that called getVideo, and the stream is later fetched
-// by the launchpad proxy. So getVideo has to be called THROUGH that same proxy. Set per resolveAcdn() call.
-let viaBase = "";
-function viaProxy(url, init, referer, origin) {
-  if (!viaBase) return fetch(url, init);
-  const p = new URL(viaBase);
-  p.searchParams.set("url", url);
-  if (referer) p.searchParams.set("referer", referer);
-  if (origin) p.searchParams.set("origin", origin);
-  return fetch(p.href, init);
-}
-
 /* ---------------- HTTP helpers ---------------- */
 async function httpGet(url, referer, cookie) {
   try {
@@ -69,8 +57,12 @@ const direct = (url, referer, kind, subtitles = []) => ({
 
 /* ---------------- Player resolvers ---------------- */
 
-/** AbyssPlayer: the page carries an encrypted `datas` blob that enc-dec.app decrypts into quality-tagged sources. */
-async function decryptAbyss(encrypted) {
+/**
+ * AbyssPlayer: the page carries an encrypted `datas` blob that enc-dec.app decrypts into quality-tagged sources.
+ * Returns the best source URL (sssrr.org links are NOT resolved here). Exported so the browser, which resolves
+ * AbyssPlayer itself when the Zenkai extension is installed, can ask the server to do the decrypt call only.
+ */
+export async function pickAbyssSource(encrypted) {
   try {
     const r = await fetch("https://enc-dec.app/api/dec-abyss", {
       method: "POST",
@@ -96,28 +88,37 @@ async function decryptAbyss(encrypted) {
         best = s.url;
       }
     }
-        if (!best) return null;
+    return best;
+  } catch {
+    return null;
+  }
+}
+
+async function decryptAbyss(encrypted) {
+  try {
+    let best = await pickAbyssSource(encrypted);
+    if (!best) return null;
 
     // sssrr.org URLs 302-redirect to trycloudflare.com tunnels.
     // Cloudflare Workers CANNOT fetch trycloudflare.com (Cloudflare blocks Worker->tunnel).
     // Pre-resolve the redirect server-side so we cache the final trycloudflare.com URL.
     // The Lovable proxy (non-Worker) and the browser can both reach trycloudflare.com directly.
-    if (best.includes('sssrr.org')) {
+    if (best.includes("sssrr.org")) {
       try {
         const redir = await fetch(best, {
-          method: 'GET',
-          headers: { 'User-Agent': UA, Referer: 'https://abyssplayer.com/' },
-          redirect: 'manual',
+          method: "GET",
+          headers: { "User-Agent": UA, Referer: "https://abyssplayer.com/" },
+          redirect: "manual",
           signal: AbortSignal.timeout(8000),
         });
-        const loc = redir.headers.get('location');
-        if (loc && loc.includes('trycloudflare.com')) best = loc;
+        const loc = redir.headers.get("location");
+        if (loc && loc.includes("trycloudflare.com")) best = loc;
       } catch {
         // If pre-resolve fails, keep sssrr.org URL; APK (ExoPlayer) can still play it directly
       }
     }
 
-    return direct(best, 'https://abyssplayer.com/', 'file');
+    return direct(best, "https://abyssplayer.com/", "file");
   } catch {
     return null;
   }
@@ -186,11 +187,11 @@ function extractSubtitlesFromPlayer(html, domain = "ravok.buzz") {
 async function resolveAsCdn(domain, hash) {
   try {
     const [pageRes, r] = await Promise.all([
-      viaProxy(`https://${domain}/video/${hash}`, {
+      fetch(`https://${domain}/video/${hash}`, {
         headers: { "User-Agent": UA, Referer: "https://animesalt.cx/" },
         signal: AbortSignal.timeout(10000),
-      }, "https://animesalt.cx/").catch(() => null),
-      viaProxy(`https://${domain}/player/index.php?data=${hash}&do=getVideo`, {
+      }).catch(() => null),
+      fetch(`https://${domain}/player/index.php?data=${hash}&do=getVideo`, {
         method: "POST",
         headers: {
           "User-Agent": UA,
@@ -201,7 +202,7 @@ async function resolveAsCdn(domain, hash) {
         },
         body: new URLSearchParams({ hash, r: "https://animesalt.cx/" }).toString(),
         signal: AbortSignal.timeout(14000),
-      }, `https://${domain}/video/${hash}`, `https://${domain}`).catch(() => null),
+      }).catch(() => null),
     ]);
 
     if (!r || !r.ok) return null;
@@ -499,8 +500,7 @@ export function getCandidateSlugsForAcdn({ saltId, season = 1, episode = 1, slug
  * Resolves the ACDN multi-audio stream for one episode.
  * Returns { streamUrl, referer, kind: 'hls' | 'file', mapped, slug } or null.
  */
-export async function resolveAcdn({ anilistId, episode = 1, title = "", isMovie = false, lang = "", proxyBase = "" }) {
-  viaBase = /^https?:\/\//i.test(proxyBase) ? proxyBase : ""; // "/proxy" (local dev) can't be called server-side
+export async function resolveAcdn({ anilistId, episode = 1, title = "", isMovie = false, lang = "" }) {
   const cand = resolveCandidate({ anilistId, episode, title, isMovie });
   if (!cand || !cand.saltId) return null;
   const slugs = getCandidateSlugsForAcdn({

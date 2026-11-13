@@ -23,7 +23,7 @@ async function loadLocalMediaModules() {
 import { resolveDirectStreamWorker, checkEpisodeAudioAvailability } from "./direct-stream.js";
 import { resolveFlixCloud, resolveReanimeEmbed } from "./flixcloud.js";
 import { extractAnimeSaltPlayer } from "./animesalt.js";
-import { resolveAcdn, resolveAbyssOnly } from "./acdn.js";
+import { resolveAcdn, resolveAbyssOnly, pickAbyssSource } from "./acdn.js";
 import { resolveMovieBoxStream } from "./moviebox.js";
 import { validateProxyUrl } from "./ssrf.js";
 import novelEngine from "./novel.js";
@@ -40,7 +40,7 @@ const OPENSUBS = "https://opensubtitles-v3.strem.io/subtitles";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "*",
-  "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
   "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
   "Access-Control-Allow-Private-Network": "true",
 };
@@ -646,6 +646,17 @@ export async function handle(request, env) {
     );
     return json({ success: true, servers: result }, 200, 600);
   }
+  // AbyssPlayer decrypt helper: the browser (with the Zenkai extension) fetches the AbyssPlayer page itself and only
+  // sends the encrypted `datas` blob here. Pure compute, nothing in the answer is bound to this server's IP.
+  if (path === "/api/stream/decrypt") {
+    if (request.method !== "POST") return json({ error: "POST only" }, 405);
+    const body = await request.json().catch(() => null);
+    const text = typeof body?.text === "string" ? body.text : "";
+    if (!text || text.length > 400000) return json({ error: "Bad request" }, 400);
+    const url = await pickAbyssSource(text);
+    if (!url) return json({ error: "Could not decrypt the AbyssPlayer source" }, 502);
+    return json({ success: true, url });
+  }
   if (path === "/api/stream") {
     // Direct stream extraction is private. Only Zenkai Player embed is provided.
     const referer = request.headers.get("Referer") || "";
@@ -684,30 +695,35 @@ export async function handle(request, env) {
       const lang = q("lang") || (audio === "dub" ? "English" : audio === "sub" ? "Japanese" : "");
       try {
         const r = await cached(`acdn:v3:${anilistId}:${episode}:${isMovie}:${lang}:${title}`, 10 * 60e3, () =>
-          resolveAcdn({ anilistId, episode, title, isMovie, lang, proxyBase }),
+          resolveAcdn({ anilistId, episode, title, isMovie, lang }),
         );
         if (!r?.streamUrl) return json({ error: "No multi-audio stream found on ACDN for this episode" }, 404);
-        const isFile = r.format === "file" || r.streamUrl.includes(".mp4") || r.streamUrl.includes("/sora/");
-        // ravok.buzz uses nginx secure_link (IP-bound md5 tokens): ALL HLS segments must route through proxy.
-        // seg=1 would let the browser fetch segments directly (different IP => 403). Never use seg=1 for ACDN.
-        // For sssrr.org/AbyssPlayer file streams, use Zenkai own /proxy (Lovable lacks the Origin-strip fix).
-        // trycloudflare.com (pre-resolved from sssrr.org) is unreachable from Cloudflare Workers.
-        // Use Lovable proxy (proxyBase) for ALL ACDN streams - it is NOT a Worker and can fetch trycloudflare.com.
-        const acdnProxy = proxyBase;
+        // resolveAcdn() returns `kind` ("hls" | "file"), not `format`.
+        const isFile = r.kind === "file" || r.streamUrl.includes(".mp4") || r.streamUrl.includes("/sora/");
+        // ravok.buzz / as-cdn use nginx secure_link (IP-bound md5 tokens): the token is minted here, so the
+        // manifest and ALL segments must be fetched from the same egress IP. That is Zenkai's own /proxy
+        // (same Pages Function that resolved the stream), never seg=1 and not a second Worker on another account.
+        // AbyssPlayer hosts (sssrr.org -> trycloudflare.com) are the exception: the external proxy handles
+        // those redirects, so it is primary for them. Each side is the other's fallback (the player retries once).
+        const isAbyssHost = /sssrr\.org|trycloudflare\.com|abyssplayer\.com|playhydrax\.com/i.test(r.streamUrl);
+        const primaryBase = isAbyssHost && proxyBase !== "/proxy" ? proxyBase : "/proxy";
+        const altBase = primaryBase === "/proxy" ? proxyBase : "/proxy";
+        const viaProxy = (base) =>
+          `${base}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}${audio ? "&audio=" + encodeURIComponent(audio) : ""}`;
         return json({
           success: true,
           server: "ACDN",
           audio: "multi",
           multiAudio: true,
           format: isFile ? "file" : "hls",
-          streamUrl: `${acdnProxy}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}${audio ? '&audio=' + encodeURIComponent(audio) : ''}`,
-          fallbackStreamUrl: `/proxy?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://animesalt.cx/")}`,
+          streamUrl: viaProxy(primaryBase),
+          fallbackStreamUrl: viaProxy(altBase),
           rawStreamUrl: r.streamUrl,
           referer: r.referer || "https://animesalt.cx/",
           subtitles: (r.subtitles || []).map((s) => ({
             ...s,
             file: s.file && !s.file.startsWith("/proxy") && !s.file.startsWith("http://localhost")
-              ? `${proxyBase}?url=${encodeURIComponent(s.file)}&referer=${encodeURIComponent(r.referer || "https://ravok.buzz/")}`
+              ? `${primaryBase}?url=${encodeURIComponent(s.file)}&referer=${encodeURIComponent(r.referer || "https://ravok.buzz/")}`
               : s.file,
           })),
           intro: null,
@@ -739,6 +755,8 @@ export async function handle(request, env) {
           format: "file",
           requiresExtension: true,
           streamUrl: r.streamUrl,
+          // Without the extension the raw url cannot play; this proxied copy is a best-effort second try.
+          fallbackStreamUrl: `${proxyBase}?url=${encodeURIComponent(r.streamUrl)}&referer=${encodeURIComponent(r.referer || "https://abyssplayer.com/")}`,
           rawStreamUrl: r.streamUrl,
           referer: r.referer || "https://abyssplayer.com/",
           subtitles: [],

@@ -21,7 +21,14 @@ function zenkaiApi(): Plugin {
           const { handle } = await server.ssrLoadModule('/server/handler.js')
           const headers = new Headers()
           for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v)
-          const out: Response | null = await handle(new Request(`http://${req.headers.host}${url}`, { method: req.method, headers }), { SHIELD_SECRET: process.env.SHIELD_SECRET, IS_DEV: true })
+          // POST bodies (e.g. /api/stream/decrypt) must reach the handler too
+          let body: string | undefined
+          if (req.method && req.method !== 'GET' && req.method !== 'HEAD') {
+            const chunks: Buffer[] = []
+            for await (const c of req) chunks.push(Buffer.from(c as Uint8Array))
+            body = Buffer.concat(chunks).toString('utf8')
+          }
+          const out: Response | null = await handle(new Request(`http://${req.headers.host}${url}`, { method: req.method, headers, body }), { SHIELD_SECRET: process.env.SHIELD_SECRET, IS_DEV: true })
           if (!out) return next()
           res.writeHead(out.status, Object.fromEntries(out.headers))
           if (out.body) Readable.fromWeb(out.body as never).pipe(res)

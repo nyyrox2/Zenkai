@@ -4,7 +4,7 @@
 (function () {
   const meta = {
     installed: true,
-    version: '1.1.0',
+    version: '1.2.0',
     name: 'Zenkai Stream Companion',
     active: true,
     capabilities: [
@@ -17,13 +17,18 @@
       'flixcloud-direct',
       'animesalt-direct',
       'cors-bypass',
-      'p2p-residential'
+      'p2p-residential',
+      // 1.2.0: the web app resolves IP-bound ACDN / AbyssPlayer streams in this browser (see rules 36-40)
+      'acdn-client',
+      'abyss-client'
     ]
   };
 
   // 1. Mark the root HTML document attribute immediately so React components detect it before first render
   document.documentElement.dataset.zenkaiCompanion = 'true';
   document.documentElement.dataset.zenkaiCompanionVersion = meta.version;
+  // capability list also as an attribute, for pages whose CSP blocks the inline script below
+  document.documentElement.dataset.zenkaiCompanionCaps = meta.capabilities.join(',');
 
   // 2. Inject global object into the page execution context
   try {

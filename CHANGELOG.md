@@ -2,6 +2,19 @@
 
 All notable changes to the Zenkai Web application will be documented in this file.
 
+## [1.0.5] - 2026-11-13
+
+### 🔧 ACDN & AbyssPlayer in production
+
+- **Browser-side resolving (extension v1.2.0)**:
+  - ACDN (ravok / as-cdn) and AbyssPlayer links are IP-bound: they only play from the IP that resolved them.
+  - With the Zenkai extension installed, the browser now resolves them itself and plays them directly, no proxy in between.
+  - Without the extension, ACDN keeps working through the server route; AbyssPlayer shows a clear "extension required" message.
+- **ACDN proxy routing fixed**: ravok / as-cdn streams use Zenkai's own `/proxy` (same egress as the resolver) instead of the external proxy; AbyssPlayer hosts keep the external proxy first. Each is the other's fallback.
+- **Stream type fix**: the API now reports `hls` / `file` correctly for ACDN (it read a field that did not exist).
+- **New endpoint**: `POST /api/stream/decrypt` (AbyssPlayer decrypt helper used by the browser resolver).
+- **Extension 1.2.0**: new header/CORS rules for AnimeDekho, AbyssPlayer page requests, `getVideo` calls and a generic resolver marker; `zenkai-companion.zip` rebuilt with portable paths (forward slashes, no `_metadata`).
+
 ## [1.0.4] - 2026-11-03
 
 ### 📞 Direct Voice Calling

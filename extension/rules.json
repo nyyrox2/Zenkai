@@ -2120,11 +2120,12 @@
         {
           "header": "Referer",
           "operation": "set",
-          "value": "https://abyssplayer.com/"
+          "value": "https://playhydrax.com/"
         },
         {
           "header": "Origin",
-          "operation": "remove"
+          "operation": "set",
+          "value": "https://playhydrax.com"
         }
       ],
       "responseHeaders": [
@@ -2158,6 +2159,256 @@
         "media",
         "xmlhttprequest",
         "other"
+      ]
+    }
+  },
+  {
+    "id": 36,
+    "priority": 4,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Origin",
+          "operation": "set",
+          "value": "https://ravok.buzz"
+        },
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://ravok.buzz/"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, POST, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "ravok.buzz"
+      ],
+      "urlFilter": "*do=getVideo*",
+      "initiatorDomains": [
+        "pages.dev",
+        "zenkai.cfd",
+        "localhost",
+        "127.0.0.1"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest"
+      ]
+    }
+  },
+  {
+    "id": 37,
+    "priority": 4,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "X-Requested-With",
+          "operation": "set",
+          "value": "XMLHttpRequest"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, POST, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*do=getVideo*",
+      "initiatorDomains": [
+        "pages.dev",
+        "zenkai.cfd",
+        "localhost",
+        "127.0.0.1"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest"
+      ]
+    }
+  },
+  {
+    "id": 38,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "set",
+          "value": "https://animedekho.app/"
+        },
+        {
+          "header": "Origin",
+          "operation": "remove"
+        }
+      ],
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, POST, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "animedekho.app"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "media",
+        "xmlhttprequest",
+        "image",
+        "script",
+        "stylesheet",
+        "other"
+      ],
+      "excludedRequestDomains": [
+        "127.0.0.1",
+        "localhost",
+        "pages.dev",
+        "zenkai.cfd"
+      ]
+    }
+  },
+  {
+    "id": 39,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Cookie",
+          "operation": "set",
+          "value": "toronites_server=vidstream"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "animedekho.app"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "main_frame",
+        "sub_frame"
+      ]
+    }
+  },
+  {
+    "id": 40,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "Access-Control-Allow-Origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Allow-Methods",
+          "operation": "set",
+          "value": "GET, HEAD, POST, OPTIONS"
+        },
+        {
+          "header": "Access-Control-Allow-Headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "Access-Control-Expose-Headers",
+          "operation": "set",
+          "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "*__zk=1*",
+      "initiatorDomains": [
+        "pages.dev",
+        "zenkai.cfd",
+        "localhost",
+        "127.0.0.1"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest"
       ]
     }
   }
