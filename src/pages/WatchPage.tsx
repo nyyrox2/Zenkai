@@ -87,7 +87,7 @@ import { StreamProblem } from '../components/StreamProblem'
 
 
 function Frame({ children }: { children: React.ReactNode }) {
-  return <div data-tour="w-player" className="relative aspect-video w-full overflow-hidden bg-black  lg:ring-1 lg:ring-white/10">{children}</div>
+  return <div data-tour="w-player" className="relative aspect-video w-full overflow-hidden bg-black">{children}</div>
 }
 
 /** Loading (episode, first load and server switch): the show's logo fills from dim to full colour. No logo: the Zenkai logo fills smoothly, plus quiet server switch. */
@@ -121,7 +121,7 @@ const WATCH_TOUR: TourStep[] = [
   { target: '[data-tour="w-eps"]', title: 'Episodes', text: 'Jump to any episode from this list.' },
 ]
 
-const pill = 'rounded-full border px-4 py-2 text-sm font-semibold transition active:scale-95'
+const pill = 'rounded-sm border px-4 py-2 text-sm font-semibold transition'
 
 export default function WatchPage() {
   const id = Number(useParams().id)
@@ -785,14 +785,14 @@ export default function WatchPage() {
         />
   )
 
-  const flat = 'inline-flex h-8 items-center gap-1.5 border border-border px-3 text-xs font-semibold text-muted transition hover:border-foreground/40 hover:text-foreground active:scale-95'
+  const flat = 'inline-flex h-8 items-center gap-1.5 border border-border px-3 text-xs font-semibold text-muted transition hover:border-foreground/40 hover:text-foreground'
   const providers = bundle?.tmdb?.watchProviders?.providers ?? []
 
   return (
-    <main className="relative pb-10">
-      <div className={cn('mx-auto lg:px-6 lg:pt-6', wide ? 'grid max-w-[1760px] grid-cols-[272px_minmax(0,1fr)_312px] items-start gap-6' : 'max-w-7xl')}>
+    <main className="calm relative pb-10">
+      <div className={cn('mx-auto lg:pt-0', wide ? 'grid max-w-[1800px] grid-cols-[264px_minmax(0,1fr)_288px] items-start' : 'max-w-[1400px] lg:px-4')}>
         {wide && (
-          <aside className="sticky top-6 max-h-[calc(100svh-3rem)] self-start overflow-y-auto overscroll-contain pb-4 scrollbar-none">
+          <aside className="sticky top-0 max-h-svh self-start overflow-y-auto overscroll-contain border-r border-border/40 px-4 py-4 scrollbar-none">
             {a ? (
               <WatchInfoRail
                 a={a}
@@ -842,7 +842,7 @@ export default function WatchPage() {
           {!sessionVerified && server.kind !== 'embed' ? (
             <Frame>
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
-                <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent">
+                <div className="relative mb-3 grid size-16 place-items-center rounded-sm border border-accent/30 bg-accent/10 text-accent">
                   <Lock className="size-8 animate-pulse" />
                 </div>
                 <h3 className="font-display text-lg font-bold text-foreground">Media Playback Locked</h3>
@@ -850,7 +850,7 @@ export default function WatchPage() {
                   Verification challenge in progress. Complete the challenge to unlock high-speed streaming. Embed servers below still work.
                 </p>
                 {shieldFailed && (
-                  <button onClick={() => void getToken()} className="mt-4 rounded-full bg-white px-5 py-2 text-xs font-bold text-black active:scale-95">
+                  <button onClick={() => void getToken()} className="mt-4 rounded-sm bg-white px-5 py-2 text-xs font-bold text-black">
                     Retry
                   </button>
                 )}
@@ -968,7 +968,7 @@ export default function WatchPage() {
           </div>
 
           {/* Title + episode nav */}
-          <div className="mt-4 flex px-3 sm:px-6 lg:px-0 flex-wrap items-start justify-between gap-4">
+          <div className="mt-3 flex px-3 sm:px-4 lg:px-4 flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               {a ? (
                 <>
@@ -996,7 +996,7 @@ export default function WatchPage() {
                 companion.isOutdated ? (
                   <Link
                     to="/extension"
-                    className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/70 transition-all hover:border-white/20 hover:text-white"
+                    className="group inline-flex items-center gap-2 rounded-sm border border-white/10 bg-transparent px-3 py-1 text-xs font-semibold text-white/70 transition-all hover:border-white/20 hover:text-white"
                     title={`Your extension is v${companion.version || '1.0.0'}. Click to update to v${LATEST_EXTENSION_VERSION}.`}
                   >
                     <span className="size-1.5 rounded-full bg-accent animate-pulse" />
@@ -1006,7 +1006,7 @@ export default function WatchPage() {
                 ) : (
                   <Link
                     to="/extension"
-                    className="group inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/70 transition-all hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                    className="group inline-flex items-center gap-2 rounded-sm border border-white/[0.08] bg-transparent px-3 py-1 text-xs font-semibold text-white/70 transition-all hover:border-white/20 hover:bg-transparent hover:text-white"
                     title={`Zenkai Extension v${companion.version || LATEST_EXTENSION_VERSION} active.`}
                   >
                     <span className="size-1.5 rounded-full bg-white/80" />
@@ -1019,7 +1019,7 @@ export default function WatchPage() {
               ) : (
                 <Link
                   to="/extension"
-                  className="group inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/60 transition-all hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                  className="group inline-flex items-center gap-1.5 rounded-sm border border-white/10 bg-transparent px-3 py-1 text-xs font-semibold text-white/60 transition-all hover:border-white/20 hover:bg-transparent hover:text-white"
                 >
                   <span>Get Extension</span>
                 </Link>
@@ -1029,7 +1029,7 @@ export default function WatchPage() {
                 onClick={() => setWatchModalOpen((o) => !o)}
                 className={cn(
                   pill,
-                  'inline-flex items-center gap-2 border shadow-sm transition active:scale-95',
+                  'inline-flex items-center gap-2 border transition',
                   room
                     ? 'border-border bg-card-2 text-foreground'
                     : 'border-border bg-card/60 text-foreground hover:border-accent'
@@ -1060,16 +1060,16 @@ export default function WatchPage() {
 
         </div>
 
-        <div className={cn('mt-2 grid gap-8 px-3 sm:px-6 lg:px-0', !wide && 'xl:grid-cols-[minmax(0,1fr)_340px]')}>
+        <div className={cn('mt-2 grid gap-4 px-3 sm:px-4 lg:px-4', !wide && 'xl:grid-cols-[minmax(0,1fr)_340px]')}>
         <div className="min-w-0">
           {room ? (
             /* Watch Together Control Center & Live Chat below Player */
             <div className="mt-5 space-y-4">
               {/* Watch Together Control & Status Bar */}
-              <div className="space-y-3 rounded-3xl border border-border bg-card/80 p-3.5 sm:p-4">
+              <div className="space-y-3 border-t border-border p-3.5 sm:p-4">
                 <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-2xl border border-border bg-card-2 text-foreground">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-sm border border-border bg-card-2 text-foreground">
                     <MonitorPlay className="size-5" />
                   </div>
                   <div>
@@ -1077,7 +1077,7 @@ export default function WatchPage() {
                       <span className="font-display text-sm sm:text-base font-bold text-foreground">
                         Room {room.roomId}
                       </span>
-                      <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
+                      <span className="inline-flex items-center gap-1 rounded-sm border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
                         <span className="size-1.5 rounded-full bg-emerald-400" />
                         Synced
                       </span>
@@ -1098,7 +1098,7 @@ export default function WatchPage() {
                     onClick={handleLeaveRoom}
                     title="Leave Watch Party"
                     aria-label="Leave Watch Party"
-                    className="grid size-9 shrink-0 place-items-center rounded-full border border-border text-muted transition hover:border-rose-500/40 hover:text-rose-400 active:scale-90"
+                    className="grid size-9 shrink-0 place-items-center rounded-full border border-border text-muted transition hover:border-rose-500/40 hover:text-rose-400"
                   >
                     <LogOut className="size-4" />
                   </button>
@@ -1140,7 +1140,7 @@ export default function WatchPage() {
                     }}
                     title={isMicActive ? 'Mute Microphone' : 'Enable Microphone'}
                     className={cn(
-                      'inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-95',
+                      'inline-flex h-10 items-center justify-center gap-1.5 rounded-sm border px-3 text-xs font-semibold transition',
                       isMicActive
                         ? 'border-transparent bg-foreground text-background'
                         : 'border-border bg-card-2 text-muted hover:text-foreground hover:border-accent'
@@ -1154,7 +1154,7 @@ export default function WatchPage() {
                   <button
                     type="button"
                     onClick={handleCopyInvite}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 text-xs font-semibold text-foreground transition hover:border-accent active:scale-95"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-sm border border-border bg-card-2 px-3 text-xs font-semibold text-foreground transition hover:border-accent"
                   >
                     {copiedInvite ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
                     <span>{copiedInvite ? 'Copied' : 'Invite'}</span>
@@ -1170,7 +1170,7 @@ export default function WatchPage() {
                     }}
                     title={hideEmojiOverlay ? 'Show floating emoji reactions' : 'Hide floating emoji reactions'}
                     className={cn(
-                      'inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 text-xs font-semibold transition active:scale-95',
+                      'inline-flex h-10 items-center justify-center gap-1.5 rounded-sm border border-border bg-card-2 px-3 text-xs font-semibold transition',
                       hideEmojiOverlay ? 'text-muted' : 'text-foreground'
                     )}
                   >
@@ -1184,7 +1184,7 @@ export default function WatchPage() {
                       <button
                         type="button"
                         onClick={() => setChangeShowOpen(true)}
-                        className="col-span-2 inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 text-xs font-semibold text-foreground transition hover:border-accent active:scale-95"
+                        className="col-span-2 inline-flex h-10 items-center justify-center gap-1.5 rounded-sm border border-border bg-card-2 px-3 text-xs font-semibold text-foreground transition hover:border-accent"
                       >
                         <Film className="size-3.5" />
                         <span>Change Show</span>
@@ -1199,7 +1199,7 @@ export default function WatchPage() {
                           toast(nextMode ? 'Playback Control: Host Only' : 'Playback Control: Free for All', 'info')
                         }}
                         title="Toggle playback control permission"
-                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border bg-card-2 px-3 text-xs font-semibold text-muted transition hover:text-foreground active:scale-95"
+                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-sm border border-border bg-card-2 px-3 text-xs font-semibold text-muted transition hover:text-foreground"
                       >
                         {room.hostOnlyControl ? <Lock className="size-3.5" /> : <Unlock className="size-3.5" />}
                         <span>{room.hostOnlyControl ? 'Host Only' : 'Free Mode'}</span>
@@ -1212,7 +1212,7 @@ export default function WatchPage() {
 
               {/* Connected Members & Voice Mute Strip */}
               {peers.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/50 bg-card-2/40 px-3 py-2 ">
+                <div className="flex flex-wrap items-center gap-2 rounded-sm border border-border/50 bg-card-2/40 px-3 py-2 ">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
                     Members ({peers.length}):
                   </span>
@@ -1222,7 +1222,7 @@ export default function WatchPage() {
                       return (
                         <div
                           key={p.peerId}
-                          className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-card/90 px-2.5 py-1 text-xs shadow-sm"
+                          className="flex items-center gap-1.5 rounded-sm border border-border/60 bg-card/90 px-2.5 py-1 text-xs"
                         >
                           <div className="relative">
                             <Avatar size={20} name={p.displayName} src={p.avatar} />
@@ -1259,7 +1259,7 @@ export default function WatchPage() {
                               }}
                               title={p.isLocallyMuted ? `Unmute @${p.username}` : `Mute @${p.username} for you`}
                               className={cn(
-                                'ml-0.5 grid size-5 place-items-center rounded-lg border transition active:scale-90',
+                                'ml-0.5 grid size-5 place-items-center rounded-sm border transition',
                                 p.isLocallyMuted
                                   ? 'border-rose-500/40 bg-rose-500/20 text-rose-400'
                                   : 'border-border/60 bg-card-2 text-muted hover:text-foreground'
@@ -1282,7 +1282,7 @@ export default function WatchPage() {
                     type="button"
                     onClick={() => setHostTab('chat')}
                     className={cn(
-                      'flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition active:scale-95',
+                      'flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold transition',
                       hostTab === 'chat'
                         ? 'bg-foreground text-background'
                         : 'bg-card-2 border border-border text-muted hover:text-foreground'
@@ -1295,7 +1295,7 @@ export default function WatchPage() {
                     type="button"
                     onClick={() => setHostTab('episodes')}
                     className={cn(
-                      'flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition active:scale-95',
+                      'flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold transition',
                       hostTab === 'episodes'
                         ? 'bg-foreground text-background'
                         : 'bg-card-2 border border-border text-muted hover:text-foreground'
@@ -1308,7 +1308,7 @@ export default function WatchPage() {
                     type="button"
                     onClick={() => setHostTab('servers')}
                     className={cn(
-                      'flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition active:scale-95',
+                      'flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold transition',
                       hostTab === 'servers'
                         ? 'bg-foreground text-background'
                         : 'bg-card-2 border border-border text-muted hover:text-foreground'
@@ -1322,15 +1322,15 @@ export default function WatchPage() {
 
               {/* Chat View (always open for guests; for host, shown when hostTab === 'chat') */}
               {(!room.isHost || hostTab === 'chat') && chatOpen && (
-                <p className="rounded-2xl border border-border bg-card/85 p-3 text-center text-xs text-muted">Chat is open beside the player.</p>
+                <p className="border-t border-border p-3 text-center text-xs text-muted">Chat is open beside the player.</p>
               )}
               {(!room.isHost || hostTab === 'chat') && !chatOpen && (
-                <div className="overflow-hidden rounded-3xl border border-border bg-card/85 p-3 sm:p-4 ">
+                <div className="overflow-hidden border-t border-border p-3 sm:p-4 ">
                   {/* Chat messages stream */}
-                  <div className="h-64 sm:h-72 overflow-y-auto space-y-2 p-2.5 overscroll-contain rounded-2xl bg-card-2/60 border border-border/40">
+                  <div className="h-64 sm:h-72 overflow-y-auto space-y-2 p-2.5 overscroll-contain rounded-sm bg-card-2/60 border border-border/40">
                     {chatMessages.length === 0 ? (
                       <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-                        <div className="grid size-11 place-items-center rounded-2xl bg-card text-muted shadow-sm">
+                        <div className="grid size-11 place-items-center rounded-sm bg-card text-muted">
                           <MessageSquare className="size-5 text-accent" />
                         </div>
                         <p className="mt-2 text-xs font-bold text-foreground">Room Chat is Live</p>
@@ -1342,7 +1342,7 @@ export default function WatchPage() {
                       chatMessages.map((msg) => (
                         <div key={msg.id} className="flex items-start gap-2.5">
                           <Avatar size={28} name={msg.senderName} src={msg.avatar} />
-                          <div className="min-w-0 max-w-[85%] rounded-2xl bg-card px-3 py-1.5 border border-border/60 shadow-sm">
+                          <div className="min-w-0 max-w-[85%] rounded-sm bg-card px-3 py-1.5 border border-border/60">
                             <div className="flex items-center justify-between gap-3">
                               <span className="font-bold text-[11px] text-muted truncate">
                                 {msg.senderName}
@@ -1371,7 +1371,7 @@ export default function WatchPage() {
                             setReactions((prev) => [...prev.slice(-30), r])
                           }
                         }}
-                        className="grid size-8 shrink-0 place-items-center rounded-xl bg-card-2 hover:bg-accent/20 text-base transition active:scale-125"
+                        className="grid size-8 shrink-0 place-items-center rounded-sm bg-card-2 hover:bg-accent/20 text-base transition active:scale-125"
                       >
                         {emoji}
                       </button>
@@ -1394,12 +1394,12 @@ export default function WatchPage() {
                       value={inlineChatText}
                       onChange={(e) => setInlineChatText(e.target.value)}
                       placeholder="Chat with watch party…"
-                      className="h-10 flex-1 rounded-xl border border-border bg-card-2 px-3.5 text-xs text-foreground outline-none transition focus-visible:border-accent"
+                      className="h-10 flex-1 rounded-sm border border-border bg-card-2 px-3.5 text-xs text-foreground outline-none transition focus-visible:border-accent"
                     />
                     <button
                       type="submit"
                       disabled={!inlineChatText.trim()}
-                      className="flex h-10 items-center gap-1.5 rounded-xl bg-accent px-4 text-xs font-bold text-accent-fg transition hover:brightness-110 active:scale-95 disabled:opacity-40 shadow-sm"
+                      className="flex h-10 items-center gap-1.5 rounded-sm bg-accent px-4 text-xs font-bold text-accent-fg transition hover:brightness-110 disabled:opacity-40"
                     >
                       <Send className="size-3.5" />
                       <span className="hidden sm:inline">Send</span>
@@ -1411,7 +1411,7 @@ export default function WatchPage() {
               {/* Host Episodes View (when hostTab === 'episodes') */}
               {room.isHost && hostTab === 'episodes' && a && available > 0 && (
                 <section data-tour="w-eps" className="mt-4" aria-label="Episodes">
-                  <div className="mb-3 rounded-2xl border border-accent/30 bg-accent/10 p-3 text-xs text-accent font-semibold flex items-center gap-2">
+                  <div className="mb-3 rounded-sm border border-accent/30 bg-accent/10 p-3 text-xs text-accent font-semibold flex items-center gap-2">
                     <Crown className="size-4 shrink-0 text-foreground" />
                     <span>Host Control: Selecting an episode immediately syncs it for all peers in this party.</span>
                   </div>
@@ -1431,8 +1431,8 @@ export default function WatchPage() {
 
               {/* Host Servers & Audio View (when hostTab === 'servers') */}
               {room.isHost && hostTab === 'servers' && (
-                <div className="rounded-3xl border border-border bg-card/85 p-4 sm:p-5  space-y-5">
-                  <div className="rounded-2xl border border-accent/30 bg-accent/10 p-3 text-xs text-accent font-semibold flex items-center gap-2">
+                <div className="border-t border-border p-4 sm:p-5  space-y-5">
+                  <div className="rounded-sm border border-accent/30 bg-accent/10 p-3 text-xs text-accent font-semibold flex items-center gap-2">
                     <Crown className="size-4 shrink-0 text-foreground" />
                     <span>Host Control: Switching server or audio (track / Sub / Dub) will instantly sync it for all peers in the room.</span>
                   </div>
@@ -1443,14 +1443,14 @@ export default function WatchPage() {
                       {tracks.length > 0 ? `Audio · ${server.name}` : 'Audio Mode'}
                     </span>
                     {tracks.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-1 rounded-3xl border border-border p-1 w-fit max-w-full">
+                      <div className="mt-2 flex flex-wrap gap-1 rounded-sm border border-border p-1 w-fit max-w-full">
                         {tracks.map((t) => (
                           <button
                             key={t.i}
                             onClick={() => pickTrack(t)}
                             className={cn(
-                              'rounded-full px-4 py-2 text-xs font-bold uppercase transition active:scale-95',
-                              aud.active === t.i ? 'bg-foreground text-background shadow-sm' : 'text-muted hover:text-foreground'
+                              'rounded-sm px-4 py-2 text-xs font-bold uppercase transition',
+                              aud.active === t.i ? 'bg-foreground text-background' : 'text-muted hover:text-foreground'
                             )}
                           >
                             {t.label}
@@ -1460,15 +1460,15 @@ export default function WatchPage() {
                     ) : server.multi || server.kind === 'animesalt' ? (
                       <p className="mt-2 text-xs text-muted">{stream.loading || salt.loading ? 'Loading audio tracks…' : 'Audio tracks are chosen inside the player on this server.'}</p>
                     ) : (
-                    <div className="mt-2 flex flex-wrap rounded-3xl border border-border p-1 w-fit">
+                    <div className="mt-2 flex flex-wrap rounded-sm border border-border p-1 w-fit">
                       {(['sub', 'dub'] as const).map((m) => (
                         <button
                           key={m}
                           disabled={!server.audio}
                           onClick={() => go({ audio: m })}
                           className={cn(
-                            'rounded-full px-5 py-2 text-xs font-bold uppercase transition active:scale-95',
-                            audio === m && server.audio ? 'bg-foreground text-background shadow-sm' : 'text-muted hover:text-foreground',
+                            'rounded-sm px-5 py-2 text-xs font-bold uppercase transition',
+                            audio === m && server.audio ? 'bg-foreground text-background' : 'text-muted hover:text-foreground',
                             !server.audio && 'opacity-40'
                           )}
                         >
@@ -1526,13 +1526,13 @@ export default function WatchPage() {
               <section className="mt-5 flex flex-wrap items-center gap-3" aria-label="Source">
                 <div data-tour="w-audio" className="flex w-full items-center gap-2 sm:w-auto">
                   <span className="text-xs font-semibold uppercase tracking-widest text-muted">Audio</span>
-                  <div className="flex flex-wrap rounded-3xl border border-border p-0.5">
+                  <div className="flex flex-wrap rounded-sm border border-border p-0.5">
                     {tracks.length > 0
                       ? tracks.map((t) => (
                           <button
                             key={t.i}
                             onClick={() => pickTrack(t)}
-                            className={cn('rounded-full px-4 py-1.5 text-xs font-bold uppercase transition', aud.active === t.i ? 'bg-foreground text-background' : 'text-muted')}
+                            className={cn('rounded-sm px-4 py-1.5 text-xs font-bold uppercase transition', aud.active === t.i ? 'bg-foreground text-background' : 'text-muted')}
                           >
                             {t.label}
                           </button>
@@ -1544,7 +1544,7 @@ export default function WatchPage() {
                             key={m}
                             disabled={!server.audio}
                             onClick={() => go({ audio: m })}
-                            className={cn('rounded-full px-4 py-1.5 text-xs font-bold uppercase transition', audio === m && server.audio ? 'bg-foreground text-background' : 'text-muted', !server.audio && 'opacity-40')}
+                            className={cn('rounded-sm px-4 py-1.5 text-xs font-bold uppercase transition', audio === m && server.audio ? 'bg-foreground text-background' : 'text-muted', !server.audio && 'opacity-40')}
                           >
                             {m}
                           </button>
@@ -1601,15 +1601,15 @@ export default function WatchPage() {
         {/* Side card */}
         <aside className={cn('space-y-4 xl:sticky xl:top-24 xl:self-start', wide && 'hidden')}>
           {a ? (
-            <div className="overflow-hidden rounded-3xl border border-border bg-card/60">
+            <div className="overflow-hidden border-t border-border">
               <div className="flex gap-4 p-4">
-                <img src={a.coverImage.large ?? ''} alt="" className="aspect-[2/3] w-24 shrink-0 rounded-2xl object-cover" />
+                <img src={a.coverImage.large ?? ''} alt="" className="aspect-[2/3] w-24 shrink-0 rounded-sm object-cover" />
                 <div className="min-w-0">
                   <p className="line-clamp-2 font-semibold leading-snug">{title}</p>
                   <p className="mt-1 text-xs text-muted">{[a.seasonYear, a.episodes ? `${a.episodes} eps` : null].filter(Boolean).join(' · ')}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {a.genres.slice(0, 3).map((g) => (
-                      <span key={g} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
+                      <span key={g} className="rounded-sm border border-border px-2 py-0.5 text-[11px] text-muted">
                         {g}
                       </span>
                     ))}
@@ -1637,12 +1637,12 @@ export default function WatchPage() {
               </div>
             </div>
           ) : (
-            <Skeleton className="h-64 w-full rounded-3xl" />
+            <Skeleton className="h-64 w-full rounded-sm" />
           )}
 
           {/* Official Streams & Creator Support */}
           {bundle?.tmdb?.watchProviders?.providers && bundle.tmdb.watchProviders.providers.length > 0 && (
-            <div className="overflow-hidden rounded-3xl border border-border bg-card/60 p-4">
+            <div className="overflow-hidden border-t border-border p-4">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="size-4 text-emerald-400" />
@@ -1653,7 +1653,7 @@ export default function WatchPage() {
                     href={bundle.tmdb.watchProviders.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-muted hover:text-foreground"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted hover:text-foreground"
                   >
                     <span>JustWatch</span>
                     <ExternalLink className="size-3" />
@@ -1670,13 +1670,13 @@ export default function WatchPage() {
                     href={bundle.tmdb?.watchProviders?.link || `https://www.google.com/search?q=watch+${encodeURIComponent(title)}+on+${encodeURIComponent(p.name)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card-2/80 px-2.5 py-1.5 text-xs font-medium transition hover:border-foreground/30 active:scale-95"
+                    className="inline-flex items-center gap-2 rounded-sm border border-border bg-card-2/80 px-2.5 py-1.5 text-xs font-semibold transition hover:border-foreground/30"
                   >
                     {p.logo && (
                       <img
                         src={p.logo}
                         alt={p.name}
-                        className="size-4 rounded object-cover shadow-sm"
+                        className="size-4 rounded object-cover"
                         onError={(e) => { (e.target as HTMLElement).style.display = 'none' }}
                       />
                     )}
@@ -1691,14 +1691,14 @@ export default function WatchPage() {
         </div>
         </div>
         {wide && (
-          <aside className="sticky top-6 self-start">
+          <aside className="sticky top-0 self-start border-l border-border/40 px-4 py-4">
             <AnimatePresence mode="wait" initial={false}>
               {watchModalOpen ? (
-                <motion.div key="party" initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 14 }} transition={{ duration: 0.22, ease: 'easeOut' }} className="h-[calc(100svh-3rem)] max-h-[780px]">
+                <motion.div key="party" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-[calc(100svh-2rem)] max-h-[780px]">
                   {watchPanel(true)}
                 </motion.div>
               ) : (
-                <motion.div key="recs" initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={{ duration: 0.22, ease: 'easeOut' }} className="max-h-[calc(100svh-3rem)] overflow-y-auto overscroll-contain pb-4 scrollbar-none">
+                <motion.div key="recs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="max-h-[calc(100svh-2rem)] overflow-y-auto overscroll-contain scrollbar-none">
                   {a && <WatchRecsRail a={a} id={id} />}
                 </motion.div>
               )}
@@ -1721,8 +1721,8 @@ export default function WatchPage() {
 
       {/* Report Modal */}
       {reportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in">
+          <div className="w-full max-w-md overflow-hidden rounded-sm border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border p-4">
               <div className="flex items-center gap-2">
                 <Flag className="size-4 text-rose-500" />
@@ -1772,7 +1772,7 @@ export default function WatchPage() {
                       key={t}
                       onClick={() => setReportIssue(t)}
                       className={cn(
-                        'rounded-xl border px-3 py-2 text-left text-xs font-medium transition',
+                        'rounded-sm border px-3 py-2 text-left text-xs font-semibold transition',
                         reportIssue === t ? 'border-accent bg-accent/15 text-accent font-semibold' : 'border-border bg-card-2/50 text-muted hover:text-foreground'
                       )}
                     >
@@ -1788,21 +1788,21 @@ export default function WatchPage() {
                   onChange={(e) => setReportDetails(e.target.value)}
                   placeholder="Describe playback timestamp or error (optional)..."
                   rows={3}
-                  className="w-full rounded-2xl border border-border bg-background/60 p-3 text-xs outline-none focus:border-accent"
+                  className="w-full rounded-sm border border-border bg-background/60 p-3 text-xs outline-none focus:border-accent"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setReportOpen(false)}
-                  className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted hover:text-foreground"
+                  className="rounded-sm border border-border px-4 py-2 text-xs font-semibold text-muted hover:text-foreground"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={reportSubmitting}
-                  className="rounded-full bg-accent px-5 py-2 text-xs font-semibold text-accent-fg transition hover:opacity-90 disabled:opacity-50"
+                  className="rounded-sm bg-accent px-5 py-2 text-xs font-semibold text-accent-fg transition hover:opacity-90 disabled:opacity-50"
                 >
                   {reportSubmitting ? 'Submitting...' : 'Send Report'}
                 </button>

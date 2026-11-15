@@ -736,3 +736,28 @@
   .zp-ac .zp-b.pill em{display:none}
   .zp-b.pill{padding:0 calc(var(--u)*.7)}
 }
+
+/* ---- Adaptive sizing: menus (settings, captions, servers) follow the screen + mode ----
+   --u comes from the smaller screen side, so one rule covers DPI, window size, fullscreen, phone portrait/landscape.
+   portrait phone: bottom sheet | phone landscape: side panel | desktop: centred card, bigger in fullscreen */
+.zp-sw { --u: clamp(11px, calc(0.55vmin + 8px), 17px); }
+.zp-fs .zp-sw { --u: clamp(12px, calc(0.7vmin + 9px), 20px); }
+.zp-sh { font-size: max(13px, calc(var(--u) * 1.05)); width: min(100%, calc(var(--u) * 34)); }
+.zp-sh .zp-row, .zp-sh .zp-pi { font-size: 1em; }
+@media (orientation: landscape) and (max-height: 620px) {
+  .zp-sw { --u: clamp(10px, calc(2.6vh), 13px); }
+  .zp-sh { width: clamp(280px, calc(var(--u) * 30), 70vw); }
+}
+@media (min-width: 900px) and (min-height: 621px) {
+  .zp-sh { width: clamp(400px, calc(var(--u) * 32), 580px); }
+  .zp-fs .zp-sh { width: clamp(440px, calc(var(--u) * 34), 640px); }
+}
+/* in-player dropdowns + controls: allow growing in fullscreen on big screens, tighter on phone landscape */
+@media (min-width: 900px) and (min-height: 621px) {
+  .zp-fs .zp-in { --u: clamp(8px, min(2.5cqw, 4.4cqh), 18px); --tap: clamp(28px, min(7cqw, 13cqh), 44px); --fm: clamp(10px, min(2.6cqw, 4.8cqh), 14px); }
+  .zp-fs .zp-pop { max-width: min(340px, 40%); }
+}
+@media (pointer: coarse) and (orientation: landscape) {
+  .zp-fs .zp-in { --u: clamp(7px, min(2.5cqw, 3.6cqh), 12px); }
+  .zp-pop { max-width: min(260px, 46%); }
+}

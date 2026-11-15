@@ -45,7 +45,7 @@ export const AnimeCard = memo(function AnimeCard({
 
   return (
     <div
-      className={cn('group/card relative animate-card-in shrink-0 snap-start', fluid ? 'w-full' : 'w-[148px] sm:w-[178px] lg:w-[196px]')}
+      className={cn('group/card relative shrink-0 snap-start', fluid ? 'w-full' : 'w-[148px] sm:w-[178px] lg:w-[196px]')}
       style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
     >
       <ListButton item={item} variant="icon" />
@@ -53,7 +53,7 @@ export const AnimeCard = memo(function AnimeCard({
         <div
           ref={tilt}
           style={{ backgroundColor: item.color ?? undefined }}
-          className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border bg-card-2 shadow-lg shadow-black/10 transition-[transform,box-shadow] duration-200 ease-out group-hover:shadow-2xl group-hover:shadow-accent/20 group-focus-visible:ring-2 group-focus-visible:ring-accent"
+          className="relative aspect-[2/3] overflow-hidden rounded-sm border border-border bg-card-2 transition-[transform,box-shadow] duration-200 ease-out group-hover:shadow-2xl group-hover:shadow-accent/20 group-focus-visible:ring-2 group-focus-visible:ring-accent"
         >
           <Img
             src={item.image}
@@ -63,11 +63,11 @@ export const AnimeCard = memo(function AnimeCard({
             loading="lazy"
             decoding="async"
             draggable={false}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-500"
           />
 
           {item.score ? (
-            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">
+            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-sm bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">
               <Star className="size-3 fill-current" />
               {toScore10(item.score)}
             </span>
@@ -82,7 +82,7 @@ export const AnimeCard = memo(function AnimeCard({
           <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/30 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100">
             <div className="flex flex-wrap gap-1">
               {(item.genres ?? []).slice(0, 2).map((g) => (
-                <span key={g} className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium text-white">
+                <span key={g} className="rounded-sm bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white">
                   {g}
                 </span>
               ))}
@@ -91,7 +91,7 @@ export const AnimeCard = memo(function AnimeCard({
           </div>
         </div>
 
-        <h3 className="mt-3 line-clamp-2 text-sm font-medium leading-snug transition-colors group-hover:text-accent">{item.title}</h3>
+        <h3 className="mt-3 line-clamp-2 text-sm font-bold leading-snug transition-colors group-hover:text-accent">{item.title}</h3>
         <p className="mt-1 truncate text-xs text-muted">{item.caption ?? meta}</p>
       </Link>
     </div>

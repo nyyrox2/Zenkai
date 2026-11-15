@@ -1,8 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { fetchHome, fetchLatestEpisodes } from '../services/anilist'
-import { fetchMalTop } from '../services/jikan'
 import { useAsync } from '../hooks/useAsync'
-import { malToCard, mediaToCard } from '../lib/mappers'
+import { mediaToCard } from '../lib/mappers'
 import { getSeason, humanize } from '../lib/utils'
 import { ContinueRow } from '../components/ContinueRow'
 import { AnimeRow } from '../components/AnimeRow'
@@ -13,13 +12,9 @@ import { GenreMarquee } from '../components/GenreMarquee'
 import { HeroCarousel } from '../components/HeroCarousel'
 import { HeroLoader } from '../components/HeroLoader'
 
-// module-level: stable identity, so useAsync doesn't re-fire every render
-const fetchMal = () => fetchMalTop(18).catch(() => null)
-
 export default function HomePage() {
   const home = useAsync(fetchHome, [])
   const latestEpisodes = useAsync(fetchLatestEpisodes, [])
-  const malTop = useAsync(fetchMal, [])
 
   const { season, year } = getSeason()
 
@@ -40,15 +35,14 @@ export default function HomePage() {
       popular: home.data?.popular.map(mediaToCard),
       top: home.data?.top.map(mediaToCard),
       upcoming: home.data?.upcoming.map(mediaToCard),
-      mal: malTop.data?.map(malToCard),
     }),
-    [home.data, malTop.data],
+    [home.data],
   )
 
   const err = home.error?.message
 
   return (
-    <main>
+    <main className="calm">
       {/* Hero Carousel: 70% viewport height so content peeks through from below */}
       {home.loading ? (
         <div className="relative h-[68svh] max-h-[660px] min-h-[460px] overflow-hidden lg:h-[70svh] lg:max-h-[660px]">
@@ -62,7 +56,7 @@ export default function HomePage() {
         <HeroCarousel items={heroItems} />
       )}
 
-      <div className="relative z-10 mt-8 space-y-12 pb-20 sm:space-y-14">
+      <div className="relative z-10 mt-4 space-y-8 pb-16 sm:space-y-10">
         {/* Continue Watching Row */}
         <ContinueRow />
 
@@ -121,15 +115,6 @@ export default function HomePage() {
           error={err}
           onRetry={home.reload}
           ranked
-        />
-
-        {/* MyAnimeList Top */}
-        <AnimeRow
-          id="mal"
-          eyebrow="MyAnimeList"
-          title="Top on MyAnimeList"
-          items={rows.mal}
-          loading={malTop.loading}
         />
 
         {/* Upcoming Anime */}

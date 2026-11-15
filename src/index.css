@@ -37,6 +37,10 @@
 :root[data-section="movies"] { --background: #ffffff; --card: #fafafa; --card-2: #efefef; --accent: #0b0b0e; --accent-fg: #ffffff; --glow: transparent; --glass: rgba(255, 255, 255, 0.78); }
 .dark[data-section="movies"] { --background: #000000; --card: #0a0a0a; --card-2: #151515; --accent: #f5f5f7; --accent-fg: #0b0b0e; --glow: transparent; --glass: rgba(0, 0, 0, 0.7); }
 
+/* Calm pages (home, player): neutral ink accent instead of crimson */
+.calm { --accent: #0b0b0e; --accent-fg: #ffffff; }
+.dark .calm { --accent: #f5f5f7; --accent-fg: #0b0b0e; }
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

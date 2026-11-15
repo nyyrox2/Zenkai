@@ -9,7 +9,11 @@ import { Skeleton } from './Skeleton'
 import { cn, formatLabel, pickTitle, stripHtml } from '../lib/utils'
 
 const Label = ({ children }: { children: ReactNode }) => (
-  <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-accent">{children}</p>
+  <p className="mb-2 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.2em] text-foreground/80 before:h-3 before:w-0.5 before:bg-accent">{children}</p>
+)
+
+const Rank = ({ n, top }: { n: number; top?: boolean }) => (
+  <span className={cn('w-7 shrink-0 text-center font-display text-xl font-black leading-none tabular-nums', top ? 'text-foreground' : 'text-muted/40')}>{n}</span>
 )
 
 const fl = (f?: string | null) => (f ? formatLabel(f) : null)
@@ -18,33 +22,28 @@ const countdown = (s: number) => {
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60)
   return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`
 }
-const fade = { initial: { opacity: 0, y: 6 }, animate: { opacity: 1, y: 0 } }
+const fade = { initial: { opacity: 0 }, animate: { opacity: 1 } }
 
 /** Left rail: about the show + franchise watch order. */
 export function WatchInfoRail({ a, title, id, actions, footer }: { a: AniLite; title: string; id: number; actions?: ReactNode; footer?: ReactNode }) {
   const [more, setMore] = useState(false)
   const next = a.nextAiringEpisode
   return (
-    <div className="space-y-7">
-      <motion.section {...fade} transition={{ duration: 0.3 }}>
+    <div className="space-y-5">
+      <motion.section {...fade} transition={{ duration: 0.2 }}>
         <Label>About</Label>
         <div className="flex gap-3">
-          <div className="relative aspect-[2/3] w-20 shrink-0 overflow-hidden bg-card-2">
+          <div className="relative aspect-[2/3] w-24 shrink-0 overflow-hidden bg-card-2">
             <Img src={a.coverImage.large ?? ''} alt="" className="size-full object-cover" />
           </div>
           <div className="min-w-0">
-            <p className="line-clamp-3 text-sm font-semibold leading-snug">{title}</p>
-            <p className="mt-1 text-xs text-muted">{meta(fl(a.format), a.seasonYear, a.episodes ? `${a.episodes} eps` : null)}</p>
-            {a.averageScore != null && (
-              <p className="mt-1 text-xs text-muted">
-                <span className="font-semibold text-foreground">{(a.averageScore / 10).toFixed(1)}</span> / 10
-              </p>
-            )}
+            <p className="line-clamp-3 text-base font-extrabold leading-snug">{title}</p>
+            <p className="mt-1 text-xs font-semibold text-muted">{meta(fl(a.format), a.seasonYear, a.episodes ? `${a.episodes} eps` : null)}</p>
           </div>
         </div>
         {a.genres.length > 0 && <p className="mt-3 text-xs text-muted">{a.genres.slice(0, 4).join(' · ')}</p>}
         {a.description && (
-          <p className="mt-2 text-xs leading-relaxed text-muted">
+          <p className="mt-2 text-xs font-medium leading-relaxed text-muted">
             <span className={cn(!more && 'line-clamp-4')}>{stripHtml(a.description)}</span>
             <button type="button" onClick={() => setMore((m) => !m)} className="mt-1 block text-[11px] font-semibold text-foreground/70 transition hover:text-foreground">
               {more ? 'Less' : 'More'}
@@ -55,7 +54,7 @@ export function WatchInfoRail({ a, title, id, actions, footer }: { a: AniLite; t
         {actions}
       </motion.section>
 
-      <motion.section {...fade} transition={{ duration: 0.3, delay: 0.08 }}>
+      <motion.section {...fade} transition={{ duration: 0.2 }}>
         <Label>Watch order</Label>
         <WatchOrder id={id} />
       </motion.section>
@@ -71,23 +70,26 @@ function WatchOrder({ id }: { id: number }) {
   const list = order.data ?? []
   if (list.length < 2) return <p className="text-xs text-muted">No other entries in this franchise.</p>
   return (
-    <ol className="max-h-[38vh] overflow-y-auto overscroll-contain border border-border scrollbar-none">
+    <ol className="max-h-[42vh] overflow-y-auto overscroll-contain scrollbar-none">
       {list.map((e, i) => {
         const cur = e.id === id
         return (
-          <motion.li key={e.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i, 10) * 0.03 }}>
+          <li key={e.id}>
             <Link
               to={`/watch/${e.id}`}
               aria-current={cur ? 'true' : undefined}
-              className={cn('flex items-center gap-2.5 border-l-2 px-2.5 py-2 transition hover:bg-card-2', cur ? 'border-foreground bg-card-2' : 'border-transparent', !e.main && !cur && 'opacity-60 hover:opacity-100')}
+              className={cn('group flex items-center gap-2.5 border-l-2 py-1.5 pl-1 pr-1.5 transition-colors hover:bg-card-2', cur ? 'border-accent bg-card-2' : 'border-transparent', !e.main && !cur && 'opacity-60 hover:opacity-100')}
             >
-              <span className="w-4 shrink-0 text-[10px] tabular-nums text-muted">{i + 1}</span>
+              <Rank n={i + 1} top={cur} />
+              <div className="relative aspect-[2/3] w-10 shrink-0 overflow-hidden bg-card-2">
+                <Img src={e.image ?? ''} alt="" loading="lazy" className="size-full object-cover" />
+              </div>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium">{pickTitle(e.title)}</span>
-                <span className="block truncate text-[10px] text-muted">{meta(fl(e.format), e.year, e.episodes ? `${e.episodes} eps` : null)}</span>
+                <span className="block truncate text-[13px] font-bold">{pickTitle(e.title)}</span>
+                <span className="block truncate text-[11px] font-medium text-muted">{meta(fl(e.format), e.year, e.episodes ? `${e.episodes} eps` : null)}</span>
               </span>
             </Link>
-          </motion.li>
+          </li>
         )
       })}
     </ol>
@@ -96,19 +98,18 @@ function WatchOrder({ id }: { id: number }) {
 
 function Row({ m, i }: { m: AniCardMedia; i: number }) {
   return (
-    <motion.li initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.035, duration: 0.25 }}>
-      <Link to={`/anime/${m.id}`} className="group flex items-center gap-3 px-1.5 py-1.5 transition hover:bg-card-2">
-        <div className="relative aspect-[2/3] w-9 shrink-0 overflow-hidden bg-card-2">
+    <li>
+      <Link to={`/anime/${m.id}`} className="group flex items-center gap-2.5 py-1.5 pl-1 pr-1.5 transition-colors hover:bg-card-2">
+        <Rank n={i + 1} top={i === 0} />
+        <div className="relative aspect-[2/3] w-10 shrink-0 overflow-hidden bg-card-2">
           <Img src={m.coverImage.large ?? ''} alt="" loading="lazy" className="size-full object-cover" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-xs font-medium text-foreground/90 transition group-hover:text-foreground">{pickTitle(m.title)}</p>
-          <p className="mt-0.5 truncate text-[10px] text-muted">
-            {meta(m.averageScore != null && `★ ${(m.averageScore / 10).toFixed(1)}`, fl(m.format), m.episodes ? `${m.episodes} eps` : null)}
-          </p>
+          <p className="line-clamp-2 text-[13px] font-bold leading-snug text-foreground/90 group-hover:text-foreground">{pickTitle(m.title)}</p>
+          <p className="mt-0.5 truncate text-[11px] font-medium text-muted">{meta(fl(m.format), m.episodes ? `${m.episodes} eps` : null)}</p>
         </div>
       </Link>
-    </motion.li>
+    </li>
   )
 }
 
@@ -130,7 +131,7 @@ export function WatchRecsRail({ a, id }: { a: AniLite; id: number }) {
   const hot = (trending.data ?? []).filter((m) => !skip.has(m.id)).slice(0, 5)
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-5">
       <section>
         <Label>More like this</Label>
         {picks.loading ? <Skel /> : (picks.data?.length ?? 0) > 0 ? <ul>{picks.data!.map((m, i) => <Row key={m.id} m={m} i={i} />)}</ul> : <p className="text-xs text-muted">Nothing similar found.</p>}

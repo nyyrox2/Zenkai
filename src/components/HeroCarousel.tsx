@@ -97,7 +97,7 @@ function SaveButton({ media }: { media: AniMedia }) {
       title={label}
       onClick={() => toggleList(toMeta(mediaToCard(media)))}
       className={cn(
-        'grid size-12 place-items-center rounded-full border backdrop-blur-md transition active:scale-90',
+        'grid size-12 place-items-center rounded-sm border-md transition',
         inList
           ? 'border-accent bg-accent/25 text-accent shadow-md shadow-accent/20'
           : 'border-white/20 bg-black/40 text-white hover:bg-white/20'
@@ -187,15 +187,13 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
         </AnimatePresence>
 
         {/* Cinematic dark scrims */}
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/80 via-black/30 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
-        <div className="absolute inset-0 hidden lg:block bg-gradient-to-r from-black/85 via-black/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
       </div>
 
       {/* Seamless cinematic bottom dark gradient: smoothly blends hero into page background */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 -bottom-1 h-44 sm:h-64 bg-gradient-to-t from-background via-background/95 via-background/60 to-transparent z-10"
+        className="pointer-events-none absolute inset-x-0 -bottom-1 h-24 sm:h-32 bg-gradient-to-t from-background to-transparent z-10"
       />
 
       <div className="relative z-20 mx-auto flex h-full w-full max-w-7xl flex-col justify-end px-5 pb-6 sm:px-8 lg:pb-10">
@@ -208,9 +206,9 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
           >
             <Heading title={title} logo={tmdb?.logo ?? null} loaded={bundle !== null} />
 
-            <Rise i={1} className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-[13px] font-medium text-white/80 lg:justify-start">
+            <Rise i={1} className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-[13px] font-semibold text-white/80 lg:justify-start">
               <span className="inline-flex items-center gap-1.5">
-                <span aria-hidden className={cn('size-2 rounded-full', dot, item.status === 'RELEASING' && 'animate-pulse')} />
+                <span aria-hidden className={cn('size-2 rounded-sm', dot, item.status === 'RELEASING' && 'animate-pulse')} />
                 {formatStatus(item.status)}
               </span>
               {score ? (
@@ -246,7 +244,7 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
               <Magnet padding={28}>
                 <Link
                   to={watchable ? `/watch/${item.id}` : `/anime/${item.id}`}
-                  className="inline-flex h-12 sm:h-13 items-center gap-2.5 rounded-full bg-white px-7 sm:px-8 text-[15px] font-bold text-black shadow-xl hover:bg-zinc-200 transition active:scale-95"
+                  className="inline-flex h-12 sm:h-13 items-center gap-2.5 rounded-sm bg-white px-7 sm:px-8 text-[15px] font-bold text-black hover:bg-zinc-200 transition"
                 >
                   {watchable ? <Play className="size-4.5 fill-current" /> : <Info className="size-4.5" />}
                   {watchable ? 'Watch now' : 'View details'}
@@ -261,7 +259,7 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
                     aria-label="Watch trailer"
                     title="Watch trailer"
                     onClick={() => setTrailer(item.trailer)}
-                    className="grid size-12 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md transition hover:bg-white/20 active:scale-90"
+                    className="grid size-12 place-items-center rounded-sm border border-white/20 bg-black/40 text-white-md transition hover:bg-white/20"
                   >
                     <Film className="size-5" />
                   </button>
@@ -271,7 +269,7 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
                     to={`/anime/${item.id}`}
                     aria-label="Details"
                     title="Details"
-                    className="grid size-12 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md transition hover:bg-white/20 active:scale-90"
+                    className="grid size-12 place-items-center rounded-sm border border-white/20 bg-black/40 text-white-md transition hover:bg-white/20"
                   >
                     <Info className="size-5" />
                   </Link>
@@ -293,7 +291,7 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
                 aria-label={`Show ${pickTitle(it.title)}`}
                 onClick={() => setIndex(i)}
                 className={cn(
-                  'h-1.5 rounded-full transition-all duration-300',
+                  'h-1.5 rounded-sm transition-all duration-300',
                   i === index ? 'w-8 bg-white' : 'w-1.5 bg-white/35 hover:bg-white/70'
                 )}
               />
@@ -310,7 +308,7 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
                 type="button"
                 aria-label={label}
                 onClick={fn}
-                className="grid size-10 place-items-center rounded-full border border-white/20 bg-black/50 text-white transition hover:bg-white hover:text-black active:scale-90"
+                className="grid size-10 place-items-center rounded-sm border border-white/20 bg-black/50 text-white transition hover:bg-white hover:text-black"
               >
                 <Icon className="size-4.5" />
               </button>
