@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import type { HistoryItem, ListItem } from './library'
 import type { ReadingItem } from './reading'
 import { getProfile, saveProfile, syncProfileToCloud, type Profile } from './profile'
-import { ascensionCell, syncAscensionWithCloud } from './ascension/ascensionStore'
+import { ascensionCell, syncAscensionWithCloud, pushAscensionToCloud, COSMETICS_DIRTY_KEY } from './ascension/ascensionStore'
 
 export const LAST_SYNC_KEY = 'zk:cloud:last_sync'
 const ONE_DAY_MS = 24 * 60 * 60 * 1000 // 24 hours (once a day)
@@ -73,12 +73,12 @@ export async function pushWatchHistory(userId: string): Promise<{ success: boole
     if (error) throw error
 
     // Also sync to public.profiles table
-    void syncProfileToCloud(userId, undefined, profile)
+    await syncProfileToCloud(userId, undefined, profile)
 
     // Sync ascension XP, level, streak & cosmetics to public.profiles table (never overwrite with stale 0)
     const asc = ascensionCell.get()
     if (asc.totalXp > 0 || asc.streak > 0) {
-      void supabase
+      await supabase
         .from('profiles')
         .update({
           total_xp: asc.totalXp,
@@ -87,9 +87,11 @@ export async function pushWatchHistory(userId: string): Promise<{ success: boole
           equipped_title: asc.equippedTitle,
           equipped_text_effect: asc.equippedTextEffect,
           equipped_frame: asc.equippedFrame,
+          name_color: asc.equippedNameColor,
         })
         .eq('id', userId)
     }
+    try { localStorage.removeItem(COSMETICS_DIRTY_KEY) } catch {}
 
     const now = Date.now()
     localStorage.setItem(LAST_SYNC_KEY, String(now))
@@ -228,6 +230,13 @@ export async function pullWatchHistory(userId: string): Promise<{ success: boole
 
 /** Two-way sync: merge the cloud into this device first, then upload the merged result (never overwrites the cloud with a stale device). */
 export async function syncNow(userId: string): Promise<{ success: boolean; count: number; error?: string }> {
+  // Equips are only saved locally while you edit; upload them first so pulling the cloud's older values can't undo them
+  try {
+    if (localStorage.getItem(COSMETICS_DIRTY_KEY)) {
+      await pushAscensionToCloud()
+      localStorage.removeItem(COSMETICS_DIRTY_KEY)
+    }
+  } catch {}
   // Always pull authoritative ascension stats (XP, level, streak, cosmetics) from cloud first
   await syncAscensionWithCloud(userId, true)
   const pulled = await pullWatchHistory(userId)
@@ -253,17 +262,8 @@ export async function checkDailySync(userId?: string): Promise<boolean> {
   return (await syncNow(userId)).success
 }
 
-let autoSyncTimeout: any = null
-export function autoSyncWatchlist() {
-  clearTimeout(autoSyncTimeout)
-  autoSyncTimeout = setTimeout(async () => {
-    try {
-      const { data } = await supabase.auth.getUser()
-      if (data?.user?.id) {
-        await pushWatchHistory(data.user.id)
-      }
-    } catch (err) {
-      console.warn('[Sync] Auto-sync background error:', err)
-    }
-  }, 600)
-}
+/**
+ * Intentionally a no-op: list / history changes stay on this device and are uploaded once a day and on sign out
+ * (plus the manual "Sync now" button), so normal use doesn't hammer the API.
+ */
+export function autoSyncWatchlist() {}

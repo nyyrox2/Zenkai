@@ -41,14 +41,13 @@ export const setProfileStore = (p: Profile) => store.set(p)
 
 /**
  * Save profile locally and asynchronously push changes to Supabase profiles & user_sync
- * if user is currently signed in.
+ * if user is currently signed in. (The customize page calls this once, when you exit it.)
  */
 export const saveProfile = (p: Partial<Profile>) => {
   const current = store.get()
   const updated = { ...current, ...p }
   store.set(updated)
 
-  // Asynchronously sync to Supabase if session exists
   supabase.auth.getSession().then(({ data: { session } }) => {
     if (session?.user?.id) {
       void syncProfileToCloud(session.user.id, undefined, updated)

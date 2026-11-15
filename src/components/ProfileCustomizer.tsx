@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -57,6 +57,7 @@ import {
   getAscensionState,
   ascensionCell,
   equipCosmetic,
+  pushAscensionToCloud,
 } from '../lib/ascension/ascensionStore'
 import { HunterRankBadge } from './ascension/HunterRankBadge'
 import { TextEffectRenderer } from './ascension/TextEffectRenderer'
@@ -440,7 +441,7 @@ function Gallery({
 /* ------------------------------------------------------------- Dedicated Profile Editor */
 
 export function ProfileEditor({
-  me,
+  me: liveMe,
   initialTab = 'identity',
   onClose,
 }: {
@@ -449,6 +450,39 @@ export function ProfileEditor({
   onClose: () => void
 }) {
   const { user, username: authUsername, updateUsername } = useAuth()
+
+  // Edits are staged here and only applied to the app (header, profile, cloud) when the editor is closed.
+  type Cos = Partial<Record<'title' | 'effect' | 'font' | 'frame' | 'color', string | null>>
+  const [draft, setDraft] = useState<Partial<Profile>>({})
+  const [draftCos, setDraftCos] = useState<Cos>({})
+  const draftRef = useRef<Partial<Profile>>({})
+  const cosRef = useRef<Cos>({})
+  const stage = (p: Partial<Profile>) => {
+    draftRef.current = { ...draftRef.current, ...p }
+    setDraft(draftRef.current)
+  }
+  const stageCosmetic = (type: keyof Cos, value: string | null) => {
+    cosRef.current = { ...cosRef.current, [type]: value }
+    setDraftCos(cosRef.current)
+  }
+  const commit = useCallback(() => {
+    const d = draftRef.current
+    const c = cosRef.current
+    draftRef.current = {}
+    cosRef.current = {}
+    if (Object.keys(d).length) saveProfile(d)
+    const equips = Object.entries(c)
+    for (const [t, v] of equips) equipCosmetic(t as keyof Cos, v as string | null, false)
+    if (equips.length) void pushAscensionToCloud()
+  }, [])
+  // Leaving the page by any route (Done, Back, nav bar) applies the staged changes.
+  useEffect(() => () => commit(), [commit])
+  const finish = () => {
+    commit()
+    onClose()
+  }
+  const me = useMemo<Profile>(() => ({ ...liveMe, ...draft }), [liveMe, draft])
+  const hasDraft = Object.keys(draft).length + Object.keys(draftCos).length > 0
   const [activeTab, setActiveTab] = useState<SectionKey>(initialTab)
 
   // Local editable state
@@ -469,12 +503,21 @@ export function ProfileEditor({
   const [frameFilter, setFrameFilter] = useState('')
   const [framesShown, setFramesShown] = useState(18)
 
-  const [ascensionState, setAscensionState] = useState(getAscensionState())
+  const [liveAscension, setAscensionState] = useState(getAscensionState())
   useEffect(() => {
     return ascensionCell.subscribe(() => {
       setAscensionState(getAscensionState())
     })
   }, [])
+  const ascensionState = useMemo(() => {
+    const a = { ...liveAscension }
+    if ('title' in draftCos) a.equippedTitle = draftCos.title || 'Otaku'
+    if ('effect' in draftCos) a.equippedTextEffect = draftCos.effect || 'none'
+    if ('font' in draftCos) a.equippedFontStyle = draftCos.font || 'default'
+    if ('frame' in draftCos) a.equippedFrame = draftCos.frame ?? null
+    if ('color' in draftCos) a.equippedNameColor = draftCos.color || 'default'
+    return a
+  }, [liveAscension, draftCos])
   const ascensionLevel = ascensionState.level
 
   const files = {
@@ -569,7 +612,7 @@ export function ProfileEditor({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card/60 p-4 backdrop-blur-md sm:px-6">
         <button
           type="button"
-          onClick={onClose}
+          onClick={finish}
           className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-4 py-2 text-sm font-semibold transition hover:border-accent hover:text-accent active:scale-95"
         >
           <ArrowLeft className="size-4" />
@@ -578,11 +621,12 @@ export function ProfileEditor({
 
         <div className="text-center sm:text-left">
           <h1 className="font-display text-lg font-bold">Customize Profile</h1>
+          {hasDraft && <p className="text-[11px] text-muted">Applies when you tap Done</p>}
         </div>
 
         <button
           type="button"
-          onClick={onClose}
+          onClick={finish}
           className="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2 text-sm font-bold text-accent-fg shadow-lg shadow-accent/25 transition hover:brightness-110 active:scale-95"
         >
           <Check className="size-4" />
@@ -692,7 +736,7 @@ export function ProfileEditor({
                     maxLength={24}
                     onChange={(e) => {
                       setName(e.target.value)
-                      saveProfile({ name: e.target.value })
+                      stage({ name: e.target.value })
                     }}
                     placeholder="e.g. Shadow Otaku"
                     className="h-11 w-full rounded-2xl border border-border bg-card/80 px-4 text-sm font-medium outline-none transition focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent"
@@ -719,7 +763,7 @@ export function ProfileEditor({
                 <button
                   type="button"
                   onClick={() => {
-                    saveProfile({ bio: bio.trim() })
+                    stage({ bio: bio.trim() })
                     toast('Bio saved successfully!', 'success')
                   }}
                   className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-bold text-accent-fg shadow-md shadow-accent/20 transition hover:brightness-110 active:scale-95"
@@ -737,7 +781,7 @@ export function ProfileEditor({
                     rows={3}
                     onChange={(e) => {
                       setBio(e.target.value)
-                      saveProfile({ bio: e.target.value })
+                      stage({ bio: e.target.value })
                     }}
                     placeholder="Tell other otakus what you're watching or your all-time favorite anime quote..."
                     className="w-full rounded-2xl border border-border bg-card/80 p-3.5 text-sm font-medium outline-none transition resize-none focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent"
@@ -766,7 +810,7 @@ export function ProfileEditor({
                         type="button"
                         onClick={() => {
                           setBio(preset)
-                          saveProfile({ bio: preset })
+                          stage({ bio: preset })
                           toast('Preset bio applied and saved!')
                         }}
                         className="rounded-full border border-border bg-card-2/60 px-3 py-1 text-xs font-medium text-foreground/85 transition hover:border-accent hover:text-accent active:scale-95"
@@ -888,7 +932,7 @@ export function ProfileEditor({
                   type="button"
                   className={pill}
                   onClick={() => {
-                    saveProfile({ avatar: null })
+                    stage({ avatar: null })
                     toast('Profile picture removed', 'info')
                   }}
                 >
@@ -910,7 +954,7 @@ export function ProfileEditor({
                     kind="avatar"
                     current={me.avatar}
                     onPick={(u) => {
-                      saveProfile({ avatar: u })
+                      stage({ avatar: u })
                       setGallery(null)
                       toast('Profile picture updated')
                     }}
@@ -961,7 +1005,7 @@ export function ProfileEditor({
                   role="radio"
                   aria-checked={!me.frame}
                   onClick={() => {
-                    saveProfile({ frame: null })
+                    stage({ frame: null })
                     toast('Frame removed', 'info')
                   }}
                   className={cn(
@@ -1000,8 +1044,8 @@ export function ProfileEditor({
                           toast(`🔒 Requires Hunter Level ${reqLvl} to unlock!`, 'error')
                           return
                         }
-                        saveProfile({ frame: f.id })
-                        equipCosmetic('frame', f.id)
+                        stage({ frame: f.id })
+                        stageCosmetic('frame', f.id)
                         toast(`Frame: ${f.name}`)
                       }}
                       className={cn(
@@ -1127,7 +1171,7 @@ export function ProfileEditor({
                   type="button"
                   className={pill}
                   onClick={() => {
-                    saveProfile({ banner: null })
+                    stage({ banner: null })
                     toast('Banner removed', 'info')
                   }}
                 >
@@ -1149,7 +1193,7 @@ export function ProfileEditor({
                     kind="banner"
                     current={me.banner}
                     onPick={(u) => {
-                      saveProfile({ banner: u })
+                      stage({ banner: u })
                       setGallery(null)
                       toast('Banner updated')
                     }}
@@ -1202,8 +1246,8 @@ export function ProfileEditor({
                           return
                         }
                         const val = col.id === 'default' ? null : col.id
-                        saveProfile({ nameColor: val })
-                        equipCosmetic('color', val)
+                        stage({ nameColor: val })
+                        stageCosmetic('color', val)
                         toast(val ? `Equipped colour: ${col.name}` : 'Reset to default colour')
                       }}
                       className={cn(
@@ -1271,7 +1315,7 @@ export function ProfileEditor({
                           toast(`🔒 Requires Hunter Level ${f.minLevel}!`, 'error')
                           return
                         }
-                        equipCosmetic('font', isEquipped ? 'default' : f.id)
+                        stageCosmetic('font', isEquipped ? 'default' : f.id)
                         toast(isEquipped ? 'Font reset to Modern Obsidian' : `Equipped font: ${cleanName}`)
                       }}
                       className={cn(
@@ -1341,7 +1385,7 @@ export function ProfileEditor({
                           toast(`🔒 Requires Hunter Level ${eff.minLevel}!`, 'error')
                           return
                         }
-                        equipCosmetic('effect', isEquipped ? 'none' : eff.id)
+                        stageCosmetic('effect', isEquipped ? 'none' : eff.id)
                         toast(isEquipped ? 'Text effect removed' : `Equipped: ${eff.name}`)
                       }}
                       className={cn(
@@ -1415,7 +1459,7 @@ export function ProfileEditor({
                           toast(`🔒 Requires Hunter Level ${t.minLevel}!`, 'error')
                           return
                         }
-                        equipCosmetic('title', t.title)
+                        stageCosmetic('title', t.title)
                         toast(`Equipped title: ${t.title}`)
                       }}
                       className={cn(
@@ -1494,7 +1538,7 @@ export function ProfileEditor({
             kind={crop.kind}
             onClose={closeCrop}
             onApply={(url) => {
-              saveProfile(crop.kind === 'avatar' ? { avatar: url } : { banner: url })
+              stage(crop.kind === 'avatar' ? { avatar: url } : { banner: url })
               toast(crop.kind === 'avatar' ? 'Profile picture updated' : 'Banner updated')
               closeCrop()
             }}

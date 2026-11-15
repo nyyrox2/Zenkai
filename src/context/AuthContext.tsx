@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { setProfileStore, resetProfileStore } from '../lib/profile'
 import { syncAscensionWithCloud, clearAscensionCache } from '../lib/ascension/ascensionStore'
 import { toast } from '../lib/toast'
+import { pushWatchHistory } from '../lib/sync'
 
 interface AuthContextValue {
   user: User | null
@@ -273,6 +274,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
+      // Upload this device's data once before the local copy is cleared (capped so sign out never hangs).
+      if (user?.id) {
+        await Promise.race([pushWatchHistory(user.id), new Promise((r) => setTimeout(r, 6000))]).catch(() => {})
+      }
       if (user?.id) {
         try {
           localStorage.removeItem(`zk:username_chosen:${user.id}`)

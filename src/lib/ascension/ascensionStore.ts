@@ -234,9 +234,14 @@ export function setAscensionSound(enabled: boolean) {
   ascensionCell.set({ ...current, soundEnabled: enabled })
 }
 
+/** Set when cosmetics were equipped locally and haven't been uploaded yet; cleared after a successful upload. */
+export const COSMETICS_DIRTY_KEY = 'zk:cos_dirty'
+
 export function equipCosmetic(
   type: 'title' | 'effect' | 'font' | 'frame' | 'color',
-  value: string | null
+  value: string | null,
+  /** Pass false to skip the cloud upload (the caller uploads once afterwards). */
+  upload = true,
 ): boolean {
   const current = ascensionCell.get()
   const level = current.level
@@ -259,19 +264,9 @@ export function equipCosmetic(
 
   ascensionCell.set(updated)
 
-  // Sync to Supabase profile
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    if (session?.user?.id) {
-      const payload: Record<string, any> = {}
-      if (type === 'title') payload.equipped_title = updated.equippedTitle
-      if (type === 'effect') payload.equipped_text_effect = updated.equippedTextEffect
-      if (type === 'frame') payload.equipped_frame = updated.equippedFrame
-      if (type === 'color') payload.name_color = updated.equippedNameColor
-      if (Object.keys(payload).length > 0) {
-        void supabase.from('profiles').update(payload).eq('id', session.user.id)
-      }
-    }
-  }).catch(() => {})
+  try { localStorage.setItem(COSMETICS_DIRTY_KEY, '1') } catch {}
+
+  if (upload) void pushAscensionToCloud(updated)
 
   return true
 }
@@ -296,7 +291,7 @@ export async function pushAscensionToCloud(customState?: AscensionState) {
     if (!session?.user?.id) return
 
     const state = customState || ascensionCell.get()
-    await supabase
+    const { error } = await supabase
       .from('profiles')
       .update({
         total_xp: state.totalXp,
@@ -306,8 +301,12 @@ export async function pushAscensionToCloud(customState?: AscensionState) {
         equipped_title: state.equippedTitle,
         equipped_text_effect: state.equippedTextEffect,
         equipped_frame: state.equippedFrame,
+        name_color: state.equippedNameColor,
       })
       .eq('id', session.user.id)
+    if (!error) {
+      try { localStorage.removeItem(COSMETICS_DIRTY_KEY) } catch {}
+    }
   } catch (err) {
     console.warn('[Ascension] Cloud sync error:', err)
   }
