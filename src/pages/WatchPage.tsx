@@ -31,6 +31,7 @@ import {
   VolumeX,
   Languages,
 } from 'lucide-react'
+import { makeDriftCheck, sameTrack } from '../lib/partySync'
 import { WatchTogetherRoom, generateWatchRoomId, type PeerMember, type WatchChatMessage, type WatchReaction } from '../lib/webrtcWatchTogether'
 import {
   createWatchRoom,
@@ -39,6 +40,8 @@ import {
   touchWatchRoom,
   deleteWatchRoom,
   getMyHostIdentifier,
+  movieRoomOf,
+  movieRoomPath,
 } from '../lib/watchRooms'
 import { WatchTogetherModal } from '../components/WatchTogetherModal'
 import { LiveReactionsOverlay } from '../components/LiveReactionsOverlay'
@@ -149,6 +152,9 @@ export default function WatchPage() {
   const [isMicActive, setIsMicActive] = useState(false)
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const [chatOpen, setChatOpen] = useState(false)
+  // latest page state for the room callbacks: they are created once at join time, so reading render-time values there would be stale
+  const goRef = useRef<(p: { ep?: number; server?: string; audio?: string }, replace?: boolean, fromPartySync?: boolean) => void>(() => {})
+  const live = useRef({ ep: 0, server: '', audio: 'sub', dubOk: true, track: null as { label: string; lang: string } | null })
   const [chatSeen, setChatSeen] = useState(0) // timestamp of the last message read while the panel was open
 
   const EMOJI_REACTIONS = ['🔥', '😱', '❤️', '😂', '👏', '⚡', '🍿', '⚔️']
@@ -294,6 +300,7 @@ export default function WatchPage() {
       user: userProfile,
     })
 
+    const drift = makeDriftCheck()
     newRoom.onSync((payload) => {
       if (payload.type === 'PLAY') {
         setExternalControl({ action: 'play', time: payload.currentTime, token: Date.now() })
@@ -306,8 +313,24 @@ export default function WatchPage() {
         const m = Math.floor(payload.currentTime / 60)
         const sec = Math.floor(payload.currentTime % 60)
         showNotice(`Seeked to ${m}:${sec < 10 ? '0' : ''}${sec}`)
-      } else if (payload.type === 'HEARTBEAT') {
-        const v = videoElRef.current
+      } else if (payload.type === 'HEARTBEAT' || payload.type === 'STATE') {
+        const L = live.current
+        if (!newRoom.isHost) {
+          // same server / episode / audio as the host? (late joiner, or someone picked a different one by accident)
+          const wantEp = !!payload.episode && payload.episode !== L.ep
+          const wantServer = !!payload.server && payload.server !== L.server
+          const wantAudio = !wantServer && !!payload.audio && payload.audio !== L.audio && (payload.audio === 'sub' || L.dubOk)
+          const wantTrack = !wantServer && !!payload.audioTrack && !!L.track && !sameTrack(L.track, payload.audioTrack)
+          const sig = [wantEp && `e${payload.episode}`, wantServer && `s${payload.server}`, wantAudio && `a${payload.audio}`, wantTrack && `t${payload.audioTrack?.lang}${payload.audioTrack?.label}`].filter(Boolean).join('|')
+          if (drift(sig)) {
+            showNotice('Synced with the party host')
+            if (wantEp || wantServer || wantAudio) {
+              goRef.current({ ...(wantEp ? { ep: payload.episode } : {}), ...(wantServer ? { server: payload.server } : {}), ...(wantAudio ? { audio: payload.audio } : {}) }, false, true)
+            }
+            if (wantTrack && payload.audioTrack) setPartyTrack({ ...payload.audioTrack, token: Date.now() })
+          }
+        }
+        const v = payload.type === 'HEARTBEAT' ? videoElRef.current : null
         if (v) {
           const expected = payload.currentTime + (Date.now() - payload.timestamp) / 1000
           const stateOff = Boolean(payload.paused) !== v.paused && !v.seeking
@@ -324,9 +347,9 @@ export default function WatchPage() {
     })
 
     newRoom.onEpisodeChange((newEp) => {
-      if (newEp !== ep) {
+      if (newEp !== live.current.ep) {
         showNotice(`Party changed to Episode ${newEp}`)
-        go({ ep: newEp }, false, true)
+        goRef.current({ ep: newEp }, false, true)
       }
     })
 
@@ -337,12 +360,12 @@ export default function WatchPage() {
 
     newRoom.onServerChange((newServer) => {
       showNotice(`Party host switched server to ${newServer}`)
-      go({ server: newServer }, false, true)
+      goRef.current({ server: newServer }, false, true)
     })
 
     newRoom.onAudioChange((newAudio) => {
       showNotice(`Party host switched audio to ${newAudio.toUpperCase()}`)
-      go({ audio: newAudio }, false, true)
+      goRef.current({ audio: newAudio }, false, true)
     })
 
     newRoom.onAudioTrackChange((t) => {
@@ -385,9 +408,9 @@ export default function WatchPage() {
         const myHostId = getMyHostIdentifier(user?.id)
         if (record) {
           const amHost = record.host_id === myHostId
-          if (record.anime_id !== id) {
+          if (movieRoomOf(record) || record.anime_id !== id) {
             joiningRoom.current = null
-            navigate(`/watch/${record.anime_id}?room=${urlRoom}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`, { replace: true })
+            navigate(movieRoomOf(record) ? movieRoomPath(record, urlRoom) : `/watch/${record.anime_id}?room=${urlRoom}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`, { replace: true })
             return
           }
           connectToRoom(urlRoom, amHost)
@@ -406,8 +429,11 @@ export default function WatchPage() {
     if (!room) return
     const interval = window.setInterval(() => {
       const v = videoElRef.current
-      if (v && !v.ended && room.isHost) {
-        room.sendSync('HEARTBEAT', v.currentTime, v.paused)
+      const L = live.current
+      const state = { episode: L.ep, server: L.server, audio: L.audio as 'sub' | 'dub' }
+      if (room.isHost) {
+        if (v && !v.ended) room.sendSync('HEARTBEAT', v.currentTime, v.paused, state)
+        else if (!v) room.sendSync('STATE', 0, undefined, state) // embed server: nothing to time, still say what we are on
       }
       if (room.isHost) {
         void touchWatchRoom(room.roomId)
@@ -456,8 +482,8 @@ export default function WatchPage() {
     const myHostId = getMyHostIdentifier(user?.id)
     const amHost = record ? record.host_id === myHostId : false
 
-    if (record && record.anime_id !== id) {
-      navigate(`/watch/${record.anime_id}?room=${cleanCode}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`)
+    if (record && (movieRoomOf(record) || record.anime_id !== id)) {
+      navigate(movieRoomOf(record) ? movieRoomPath(record, cleanCode) : `/watch/${record.anime_id}?room=${cleanCode}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`)
       return
     }
 
@@ -694,6 +720,15 @@ export default function WatchPage() {
       go({ audio: 'sub' })
     }
   }, [currentServerInfo, audio])
+
+  goRef.current = go
+  live.current = {
+    ep,
+    server: server.id,
+    audio,
+    dubOk: currentServerInfo ? currentServerInfo.dub : true,
+    track: aud.tracks.find((t) => t.i === aud.active) ?? null,
+  }
 
   const chatPanel = (glass: boolean, className?: string) =>
     room ? (

@@ -48,6 +48,7 @@ export function WatchTogetherModal({
   episode,
   isHost,
   onChangeShowClick,
+  shareUrl,
 }: {
   open: boolean
   onClose: () => void
@@ -66,6 +67,8 @@ export function WatchTogetherModal({
   isHost: boolean
   connectionStatus: 'connecting' | 'connected' | 'p2p' | 'disconnected'
   onChangeShowClick?: () => void
+  /** invite link override (movies / TV live on a different route than anime) */
+  shareUrl?: string
 }) {
   const [joinCode, setJoinCode] = useState('')
   const [copied, setCopied] = useState<'code' | 'link' | null>(null)
@@ -80,7 +83,7 @@ export function WatchTogetherModal({
 
   const me = room ? peers.find((p) => p.peerId === room.peerId) : undefined
   const selfName = me?.displayName || 'A friend'
-  const inviteUrl = room ? partyShareUrl(animeId, episode, room.roomId, selfName, animeTitle, me?.avatar) : ''
+  const inviteUrl = room ? (shareUrl ?? partyShareUrl(animeId, episode, room.roomId, selfName, animeTitle, me?.avatar)) : ''
   const card: ShareCardOpts | null = room
     ? {
         kind: 'party',

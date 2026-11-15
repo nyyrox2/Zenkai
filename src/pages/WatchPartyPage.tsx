@@ -16,7 +16,7 @@ import {
   Zap,
   Film,
 } from 'lucide-react'
-import { getWatchRoom } from '../lib/watchRooms'
+import { getWatchRoom, movieRoomOf, movieRoomPath } from '../lib/watchRooms'
 import { useHistory, type HistoryItem } from '../lib/library'
 import { useTmdb } from '../hooks/useTmdb'
 import { tmdbImg } from '../services/api'
@@ -102,7 +102,7 @@ export default function WatchPartyPage() {
         return
       }
       toast(`Joining party room ${clean.toUpperCase()}!`, 'success')
-      navigate(`/watch/${rec.anime_id}?room=${clean}&ep=${rec.episode}&server=${rec.server}&audio=${rec.audio}`)
+      navigate(movieRoomOf(rec) ? movieRoomPath(rec, clean) : `/watch/${rec.anime_id}?room=${clean}&ep=${rec.episode}&server=${rec.server}&audio=${rec.audio}`)
     } catch (err) {
       console.error('[WatchParty] Join error:', err)
       toast('Failed to connect to watch party', 'error')
