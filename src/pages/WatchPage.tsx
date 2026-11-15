@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useMedia } from '../hooks/useMedia'
+import { WatchInfoRail } from '../components/WatchRails'
+import { Footer } from '../components/Footer'
+import { SiteHeader } from '../components/SiteHeader'
 import { useBackToDetails } from '../lib/backToDetails'
 import {
   ChevronLeft,
@@ -31,6 +36,7 @@ import {
   VolumeX,
   Languages,
 } from 'lucide-react'
+import { makeDriftCheck, sameTrack } from '../lib/partySync'
 import { WatchTogetherRoom, generateWatchRoomId, type PeerMember, type WatchChatMessage, type WatchReaction } from '../lib/webrtcWatchTogether'
 import {
   createWatchRoom,
@@ -39,6 +45,8 @@ import {
   touchWatchRoom,
   deleteWatchRoom,
   getMyHostIdentifier,
+  movieRoomOf,
+  movieRoomPath,
 } from '../lib/watchRooms'
 import { WatchTogetherModal } from '../components/WatchTogetherModal'
 import { LiveReactionsOverlay } from '../components/LiveReactionsOverlay'
@@ -48,7 +56,7 @@ import { Avatar } from '../components/Avatar'
 import { useAuth } from '../context/AuthContext'
 import { useProfile } from '../lib/profile'
 import { submitStreamReport } from '../lib/supabase'
-import { fetchAnimeLite } from '../services/anilist'
+import { fetchAnimeLite, fetchRecommendations } from '../services/anilist'
 import { acdnMapped, fetchAnimeSalt, fetchStream, fetchEpisodeServers, type ServerAudioMap, tmdbImg } from '../services/api'
 import { useCompanion, LATEST_EXTENSION_VERSION } from '../lib/useCompanion'
 import { useAsync } from '../hooks/useAsync'
@@ -63,12 +71,14 @@ import { lastEpisode, saveEpisode } from '../lib/progress'
 import { toast } from '../lib/toast'
 import { partyShareUrl } from '../lib/share'
 import { finishEpisode, getHistory, getPrefs, savePrefs, touchHistory } from '../lib/library'
-import { mediaToCard } from '../lib/mappers'
+import { mediaToCard, recommendationToCard } from '../lib/mappers'
 import { ListButton } from '../components/ListButton'
 import { cn, formatLabel, formatStatus, pickTitle, stripHtml } from '../lib/utils'
 import { requestMicrophoneStream } from '../lib/microphone'
 import CinePlayer from '../components/CinePlayer'
 import { EpisodeList } from '../components/EpisodeList'
+import { MoreLikeThis } from '../components/MoreLikeThis'
+import type { CardItem } from '../types/anime'
 import { ErrorState } from '../components/ErrorState'
 import { Skeleton } from '../components/Skeleton'
 import { LoadingGrid } from '../components/LoadingGrid'
@@ -81,7 +91,7 @@ import { StreamProblem } from '../components/StreamProblem'
 
 
 function Frame({ children }: { children: React.ReactNode }) {
-  return <div data-tour="w-player" className="relative aspect-video w-full overflow-hidden bg-black lg:shadow-2xl lg:shadow-black/40 lg:ring-1 lg:ring-white/10">{children}</div>
+  return <div data-tour="w-player" className="relative aspect-video w-full overflow-hidden bg-black lg:rounded-xl">{children}</div>
 }
 
 /** Loading (episode, first load and server switch): the show's logo fills from dim to full colour. No logo: the Zenkai logo fills smoothly, plus quiet server switch. */
@@ -129,6 +139,7 @@ export default function WatchPage() {
   // Watch Together State (WebRTC + Supabase Broadcast Signaling)
   const { user } = useAuth()
   const me = useProfile()
+  const wide = useMedia('(min-width: 1280px)') // three columns: details | player | party or recommendations
   const [watchModalOpen, setWatchModalOpen] = useState(false)
   const [room, setRoom] = useState<WatchTogetherRoom | null>(null)
   const [peers, setPeers] = useState<PeerMember[]>([])
@@ -149,6 +160,9 @@ export default function WatchPage() {
   const [isMicActive, setIsMicActive] = useState(false)
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const [chatOpen, setChatOpen] = useState(false)
+  // latest page state for the room callbacks: they are created once at join time, so reading render-time values there would be stale
+  const goRef = useRef<(p: { ep?: number; server?: string; audio?: string }, replace?: boolean, fromPartySync?: boolean) => void>(() => {})
+  const live = useRef({ ep: 0, server: '', audio: 'sub', dubOk: true, track: null as { label: string; lang: string } | null })
   const [chatSeen, setChatSeen] = useState(0) // timestamp of the last message read while the panel was open
 
   const EMOJI_REACTIONS = ['🔥', '😱', '❤️', '😂', '👏', '⚡', '🍿', '⚔️']
@@ -211,6 +225,12 @@ export default function WatchPage() {
   const a = anime.data
   const title = a ? pickTitle(a.title) : ''
   const counts = a ? episodeCounts(a) : { total: 0, available: 0 }
+  // Movies have no real episode list, so the side column / section shows "More like this" instead.
+  const isMovie = a?.format === 'MOVIE'
+  const similar = useAsync<CardItem[]>(
+    async () => (isMovie ? (await fetchRecommendations(id)).map(recommendationToCard).filter((c): c is CardItem => c !== null) : []),
+    [id, isMovie],
+  )
 
   const rawEp = Number(sp.get('ep')) || lastEpisode(id) || 1
   const maxEp = a ? (a.status === 'RELEASING' && !a.episodes ? Math.max(counts.available, rawEp) : Math.max(counts.available, 1)) : rawEp
@@ -294,6 +314,7 @@ export default function WatchPage() {
       user: userProfile,
     })
 
+    const drift = makeDriftCheck()
     newRoom.onSync((payload) => {
       if (payload.type === 'PLAY') {
         setExternalControl({ action: 'play', time: payload.currentTime, token: Date.now() })
@@ -306,8 +327,24 @@ export default function WatchPage() {
         const m = Math.floor(payload.currentTime / 60)
         const sec = Math.floor(payload.currentTime % 60)
         showNotice(`Seeked to ${m}:${sec < 10 ? '0' : ''}${sec}`)
-      } else if (payload.type === 'HEARTBEAT') {
-        const v = videoElRef.current
+      } else if (payload.type === 'HEARTBEAT' || payload.type === 'STATE') {
+        const L = live.current
+        if (!newRoom.isHost) {
+          // same server / episode / audio as the host? (late joiner, or someone picked a different one by accident)
+          const wantEp = !!payload.episode && payload.episode !== L.ep
+          const wantServer = !!payload.server && payload.server !== L.server
+          const wantAudio = !wantServer && !!payload.audio && payload.audio !== L.audio && (payload.audio === 'sub' || L.dubOk)
+          const wantTrack = !wantServer && !!payload.audioTrack && !!L.track && !sameTrack(L.track, payload.audioTrack)
+          const sig = [wantEp && `e${payload.episode}`, wantServer && `s${payload.server}`, wantAudio && `a${payload.audio}`, wantTrack && `t${payload.audioTrack?.lang}${payload.audioTrack?.label}`].filter(Boolean).join('|')
+          if (drift(sig)) {
+            showNotice('Synced with the party host')
+            if (wantEp || wantServer || wantAudio) {
+              goRef.current({ ...(wantEp ? { ep: payload.episode } : {}), ...(wantServer ? { server: payload.server } : {}), ...(wantAudio ? { audio: payload.audio } : {}) }, false, true)
+            }
+            if (wantTrack && payload.audioTrack) setPartyTrack({ ...payload.audioTrack, token: Date.now() })
+          }
+        }
+        const v = payload.type === 'HEARTBEAT' ? videoElRef.current : null
         if (v) {
           const expected = payload.currentTime + (Date.now() - payload.timestamp) / 1000
           const stateOff = Boolean(payload.paused) !== v.paused && !v.seeking
@@ -324,9 +361,9 @@ export default function WatchPage() {
     })
 
     newRoom.onEpisodeChange((newEp) => {
-      if (newEp !== ep) {
+      if (newEp !== live.current.ep) {
         showNotice(`Party changed to Episode ${newEp}`)
-        go({ ep: newEp }, false, true)
+        goRef.current({ ep: newEp }, false, true)
       }
     })
 
@@ -337,12 +374,12 @@ export default function WatchPage() {
 
     newRoom.onServerChange((newServer) => {
       showNotice(`Party host switched server to ${newServer}`)
-      go({ server: newServer }, false, true)
+      goRef.current({ server: newServer }, false, true)
     })
 
     newRoom.onAudioChange((newAudio) => {
       showNotice(`Party host switched audio to ${newAudio.toUpperCase()}`)
-      go({ audio: newAudio }, false, true)
+      goRef.current({ audio: newAudio }, false, true)
     })
 
     newRoom.onAudioTrackChange((t) => {
@@ -385,9 +422,9 @@ export default function WatchPage() {
         const myHostId = getMyHostIdentifier(user?.id)
         if (record) {
           const amHost = record.host_id === myHostId
-          if (record.anime_id !== id) {
+          if (movieRoomOf(record) || record.anime_id !== id) {
             joiningRoom.current = null
-            navigate(`/watch/${record.anime_id}?room=${urlRoom}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`, { replace: true })
+            navigate(movieRoomOf(record) ? movieRoomPath(record, urlRoom) : `/watch/${record.anime_id}?room=${urlRoom}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`, { replace: true })
             return
           }
           connectToRoom(urlRoom, amHost)
@@ -406,8 +443,11 @@ export default function WatchPage() {
     if (!room) return
     const interval = window.setInterval(() => {
       const v = videoElRef.current
-      if (v && !v.ended && room.isHost) {
-        room.sendSync('HEARTBEAT', v.currentTime, v.paused)
+      const L = live.current
+      const state = { episode: L.ep, server: L.server, audio: L.audio as 'sub' | 'dub' }
+      if (room.isHost) {
+        if (v && !v.ended) room.sendSync('HEARTBEAT', v.currentTime, v.paused, state)
+        else if (!v) room.sendSync('STATE', 0, undefined, state) // embed server: nothing to time, still say what we are on
       }
       if (room.isHost) {
         void touchWatchRoom(room.roomId)
@@ -456,8 +496,8 @@ export default function WatchPage() {
     const myHostId = getMyHostIdentifier(user?.id)
     const amHost = record ? record.host_id === myHostId : false
 
-    if (record && record.anime_id !== id) {
-      navigate(`/watch/${record.anime_id}?room=${cleanCode}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`)
+    if (record && (movieRoomOf(record) || record.anime_id !== id)) {
+      navigate(movieRoomOf(record) ? movieRoomPath(record, cleanCode) : `/watch/${record.anime_id}?room=${cleanCode}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`)
       return
     }
 
@@ -695,10 +735,20 @@ export default function WatchPage() {
     }
   }, [currentServerInfo, audio])
 
-  const chatPanel = (glass: boolean, className?: string) =>
+  goRef.current = go
+  live.current = {
+    ep,
+    server: server.id,
+    audio,
+    dubOk: currentServerInfo ? currentServerInfo.dub : true,
+    track: aud.tracks.find((t) => t.i === aud.active) ?? null,
+  }
+
+  const chatPanel = (glass: boolean, className?: string, bare?: boolean) =>
     room ? (
       <PartyChatPanel
         glass={glass}
+        bare={bare}
         className={className}
         messages={chatMessages}
         selfId={room.peerId}
@@ -715,9 +765,88 @@ export default function WatchPage() {
       />
     ) : null
 
+  const watchPanel = (inline = false) => (
+    <WatchTogetherModal
+        inline={inline}
+        open={watchModalOpen}
+        tab={chatOpen ? 'chat' : 'room'}
+        onTab={(t) => setChatOpen(t === 'chat')}
+        unread={chatUnread}
+        chat={chatPanel(true, 'h-full', true)}
+        onClose={() => { setWatchModalOpen(false); setChatOpen(false) }}
+        room={room}
+        peers={peers}
+        onSendReaction={(em) => {
+          if (!room) return
+          const r = room.sendReaction(em, userProfile.displayName, userProfile.avatar)
+          setReactions((prev) => [...prev.slice(-30), r])
+        }}
+        onCreateRoom={handleCreateRoom}
+        onJoinRoom={handleJoinRoom}
+        onLeaveRoom={handleLeaveRoom}
+        onForceSync={handleForceSync}
+        animeTitle={title}
+        animeId={id}
+        image={a ? (a.bannerImage ?? a.coverImage.extraLarge) : null}
+        episode={ep}
+        isHost={room ? room.isHost : false}
+        connectionStatus={connectionStatus}
+        onChangeShowClick={() => setChangeShowOpen(true)}
+        />
+  )
+
+  const flat = 'inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-muted transition hover:border-foreground/40 hover:text-foreground active:scale-95'
+  const providers = bundle?.tmdb?.watchProviders?.providers ?? []
+
   return (
+    <>
+    <SiteHeader />
     <main className="relative pb-10">
-      <div className="mx-auto max-w-7xl lg:px-6 lg:pt-6">
+      <div className={cn('mx-auto lg:pt-0', wide ? 'grid max-w-[1800px] grid-cols-[248px_minmax(0,1fr)_320px] items-start' : 'max-w-[1400px] lg:px-4')}>
+        {wide && (
+          <aside className="sticky top-0 max-h-svh self-start overflow-y-auto overscroll-contain border-r border-border/40 px-4 py-4 scrollbar-none">
+            {a ? (
+              <WatchInfoRail
+                a={a}
+                title={title}
+                id={id}
+                actions={
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <ListButton item={mediaToCard(a)} className={flat} />
+                    <Link to={`/anime/${id}`} onClick={backTo(`/anime/${id}`)} className={flat}>
+                      <Info className="size-3.5" /> Details
+                    </Link>
+                    {sequel && (
+                      <Link to={`/watch/${sequel.node.id}`} className={flat}>
+                        Next season →
+                      </Link>
+                    )}
+                    <button type="button" onClick={() => setReportOpen(true)} className={flat}>
+                      <Flag className="size-3.5" /> Report
+                    </button>
+                  </div>
+                }
+                footer={
+                  providers.length > 0 && (
+                    <section>
+                      <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-accent">Official streams</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                        {providers.map((p) => (
+                          <a key={p.id} href={bundle?.tmdb?.watchProviders?.link || `https://www.google.com/search?q=watch+${encodeURIComponent(title)}+on+${encodeURIComponent(p.name)}`} target="_blank" rel="noopener noreferrer" className="text-xs text-muted transition hover:text-foreground">
+                            {p.name}
+                          </a>
+                        ))}
+                      </div>
+                    </section>
+                  )
+                }
+              />
+            ) : (
+              <Skeleton className="h-72 w-full" />
+            )}
+          </aside>
+        )}
+        <div className="min-w-0">
         <div className="min-w-0">
           {/* Player (+ party chat docked at ~24% beside it on desktop) */}
           <div className="lg:flex lg:items-stretch lg:gap-3">
@@ -725,7 +854,7 @@ export default function WatchPage() {
           {!sessionVerified && server.kind !== 'embed' ? (
             <Frame>
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
-                <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-xl shadow-black/50">
+                <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent">
                   <Lock className="size-8 animate-pulse" />
                 </div>
                 <h3 className="font-display text-lg font-bold text-foreground">Media Playback Locked</h3>
@@ -806,10 +935,10 @@ export default function WatchPage() {
                   onVideoRef={(v) => { videoElRef.current = v }}
                   onPlayerAction={handlePlayerAction}
                   externalControl={externalControl}
-                  onWatchTogetherClick={() => setWatchModalOpen(true)}
+                  onWatchTogetherClick={() => setWatchModalOpen((o) => !o)}
                   watchPartyActive={Boolean(room)}
                   watchPartyPeersCount={peers.length}
-                  onChatClick={() => setChatOpen((o) => !o)}
+                  onChatClick={() => { const on = !(chatOpen && watchModalOpen); setChatOpen(on); if (on) setWatchModalOpen(true) }}
                   chatOpen={chatOpen}
                   chatUnread={chatUnread}
                   chatPanel={chatPanel(true, 'h-full')}
@@ -847,18 +976,11 @@ export default function WatchPage() {
           )}
 
           </div>
-          {room && chatOpen && (
-            <>
-              <aside className="relative hidden w-[24%] min-w-[260px] max-w-[360px] shrink-0 lg:block">
-                <div className="absolute inset-0">{chatPanel(false)}</div>
-              </aside>
-              <div className="fixed inset-x-0 bottom-0 z-40 h-[60svh] p-2 lg:hidden">{chatPanel(false, 'shadow-2xl shadow-black/50')}</div>
-            </>
-          )}
+          {!wide && watchPanel()}
           </div>
 
           {/* Title + episode nav */}
-          <div className="mt-4 flex px-3 sm:px-6 lg:px-0 flex-wrap items-start justify-between gap-4">
+          <div className="mt-3 flex px-3 sm:px-4 lg:px-4 flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               {a ? (
                 <>
@@ -886,20 +1008,20 @@ export default function WatchPage() {
                 companion.isOutdated ? (
                   <Link
                     to="/extension"
-                    className="group inline-flex items-center gap-2 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300 backdrop-blur-sm transition-all hover:border-amber-500/40 hover:bg-amber-500/15 hover:text-amber-200"
+                    className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-3 py-1 text-xs font-semibold text-white/70 transition-all hover:border-white/20 hover:text-white"
                     title={`Your extension is v${companion.version || '1.0.0'}. Click to update to v${LATEST_EXTENSION_VERSION}.`}
                   >
-                    <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    <span className="size-1.5 rounded-full bg-accent animate-pulse" />
                     <span>Update Extension</span>
-                    <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[10px] font-mono text-amber-200">v{LATEST_EXTENSION_VERSION}</span>
+                    <span className="text-[10px] font-mono text-white/40">v{LATEST_EXTENSION_VERSION}</span>
                   </Link>
                 ) : (
                   <Link
                     to="/extension"
-                    className="group inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/70 backdrop-blur-sm transition-all hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                    className="group inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-transparent px-3 py-1 text-xs font-semibold text-white/70 transition-all hover:border-white/20 hover:bg-transparent hover:text-white"
                     title={`Zenkai Extension v${companion.version || LATEST_EXTENSION_VERSION} active.`}
                   >
-                    <span className="size-1.5 rounded-full bg-emerald-400/90 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                    <span className="size-1.5 rounded-full bg-white/80" />
                     <span>Extension Active</span>
                     {companion.version && (
                       <span className="text-[10px] text-white/35 font-mono">v{companion.version}</span>
@@ -909,17 +1031,17 @@ export default function WatchPage() {
               ) : (
                 <Link
                   to="/extension"
-                  className="group inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/60 backdrop-blur-sm transition-all hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                  className="group inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-transparent px-3 py-1 text-xs font-semibold text-white/60 transition-all hover:border-white/20 hover:bg-transparent hover:text-white"
                 >
                   <span>Get Extension</span>
                 </Link>
               )}
               <button
                 type="button"
-                onClick={() => setWatchModalOpen(true)}
+                onClick={() => setWatchModalOpen((o) => !o)}
                 className={cn(
                   pill,
-                  'inline-flex items-center gap-2 border shadow-sm transition active:scale-95',
+                  'inline-flex items-center gap-2 border transition active:scale-95',
                   room
                     ? 'border-border bg-card-2 text-foreground'
                     : 'border-border bg-card/60 text-foreground hover:border-accent'
@@ -927,7 +1049,7 @@ export default function WatchPage() {
               >
                 <Users className="size-4" />
                 <span>{room ? `Party (${peers.length})` : 'Watch Together'}</span>
-                {room && <span className="size-1.5 rounded-full bg-emerald-400" />}
+                {room && <span className="size-1.5 rounded-full bg-foreground" />}
               </button>
               <button
                 disabled={!hasPrev || Boolean(room && !room.isHost)}
@@ -950,13 +1072,13 @@ export default function WatchPage() {
 
         </div>
 
-        <div className="mt-2 grid gap-8 px-3 sm:px-6 lg:px-0 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className={cn('mt-2 grid gap-4 px-3 sm:px-4 lg:px-4', !wide && 'xl:grid-cols-[minmax(0,1fr)_340px]')}>
         <div className="min-w-0">
           {room ? (
             /* Watch Together Control Center & Live Chat below Player */
             <div className="mt-5 space-y-4">
               {/* Watch Together Control & Status Bar */}
-              <div className="space-y-3 rounded-3xl border border-border bg-card/80 p-3.5 sm:p-4">
+              <div className="space-y-3 border-t border-border p-3.5 sm:p-4">
                 <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="grid size-10 shrink-0 place-items-center rounded-2xl border border-border bg-card-2 text-foreground">
@@ -1112,7 +1234,7 @@ export default function WatchPage() {
                       return (
                         <div
                           key={p.peerId}
-                          className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-card/90 px-2.5 py-1 text-xs shadow-sm"
+                          className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-card/90 px-2.5 py-1 text-xs"
                         >
                           <div className="relative">
                             <Avatar size={20} name={p.displayName} src={p.avatar} />
@@ -1215,12 +1337,12 @@ export default function WatchPage() {
                 <p className="rounded-2xl border border-border bg-card/85 p-3 text-center text-xs text-muted">Chat is open beside the player.</p>
               )}
               {(!room.isHost || hostTab === 'chat') && !chatOpen && (
-                <div className="overflow-hidden rounded-3xl border border-border bg-card/85 p-3 sm:p-4 shadow-xl backdrop-blur-xl">
+                <div className="overflow-hidden border-t border-border p-3 sm:p-4 ">
                   {/* Chat messages stream */}
                   <div className="h-64 sm:h-72 overflow-y-auto space-y-2 p-2.5 overscroll-contain rounded-2xl bg-card-2/60 border border-border/40">
                     {chatMessages.length === 0 ? (
                       <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-                        <div className="grid size-11 place-items-center rounded-2xl bg-card text-muted shadow-sm">
+                        <div className="grid size-11 place-items-center rounded-2xl bg-card text-muted">
                           <MessageSquare className="size-5 text-accent" />
                         </div>
                         <p className="mt-2 text-xs font-bold text-foreground">Room Chat is Live</p>
@@ -1232,7 +1354,7 @@ export default function WatchPage() {
                       chatMessages.map((msg) => (
                         <div key={msg.id} className="flex items-start gap-2.5">
                           <Avatar size={28} name={msg.senderName} src={msg.avatar} />
-                          <div className="min-w-0 max-w-[85%] rounded-2xl bg-card px-3 py-1.5 border border-border/60 shadow-sm">
+                          <div className="min-w-0 max-w-[85%] rounded-2xl bg-card px-3 py-1.5 border border-border/60">
                             <div className="flex items-center justify-between gap-3">
                               <span className="font-bold text-[11px] text-muted truncate">
                                 {msg.senderName}
@@ -1289,7 +1411,7 @@ export default function WatchPage() {
                     <button
                       type="submit"
                       disabled={!inlineChatText.trim()}
-                      className="flex h-10 items-center gap-1.5 rounded-xl bg-accent px-4 text-xs font-bold text-accent-fg transition hover:brightness-110 active:scale-95 disabled:opacity-40 shadow-sm"
+                      className="flex h-10 items-center gap-1.5 rounded-xl bg-accent px-4 text-xs font-bold text-accent-fg transition hover:brightness-110 active:scale-95 disabled:opacity-40"
                     >
                       <Send className="size-3.5" />
                       <span className="hidden sm:inline">Send</span>
@@ -1321,7 +1443,7 @@ export default function WatchPage() {
 
               {/* Host Servers & Audio View (when hostTab === 'servers') */}
               {room.isHost && hostTab === 'servers' && (
-                <div className="rounded-3xl border border-border bg-card/85 p-4 sm:p-5 shadow-xl backdrop-blur-xl space-y-5">
+                <div className="border-t border-border p-4 sm:p-5  space-y-5">
                   <div className="rounded-2xl border border-accent/30 bg-accent/10 p-3 text-xs text-accent font-semibold flex items-center gap-2">
                     <Crown className="size-4 shrink-0 text-foreground" />
                     <span>Host Control: Switching server or audio (track / Sub / Dub) will instantly sync it for all peers in the room.</span>
@@ -1340,7 +1462,7 @@ export default function WatchPage() {
                             onClick={() => pickTrack(t)}
                             className={cn(
                               'rounded-full px-4 py-2 text-xs font-bold uppercase transition active:scale-95',
-                              aud.active === t.i ? 'bg-foreground text-background shadow-sm' : 'text-muted hover:text-foreground'
+                              aud.active === t.i ? 'bg-foreground text-background' : 'text-muted hover:text-foreground'
                             )}
                           >
                             {t.label}
@@ -1358,7 +1480,7 @@ export default function WatchPage() {
                           onClick={() => go({ audio: m })}
                           className={cn(
                             'rounded-full px-5 py-2 text-xs font-bold uppercase transition active:scale-95',
-                            audio === m && server.audio ? 'bg-foreground text-background shadow-sm' : 'text-muted hover:text-foreground',
+                            audio === m && server.audio ? 'bg-foreground text-background' : 'text-muted hover:text-foreground',
                             !server.audio && 'opacity-40'
                           )}
                         >
@@ -1397,7 +1519,7 @@ export default function WatchPage() {
                               className={cn(
                                 pill,
                                 'disabled:opacity-35',
-                                s.id === server.id ? 'border-transparent bg-accent text-accent-fg shadow-lg shadow-accent/30' : 'border-border bg-card hover:bg-card-2'
+                                s.id === server.id ? 'border-transparent bg-foreground text-background' : 'border-border bg-card hover:bg-card-2'
                               )}
                             >
                               {s.name}
@@ -1468,7 +1590,7 @@ export default function WatchPage() {
                           disabled={s.kind === 'embed' && bundle !== null && !s.url?.(ctx)}
                           onClick={() => go({ server: s.id })}
                           title={s.note}
-                          className={cn(pill, 'disabled:opacity-35', s.id === server.id ? 'border-transparent bg-accent text-accent-fg shadow-lg shadow-accent/30' : 'border-border bg-card hover:bg-card-2')}
+                          className={cn(pill, 'disabled:opacity-35', s.id === server.id ? 'border-transparent bg-foreground text-background' : 'border-border bg-card hover:bg-card-2')}
                         >
                           {s.name}
                         </button>
@@ -1479,9 +1601,9 @@ export default function WatchPage() {
               </div>
 
               {/* Episodes */}
-              {a && available > 0 && (
-                <section data-tour="w-eps" className="mt-8" aria-label="Episodes">
-                  <EpisodeList total={total} available={available} current={ep} hrefFor={hrefFor} onPick={() => setLoadKind('episode')} info={eps} kinds={kinds} fallbackImg={a.bannerImage ?? a.coverImage.extraLarge} defaultRuntime={a.duration} />
+              {!wide && a && available > 0 && (
+                <section data-tour="w-eps" className="mt-8" aria-label={isMovie ? 'More like this' : 'Episodes'}>
+                  {isMovie ? <MoreLikeThis items={similar.data ?? []} loading={similar.loading} /> : <EpisodeList total={total} available={available} current={ep} hrefFor={hrefFor} onPick={() => setLoadKind('episode')} info={eps} kinds={kinds} fallbackImg={a.bannerImage ?? a.coverImage.extraLarge} defaultRuntime={a.duration} />}
                 </section>
               )}
             </>
@@ -1489,9 +1611,9 @@ export default function WatchPage() {
         </div>
 
         {/* Side card */}
-        <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+        <aside className={cn('space-y-4 xl:sticky xl:top-24 xl:self-start', wide && 'hidden')}>
           {a ? (
-            <div className="overflow-hidden rounded-3xl border border-border bg-card/60">
+            <div className="overflow-hidden border-t border-border">
               <div className="flex gap-4 p-4">
                 <img src={a.coverImage.large ?? ''} alt="" className="aspect-[2/3] w-24 shrink-0 rounded-2xl object-cover" />
                 <div className="min-w-0">
@@ -1532,7 +1654,7 @@ export default function WatchPage() {
 
           {/* Official Streams & Creator Support */}
           {bundle?.tmdb?.watchProviders?.providers && bundle.tmdb.watchProviders.providers.length > 0 && (
-            <div className="overflow-hidden rounded-3xl border border-border bg-card/60 p-4">
+            <div className="overflow-hidden border-t border-border p-4">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="size-4 text-emerald-400" />
@@ -1543,7 +1665,7 @@ export default function WatchPage() {
                     href={bundle.tmdb.watchProviders.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-muted hover:text-foreground"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted hover:text-foreground"
                   >
                     <span>JustWatch</span>
                     <ExternalLink className="size-3" />
@@ -1560,13 +1682,13 @@ export default function WatchPage() {
                     href={bundle.tmdb?.watchProviders?.link || `https://www.google.com/search?q=watch+${encodeURIComponent(title)}+on+${encodeURIComponent(p.name)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card-2/80 px-2.5 py-1.5 text-xs font-medium transition hover:border-foreground/30 active:scale-95"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card-2/80 px-2.5 py-1.5 text-xs font-semibold transition hover:border-foreground/30 active:scale-95"
                   >
                     {p.logo && (
                       <img
                         src={p.logo}
                         alt={p.name}
-                        className="size-4 rounded object-cover shadow-sm"
+                        className="size-4 rounded object-cover"
                         onError={(e) => { (e.target as HTMLElement).style.display = 'none' }}
                       />
                     )}
@@ -1579,6 +1701,26 @@ export default function WatchPage() {
           )}
         </aside>
         </div>
+        </div>
+        {wide && (
+          <aside className="sticky top-0 self-start border-l border-border/40 px-4 py-4">
+            <AnimatePresence mode="wait" initial={false}>
+              {watchModalOpen ? (
+                <motion.div key="party" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-[calc(100svh-2rem)] max-h-[780px]">
+                  {watchPanel(true)}
+                </motion.div>
+              ) : (
+                <motion.div key="recs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="">
+                  {a && available > 0 && (
+                    <div data-tour="w-eps" className="h-[calc(100svh-2rem)] overflow-y-auto overscroll-contain pr-1 scrollbar-none">
+                      {isMovie ? <MoreLikeThis compact items={similar.data ?? []} loading={similar.loading} /> : <EpisodeList compact total={total} available={available} current={ep} hrefFor={hrefFor} onPick={() => setLoadKind('episode')} info={eps} kinds={kinds} fallbackImg={a.bannerImage ?? a.coverImage.extraLarge} defaultRuntime={a.duration} />}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </aside>
+        )}
       </div>
       {tourOn && !pageTourDone && (
         <Tour
@@ -1595,8 +1737,8 @@ export default function WatchPage() {
 
       {/* Report Modal */}
       {reportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-in fade-in">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border p-4">
               <div className="flex items-center gap-2">
                 <Flag className="size-4 text-rose-500" />
@@ -1646,7 +1788,7 @@ export default function WatchPage() {
                       key={t}
                       onClick={() => setReportIssue(t)}
                       className={cn(
-                        'rounded-xl border px-3 py-2 text-left text-xs font-medium transition',
+                        'rounded-xl border px-3 py-2 text-left text-xs font-semibold transition',
                         reportIssue === t ? 'border-accent bg-accent/15 text-accent font-semibold' : 'border-border bg-card-2/50 text-muted hover:text-foreground'
                       )}
                     >
@@ -1685,28 +1827,6 @@ export default function WatchPage() {
           </div>
         </div>
       )}
-      <WatchTogetherModal
-        open={watchModalOpen}
-        onClose={() => setWatchModalOpen(false)}
-        room={room}
-        peers={peers}
-        onSendReaction={(em) => {
-          if (!room) return
-          const r = room.sendReaction(em, userProfile.displayName, userProfile.avatar)
-          setReactions((prev) => [...prev.slice(-30), r])
-        }}
-        onCreateRoom={handleCreateRoom}
-        onJoinRoom={handleJoinRoom}
-        onLeaveRoom={handleLeaveRoom}
-        onForceSync={handleForceSync}
-        animeTitle={title}
-        animeId={id}
-        image={a ? (a.bannerImage ?? a.coverImage.extraLarge) : null}
-        episode={ep}
-        isHost={room ? room.isHost : false}
-        connectionStatus={connectionStatus}
-        onChangeShowClick={() => setChangeShowOpen(true)}
-      />
       <ChangeShowModal
         open={changeShowOpen}
         onClose={() => setChangeShowOpen(false)}
@@ -1714,5 +1834,7 @@ export default function WatchPage() {
         currentAnimeId={id}
       />
     </main>
+    <Footer />
+    </>
   )
 }

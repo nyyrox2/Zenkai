@@ -2,7 +2,7 @@ import { toast } from '../lib/toast'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
-import { ChevronLeft, ChevronRight, Loader2, Lock, TriangleAlert, Download, Zap } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Lock, MessageSquare, TriangleAlert, Download, Users, Zap } from 'lucide-react'
 import { ErrorState } from '../components/ErrorState'
 import { ServerPopup } from '../components/ServerPopup'
 import { EpisodeList } from '../components/EpisodeList'
@@ -25,6 +25,11 @@ import {
 } from '../services/movies'
 import { useShieldVerified, useShield, getToken } from '../lib/shield'
 import CinePlayer from '../components/CinePlayer'
+import { PartyChatPanel } from '../components/PartyChatPanel'
+import { WatchTogetherModal } from '../components/WatchTogetherModal'
+import { LiveReactionsOverlay } from '../components/LiveReactionsOverlay'
+import { useMovieParty } from '../hooks/useMovieParty'
+import { useMovieSkipTimes } from '../hooks/useMovieSkipTimes'
 
 const pill = 'rounded-full border px-4 py-2 text-sm font-semibold transition active:scale-95'
 const PREF = 'zk:movie-server:v1'
@@ -55,6 +60,7 @@ export default function MovieWatchPage() {
   const providerId = list.find((p) => p.id === params.get('p'))?.id ?? list.find((p) => p.id === readPref())?.id ?? list[0]?.id
   const provider = list.find((p) => p.id === providerId)
   const isMovieBox = providerId === 'moviebox'
+
 
   const [selectedDub, setSelectedDub] = useState<string | null>(params.get('dub')?.replace(/^-/, '') || null)
   const [selectedQuality, setSelectedQuality] = useState<string | null>(null)
@@ -103,6 +109,28 @@ export default function MovieWatchPage() {
   const dubs = mbStream.data?.dubs ?? (dubCache?.id === id ? dubCache.dubs : [])
   const curDub = dubs.find((d) => d.selected)?.id ?? dubs[0]?.id
 
+  // Watch Together (same room engine as anime; rooms ride the existing watch_rooms table)
+  const [partyOpen, setPartyOpen] = useState(false)
+  const party = useMovieParty({
+    type,
+    id,
+    title: details.data?.title ?? '',
+    season,
+    episode,
+    provider: providerId ?? '',
+    roomParam: params.get('room'),
+    setRoomParam: (r) =>
+      setParams((prev) => {
+        const n = new URLSearchParams(prev)
+        r ? n.set('room', r) : n.delete('room')
+        return n
+      }, { replace: true }),
+    dub: providerId === 'moviebox' ? (selectedDub ?? curDub ?? null) : null,
+    apply: (patch) => go({ ...(patch.s != null ? { s: patch.s } : {}), ...(patch.e != null ? { e: patch.e } : {}), ...(patch.p ? { p: patch.p, dub: null } : {}), ...(patch.d ? { dub: patch.d } : {}) }),
+    navigate,
+  })
+  const isGuest = Boolean(party.room && !party.room.isHost)
+
   const companion = useCompanion()
   const availableStreams = mbStream.data?.streams || []
   const activeStream = useMemo(() => {
@@ -113,6 +141,9 @@ export default function MovieWatchPage() {
     }
     return availableStreams[0]
   }, [availableStreams, selectedQuality])
+
+  // real intro / credits times (TheIntroDB); asked once the stream's length is known so the right release matches
+  const skipTimes = useMovieSkipTimes({ tmdbId: id, type, season, episode, duration: activeStream?.duration, on: isMovieBox && !!mbStream.data })
 
   const activeStreamUrl = companion.installed
     ? (activeStream?.rawStreamUrl || activeStream?.url || activeStream?.streamUrl || '')
@@ -133,12 +164,19 @@ export default function MovieWatchPage() {
   }, [details.data?.title])
 
   function go(next: Record<string, string | number | null>) {
+    // a guest cannot change season / episode / server by hand (the host's changes come through party.apply)
+    if (('s' in next || 'e' in next || 'p' in next) && party.guestLocked()) {
+      toast('Only the party host can change this', 'info')
+      return
+    }
     const p = new URLSearchParams(params)
     for (const [k, v] of Object.entries(next)) v === null ? p.delete(k) : p.set(k, String(v))
     setParams(p, { replace: true })
+    party.announce({ s: Number(p.get('s')) || 1, e: Number(p.get('e')) || 1, p: p.get('p') ?? providerId ?? '' })
   }
 
   function pick(pid: string) {
+    if (party.guestLocked()) return toast('Only the party host can change the server', 'info')
     try {
       localStorage.setItem(PREF, pid)
     } catch {
@@ -159,6 +197,7 @@ export default function MovieWatchPage() {
 
   // each MovieBox audio version is its own entry in the server list
   function pickAny(sid: string) {
+    if (party.guestLocked()) return toast('Only the party host can change the server', 'info')
     if (!sid.startsWith(DUB)) return pick(sid)
     const dub = sid.slice(DUB.length)
     if (providerId === 'moviebox') return pickDub(dub)
@@ -209,10 +248,53 @@ export default function MovieWatchPage() {
   }
   const nextServer = list[(list.findIndex((p) => p.id === providerId) + 1) % Math.max(list.length, 1)]
 
+  const chatPanel = (glass: boolean, className?: string, bare?: boolean) =>
+    party.room ? (
+      <PartyChatPanel
+        glass={glass}
+        bare={bare}
+        className={className}
+        messages={party.chat}
+        selfId={party.room.peerId}
+        online={party.peers.length}
+        onClose={() => party.setChatOpen(false)}
+        onSend={party.sendChat}
+        onReact={party.react}
+      />
+    ) : null
+  const backdrop = details.data?.backdrop ? `https://image.tmdb.org/t/p/w1280${details.data.backdrop}` : details.data?.poster ? `https://image.tmdb.org/t/p/w500${details.data.poster}` : null
+
+  const watchPanel = (
+    <WatchTogetherModal
+        open={partyOpen}
+        onClose={() => { setPartyOpen(false); party.setChatOpen(false) }}
+        tab={party.chatOpen ? 'chat' : 'room'}
+        onTab={(t) => party.setChatOpen(t === 'chat')}
+        unread={party.unread}
+        chat={chatPanel(true, 'h-full', true)}
+        room={party.room}
+        peers={party.peers}
+        onSendReaction={party.react}
+        onCreateRoom={party.create}
+        onJoinRoom={party.join}
+        onLeaveRoom={party.leave}
+        onForceSync={party.forceSync}
+        animeTitle={title}
+        animeId={id}
+        image={backdrop}
+        episode={type === 'tv' ? episode : 1}
+        isHost={party.room ? party.room.isHost : false}
+        connectionStatus={party.status}
+        shareUrl={party.shareUrl}
+        />
+  )
+
   return (
     <main className="relative pb-10">
       <div className="mx-auto max-w-7xl lg:px-6 lg:pt-6">
-      {/* Player */}
+      {/* Player (+ party chat docked at ~24% beside it on desktop) */}
+      <div className="lg:flex lg:items-stretch lg:gap-3">
+      <div className="min-w-0 flex-1">
       <div className="relative aspect-video w-full overflow-hidden bg-black lg:shadow-2xl lg:shadow-black/40 lg:ring-1 lg:ring-white/10">
         {!sessionVerified && isMovieBox ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
@@ -270,6 +352,19 @@ export default function MovieWatchPage() {
                 onPrevEpisode={() => prevTarget && go({ s: prevTarget.s, e: prevTarget.e })}
                 onSelectEpisode={(n) => go({ e: n })}
                 switching={mbStream.loading}
+                intro={skipTimes.intro}
+                outro={skipTimes.outro}
+                onVideoRef={party.setVideo}
+                onPlayerAction={party.onPlayerAction}
+                externalControl={party.external}
+                onWatchTogetherClick={() => setPartyOpen((o) => !o)}
+                watchPartyActive={Boolean(party.room)}
+                watchPartyPeersCount={party.peers.length}
+                isPartyGuest={isGuest}
+                onChatClick={() => { const on = !(party.chatOpen && partyOpen); party.setChatOpen(on); if (on) setPartyOpen(true) }}
+                chatOpen={party.chatOpen}
+                chatUnread={party.unread}
+                chatPanel={chatPanel(true, 'h-full')}
                 fallbackImg={details.data?.backdrop ? `https://image.tmdb.org/t/p/w1280${details.data.backdrop}` : details.data?.poster ? `https://image.tmdb.org/t/p/w500${details.data.poster}` : null}
                 defaultRuntime={
                   activeStream?.duration
@@ -345,6 +440,10 @@ export default function MovieWatchPage() {
             )}
           </>
         )}
+        <LiveReactionsOverlay reactions={party.reactions} syncNotice={party.notice} />
+      </div>
+      </div>
+      {watchPanel}
       </div>
 
       {/* Title + nav */}
@@ -402,6 +501,15 @@ export default function MovieWatchPage() {
             </Link>
           )}
           {!companion.installed && <InstallHelp />}
+          <button type="button" onClick={() => setPartyOpen((o) => !o)} className={cn(pill, 'inline-flex items-center gap-1.5 border-border bg-card/60', party.room && 'text-accent')}>
+            <Users className="size-4" /> {party.room ? `Party · ${party.peers.length}` : 'Watch Together'}
+          </button>
+          {party.room && (
+            <button type="button" onClick={() => { const on = !(party.chatOpen && partyOpen); party.setChatOpen(on); if (on) setPartyOpen(true) }} aria-pressed={party.chatOpen} className={cn(pill, 'relative inline-flex items-center gap-1.5 border-border bg-card/60', party.chatOpen && 'text-accent')}>
+              <MessageSquare className="size-4" /> Chat
+              {!party.chatOpen && party.unread > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[9px] font-bold text-accent-fg">{party.unread > 9 ? '9+' : party.unread}</span>}
+            </button>
+          )}
           {type === 'tv' && (
             <>
               <button type="button" disabled={!prevTarget} onClick={() => prevTarget && go({ s: prevTarget.s, e: prevTarget.e })} className={cn(pill, 'inline-flex items-center gap-1.5 border-border bg-card/60 disabled:opacity-35')}>
@@ -414,6 +522,10 @@ export default function MovieWatchPage() {
           )}
         </div>
       </div>
+
+      {party.room && !isMovieBox && (
+        <p className="mt-3 px-3 text-xs text-muted sm:px-6 lg:px-0">Playback sync works on Zenkai player servers. Embed servers can&rsquo;t be synced, chat and reactions still work.</p>
+      )}
 
       {/* Direct server */}
       <section className="mt-5 flex flex-wrap items-center gap-3 px-3 sm:px-6 lg:px-0" aria-label="Source">
@@ -469,7 +581,8 @@ export default function MovieWatchPage() {
 
       {/* Episodes */}
       {type === 'tv' && (
-        <section className="mt-8 px-3 sm:px-6 lg:px-0" aria-label="Episodes">
+        <section className={cn('mt-8 px-3 sm:px-6 lg:px-0', isGuest && 'pointer-events-none opacity-60')} aria-label="Episodes">
+          {isGuest && <p className="mb-3 text-xs font-semibold text-muted">The party host picks the episode.</p>}
           {seasons.length > 1 && (
             <div className="mb-4">
               <Tabs tabs={seasons.map((s) => ({ id: String(s.n), label: `S${s.n}` }))} value={String(season)} onChange={(v) => go({ s: v, e: 1 })} />

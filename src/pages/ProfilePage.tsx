@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  Bookmark,
   BookmarkCheck,
   ChevronRight,
   Cloud,
@@ -9,6 +10,8 @@ import {
   SlidersHorizontal,
   Sun,
   UserCheck,
+  ChevronsUp,
+  Check,
 } from 'lucide-react'
 import { AccountPanel, AuthPanel } from '../components/CloudSyncCard'
 import { useAuth } from '../context/AuthContext'
@@ -16,7 +19,7 @@ import { AniListCard } from '../components/AniListCard'
 import { ProfileEditor, ProfileHero, type SectionKey } from '../components/ProfileCustomizer'
 import { CustomSelect } from '../components/CustomSelect'
 import { DISCORD_URL, REPO_URL, TELEGRAM_URL } from '../lib/app'
-import { getPrefs, savePrefs, type Audio } from '../lib/library'
+import { getPrefs, savePrefs, useList, type Audio, type ListStatus } from '../lib/library'
 import { useProfile } from '../lib/profile'
 import { DIRECT } from '../lib/servers'
 import { toast } from '../lib/toast'
@@ -24,8 +27,17 @@ import { cn } from '../lib/utils'
 import { useTheme } from '../context/ThemeContext'
 import { useFlag } from '../hooks/useFlag'
 import { supabase } from '../lib/supabase'
+import {
+  getAscensionState,
+  ascensionCell,
+  claimQuestReward,
+} from '../lib/ascension/ascensionStore'
+import {
+  DAILY_QUEST_TEMPLATES,
+  WEEKLY_QUEST_TEMPLATES,
+} from '../lib/ascension/types'
 
-type TabKey = 'preferences' | 'account' | 'anilist' | 'legal'
+type TabKey = 'watchlist' | 'preferences' | 'ascension' | 'account' | 'anilist' | 'legal'
 
 const h2 = 'font-display text-xl font-bold'
 
@@ -99,6 +111,8 @@ export default function ProfilePage() {
   const [showAuth, setShowAuth] = useState(false)
   const [editTab, setEditTab] = useState<SectionKey>('identity')
   const [activeTab, setActiveTab] = useState<TabKey>('preferences')
+  const [watchlistFilter, setWatchlistFilter] = useState<'all' | ListStatus>('all')
+  const list = useList()
 
   const [prefs, setPrefs] = useState(getPrefs)
   const [autoNext, setAutoNext] = useFlag('zk:autonext', true)
@@ -107,6 +121,22 @@ export default function ProfilePage() {
   const [layout, setLayout] = useStored('zk:eplayout')
   const [lang, setLang] = useStored('zp-alang')
   const [maxQ, setMaxQ] = useStored('zp-q')
+
+  const [ascensionState, setAscensionState] = useState(getAscensionState())
+  const [claimLoading, setClaimLoading] = useState<string | null>(null)
+
+  useEffect(() => {
+    return ascensionCell.subscribe(() => {
+      setAscensionState(getAscensionState())
+    })
+  }, [])
+
+  const handleClaimQuest = async (questId: string) => {
+    setClaimLoading(questId)
+    const ok = await claimQuestReward(questId)
+    setClaimLoading(null)
+    if (ok) toast('Reward claimed! XP added.')
+  }
 
   useEffect(() => {
     // Intercept OAuth callback parameters in URL (PKCE code, implicit hash tokens, or errors)
@@ -176,6 +206,8 @@ export default function ProfilePage() {
 
   const SUB_TABS = [
     { id: 'preferences' as const, label: 'Preferences', icon: SlidersHorizontal },
+    { id: 'ascension' as const, label: 'Ascension Quests', icon: ChevronsUp, badge: `Lv.${ascensionState.level}` },
+    { id: 'watchlist' as const, label: 'Watchlist', icon: Bookmark, badge: list.length > 0 ? `${list.length}` : null },
     { id: 'account' as const, label: 'Cloud & Sync', icon: Cloud, badge: user ? 'Connected' : null },
     { id: 'anilist' as const, label: 'AniList', icon: BookmarkCheck },
     { id: 'legal' as const, label: 'About & Legal', icon: ShieldCheck },
@@ -218,7 +250,115 @@ export default function ProfilePage() {
             })}
           </div>
 
-          {/* 3. Unified Content Sections */}
+          {/* 3. Watchlist Section matching Zenkai theme */}
+          {activeTab === 'watchlist' && (
+            <section className="space-y-4" aria-label="Watchlist">
+              {/* Header row: Bookmark icon + Watchlist + count */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Bookmark className="size-5 text-accent fill-accent/20" />
+                  <h2 className="font-display text-xl font-bold tracking-tight text-foreground">
+                    Watchlist
+                  </h2>
+                </div>
+                <span className="font-mono text-xs text-muted">
+                  {list.length} anime
+                </span>
+              </div>
+
+              {/* Filter Pills matching Zenkai theme */}
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {[
+                  { id: 'all' as const, label: 'All', count: list.length },
+                  { id: 'watching' as const, label: 'Watching', count: list.filter((i) => i.status === 'watching').length },
+                  { id: 'planning' as const, label: 'Planning', count: list.filter((i) => i.status === 'planning').length },
+                  { id: 'completed' as const, label: 'Completed', count: list.filter((i) => i.status === 'completed').length },
+                  { id: 'paused' as const, label: 'Paused', count: list.filter((i) => i.status === 'paused').length },
+                  { id: 'dropped' as const, label: 'Dropped', count: list.filter((i) => i.status === 'dropped').length },
+                ].map((f) => {
+                  const on = watchlistFilter === f.id
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setWatchlistFilter(f.id)}
+                      className={cn(
+                        'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-mono font-semibold transition active:scale-95',
+                        on
+                          ? 'bg-accent text-accent-fg font-bold shadow-md shadow-accent/25'
+                          : 'border border-[#242730] bg-card/60 text-muted hover:border-border hover:text-foreground'
+                      )}
+                    >
+                      {f.label} ({f.count})
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Media Cards Grid */}
+              {(() => {
+                const filtered = watchlistFilter === 'all' ? list : list.filter((i) => i.status === watchlistFilter)
+                if (filtered.length === 0) {
+                  return (
+                    <div className="grid place-items-center rounded-3xl border border-dashed border-border/80 bg-card/20 px-6 py-14 text-center">
+                      <Bookmark className="size-10 text-muted/50 mb-2" />
+                      <p className="font-semibold text-foreground">
+                        {list.length === 0 ? 'Your watchlist is empty' : `No anime marked "${watchlistFilter}"`}
+                      </p>
+                      <p className="mt-1 max-w-sm text-xs text-muted">
+                        Bookmark your favorite series while browsing to track your progress here.
+                      </p>
+                      <Link
+                        to="/browse"
+                        className="mt-5 rounded-full bg-foreground px-6 py-2.5 text-xs font-bold text-background transition hover:brightness-110 active:scale-95"
+                      >
+                        Browse Anime
+                      </Link>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    {filtered.map((item) => (
+                      <div key={item.id} className="group/card relative">
+                        <Link to={`/anime/${item.id}`} className="block outline-none">
+                          <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border/70 bg-card-2 transition duration-200 group-hover:scale-[1.02] group-hover:border-accent/40 group-hover:shadow-2xl">
+                            <img
+                              src={item.image}
+                              alt={item.title}
+                              loading="lazy"
+                              className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+
+                            {/* Top Left Score Rating Badge */}
+                            {item.score ? (
+                              <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-400 backdrop-blur-sm">
+                                ★ {item.score}
+                              </span>
+                            ) : null}
+
+                            {/* Episode Progress Tag */}
+                            {item.progress ? (
+                              <span className="absolute bottom-2 right-2 rounded-md bg-black/80 px-2 py-0.5 text-[10px] font-mono font-semibold text-white backdrop-blur-sm">
+                                Ep {item.progress}{item.episodes ? ` / ${item.episodes}` : ''}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <h3 className="mt-2.5 line-clamp-1 text-xs sm:text-sm font-bold text-foreground transition-colors group-hover:text-accent">
+                            {item.title}
+                          </h3>
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </section>
+          )}
+
+          {/* 4. Unified Content Sections */}
           {activeTab === 'preferences' && (
             <section
               id="settings"
@@ -340,6 +480,147 @@ export default function ProfilePage() {
                   label="Episode cards"
                 />
               </Row>
+            </section>
+          )}
+
+          {activeTab === 'ascension' && (
+            <section className="rounded-3xl border border-border/60 bg-card-2/40 p-5 sm:p-7 shadow-xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/50 pb-4">
+                <div>
+                  <h2 className="font-display text-lg font-bold flex items-center gap-2 text-foreground">
+                    <ChevronsUp className="size-5 text-accent" />
+                    <span>Hunter Daily &amp; Weekly Quests</span>
+                  </h2>
+                  <p className="mt-1 text-xs text-muted">
+                    Earn XP by watching anime episodes, reading chapters, and checking in daily.
+                  </p>
+                </div>
+
+                <Link
+                  to="/ascension"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-mono font-bold text-accent transition hover:bg-accent/20"
+                >
+                  <span>Full Ascension System ➔</span>
+                </Link>
+              </div>
+
+              {/* Daily Quests List */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-muted">
+                  DAILY COMMISSIONS
+                </h3>
+                <div className="divide-y divide-border/50">
+                  {DAILY_QUEST_TEMPLATES.map((q) => {
+                    const uq = ascensionState.quests[q.id]
+                    const progressVal = uq ? uq.progress : 0
+                    const isCompleted = uq ? uq.completed : false
+                    const isClaimed = uq ? uq.claimed : false
+                    const percent = Math.min(100, Math.round((progressVal / q.target) * 100))
+
+                    return (
+                      <div key={q.id} className="py-3.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <span className="text-2xl shrink-0 mt-0.5">{q.icon}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-foreground">{q.title}</span>
+                              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
+                                +{q.xpReward} XP
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted mt-0.5">{q.description}</p>
+                            <div className="mt-2 flex items-center gap-2.5 max-w-xs">
+                              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
+                                <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${percent}%` }} />
+                              </div>
+                              <span className="text-[11px] font-mono text-muted">{progressVal}/{q.target}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 self-end sm:self-center">
+                          {isClaimed ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-mono font-bold text-emerald-500">
+                              <Check className="size-3.5 stroke-[3]" /> Claimed
+                            </span>
+                          ) : isCompleted ? (
+                            <button
+                              type="button"
+                              disabled={claimLoading === q.id}
+                              onClick={() => handleClaimQuest(q.id)}
+                              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-xs font-bold text-accent-fg shadow-md shadow-accent/25 transition hover:brightness-110 active:scale-95 disabled:opacity-50"
+                            >
+                              <Check className="size-3.5 stroke-[3]" />
+                              <span>{claimLoading === q.id ? 'Claiming…' : `Claim +${q.xpReward} XP`}</span>
+                            </button>
+                          ) : (
+                            <span className="text-xs font-mono text-muted">In progress</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Weekly Expeditions List */}
+              <div className="space-y-3 border-t border-border/50 pt-5">
+                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-muted">
+                  WEEKLY EXPEDITIONS
+                </h3>
+                <div className="divide-y divide-border/50">
+                  {WEEKLY_QUEST_TEMPLATES.map((q) => {
+                    const uq = ascensionState.quests[q.id]
+                    const progressVal = uq ? uq.progress : 0
+                    const isCompleted = uq ? uq.completed : false
+                    const isClaimed = uq ? uq.claimed : false
+                    const percent = Math.min(100, Math.round((progressVal / q.target) * 100))
+
+                    return (
+                      <div key={q.id} className="py-3.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <span className="text-2xl shrink-0 mt-0.5">{q.icon}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-foreground">{q.title}</span>
+                              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
+                                +{q.xpReward} XP
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted mt-0.5">{q.description}</p>
+                            <div className="mt-2 flex items-center gap-2.5 max-w-xs">
+                              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
+                                <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${percent}%` }} />
+                              </div>
+                              <span className="text-[11px] font-mono text-muted">{progressVal}/{q.target}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 self-end sm:self-center">
+                          {isClaimed ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-mono font-bold text-emerald-500">
+                              <Check className="size-3.5 stroke-[3]" /> Claimed
+                            </span>
+                          ) : isCompleted ? (
+                            <button
+                              type="button"
+                              disabled={claimLoading === q.id}
+                              onClick={() => handleClaimQuest(q.id)}
+                              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-xs font-bold text-accent-fg shadow-md shadow-accent/25 transition hover:brightness-110 active:scale-95 disabled:opacity-50"
+                            >
+                              <Check className="size-3.5 stroke-[3]" />
+                              <span>{claimLoading === q.id ? 'Claiming…' : `Claim +${q.xpReward} XP`}</span>
+                            </button>
+                          ) : (
+                            <span className="text-xs font-mono text-muted">In progress</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </section>
           )}
 

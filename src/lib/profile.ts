@@ -9,12 +9,21 @@ export interface Profile {
   banner: string | null
   frame: string | null
   bio?: string | null
+  nameColor?: string | null
 }
 
 export interface PublicUserData {
   id?: string
   username: string
   profile: Profile
+  level?: number
+  totalXp?: number
+  streak?: number
+  equippedTitle?: string
+  equippedTextEffect?: string
+  equippedFontStyle?: string
+  nameColor?: string | null
+  watchlist?: any[]
   watchlistCount?: number
   historyCount?: number
   readingCount?: number
@@ -22,7 +31,7 @@ export interface PublicUserData {
   updatedAt?: string
 }
 
-const empty: Profile = { name: '', avatar: null, banner: null, frame: null, bio: '' }
+const empty: Profile = { name: '', avatar: null, banner: null, frame: null, bio: '', nameColor: null }
 const store = cell<Profile>('zk:profile', empty)
 
 export const useProfile = () => useSyncExternalStore(store.subscribe, store.get)
@@ -62,6 +71,7 @@ export async function syncProfileToCloud(userId: string, username?: string, p?: 
       banner_url: current.banner || null,
       frame: current.frame || null,
       bio: current.bio ?? '',
+      name_color: current.nameColor || null,
       updated_at: new Date().toISOString(),
     }
     if (cleanUsername) {
@@ -105,6 +115,7 @@ export async function pullProfileFromCloud(userId: string): Promise<Profile | nu
       banner: data.banner_url || null,
       frame: data.frame || null,
       bio: data.bio || '',
+      nameColor: data.name_color || null,
     }
 
     const current = store.get()
@@ -115,6 +126,7 @@ export async function pullProfileFromCloud(userId: string): Promise<Profile | nu
       banner: current.banner || remote.banner,
       frame: current.frame || remote.frame,
       bio: current.bio || remote.bio,
+      nameColor: current.nameColor || remote.nameColor,
     }
 
     store.set(merged)
@@ -133,12 +145,21 @@ export async function fetchPublicProfile(username: string): Promise<PublicUserDa
   if (!clean) return null
 
   try {
-    // 1. Check public.profiles table
-    const { data: profileRow } = await supabase
-      .from('profiles')
-      .select('id, username, display_name, avatar_url, banner_url, frame, bio, created_at, updated_at')
-      .ilike('username', clean)
-      .maybeSingle()
+    // 1. Check public.profiles table using '*' to safely fetch available columns
+    let profileRow: any = null
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('username', clean)
+        .maybeSingle()
+
+      if (!error && data) {
+        profileRow = data
+      }
+    } catch (err) {
+      console.warn('[Profile] profiles select query error:', err)
+    }
 
     let userId = profileRow?.id
     let displayName = profileRow?.display_name || profileRow?.username || clean
@@ -148,43 +169,89 @@ export async function fetchPublicProfile(username: string): Promise<PublicUserDa
     let bio = profileRow?.bio || ''
     let createdAt = profileRow?.created_at
     let updatedAt = profileRow?.updated_at
+    let totalXp = Number(profileRow?.total_xp) || 0
+    let level = Number(profileRow?.level) || 1
+    let streak = Number(profileRow?.login_streak) || 0
+    let equippedTitle =
+      profileRow?.equipped_title && profileRow.equipped_title !== 'Novice Hunter'
+        ? profileRow.equipped_title
+        : 'Otaku'
+    let equippedTextEffect = profileRow?.equipped_text_effect || 'none'
+    let equippedFontStyle = profileRow?.equipped_font_style || 'default'
+    let nameColor = profileRow?.name_color || null
 
     // 2. Fallback to user_sync if not found in profiles table
     if (!profileRow) {
-      const { data: syncRow } = await supabase
-        .from('user_sync')
-        .select('user_id, username, profile, updated_at')
-        .ilike('username', clean)
-        .maybeSingle()
+      try {
+        const { data: syncRow } = await supabase
+          .from('user_sync')
+          .select('*')
+          .ilike('username', clean)
+          .maybeSingle()
 
-      if (!syncRow) return null
-
-      userId = syncRow.user_id
-      const p = (syncRow.profile as Profile) || empty
-      displayName = p.name || syncRow.username
-      avatarUrl = p.avatar || null
-      bannerUrl = p.banner || null
-      frame = p.frame || null
-      bio = p.bio || ''
-      updatedAt = syncRow.updated_at
+        if (syncRow) {
+          userId = syncRow.user_id
+          const p = (syncRow.profile as Profile) || empty
+          displayName = p.name || syncRow.username || clean
+          avatarUrl = p.avatar || null
+          bannerUrl = p.banner || null
+          frame = p.frame || null
+          bio = p.bio || ''
+          nameColor = p.nameColor || null
+          updatedAt = syncRow.updated_at
+        }
+      } catch (err) {
+        console.warn('[Profile] user_sync query error:', err)
+      }
     }
 
-    // 3. Query stats from user_sync
+    // 3. Fallback to local profile if this is the active user or local storage otaku
+    if (!profileRow && !userId) {
+      const local = getProfile()
+      const isLocalUser = (local.name && local.name.toLowerCase() === clean) || clean === 'otaku'
+      if (isLocalUser) {
+        return {
+          id: 'local',
+          username: clean,
+          profile: local,
+          level: 1,
+          totalXp: 0,
+          streak: 0,
+          equippedTitle: 'Otaku',
+          equippedTextEffect: 'none',
+          equippedFontStyle: 'default',
+          nameColor: local.nameColor || null,
+          watchlist: [],
+          watchlistCount: 0,
+          historyCount: 0,
+          readingCount: 0,
+        }
+      }
+      return null
+    }
+
+    // 4. Query stats and watchlist from user_sync
     let watchlistCount = 0
     let historyCount = 0
     let readingCount = 0
+    let userWatchlist: any[] = []
 
     if (userId) {
-      const { data: stats } = await supabase
-        .from('user_sync')
-        .select('watchlist, history, reading')
-        .eq('user_id', userId)
-        .maybeSingle()
+      try {
+        const { data: stats } = await supabase
+          .from('user_sync')
+          .select('watchlist, history, reading')
+          .eq('user_id', userId)
+          .maybeSingle()
 
-      if (stats) {
-        watchlistCount = Array.isArray(stats.watchlist) ? stats.watchlist.length : 0
-        historyCount = Array.isArray(stats.history) ? stats.history.length : 0
-        readingCount = Array.isArray(stats.reading) ? stats.reading.length : 0
+        if (stats) {
+          userWatchlist = Array.isArray(stats.watchlist) ? stats.watchlist : []
+          watchlistCount = userWatchlist.length
+          historyCount = Array.isArray(stats.history) ? stats.history.length : 0
+          readingCount = Array.isArray(stats.reading) ? stats.reading.length : 0
+        }
+      } catch (err) {
+        console.warn('[Profile] stats query error:', err)
       }
     }
 
@@ -197,7 +264,16 @@ export async function fetchPublicProfile(username: string): Promise<PublicUserDa
         banner: bannerUrl,
         frame,
         bio,
+        nameColor,
       },
+      level,
+      totalXp,
+      streak,
+      equippedTitle,
+      equippedTextEffect,
+      equippedFontStyle,
+      nameColor,
+      watchlist: userWatchlist,
       watchlistCount,
       historyCount,
       readingCount,

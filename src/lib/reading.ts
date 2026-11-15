@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { recordProgressionActivity } from './ascension/ascensionStore'
 
 /**
  * Local-only reading library for novels and manga: "continue reading" shelf + reader preferences.
@@ -73,6 +74,15 @@ if (typeof window !== 'undefined') {
 export function saveReading(item: Omit<ReadingItem, 't'>) {
   const rest = read().filter((x) => !(x.kind === item.kind && x.id === item.id))
   write([{ ...item, t: Date.now() }, ...rest].slice(0, MAX))
+
+  // Award progression XP when reaching 85%+ chapter progress
+  if (item.progress >= 0.85) {
+    recordProgressionActivity({
+      action: item.kind === 'manga' ? 'read_manga_chapter' : 'read_novel_chapter',
+      xp: 15,
+      refId: `${item.id}_${item.label}`,
+    })
+  }
 }
 
 export function removeReading(kind: ReadKind, id: string) {

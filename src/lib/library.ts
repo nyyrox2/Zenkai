@@ -1,6 +1,7 @@
 import { autoSyncWatchlist } from './sync'
 import { useSyncExternalStore } from 'react'
 import type { CardItem } from '../types/anime'
+import { recordProgressionActivity } from './ascension/ascensionStore'
 
 /**
  * Local-only library: continue-watching history, the watchlist and the last-used player prefs.
@@ -182,6 +183,15 @@ export function touchHistory(m: Meta, p: { ep: number; server: string; audio: Au
   // Newly touched/watched anime is immediately at index 0
   history.set([next, ...all].slice(0, MAX_HISTORY))
 
+  // Award progression XP when reaching 80%+ playback
+  if (next.dur > 0 && next.pos / next.dur >= 0.8) {
+    recordProgressionActivity({
+      action: 'watch_episode',
+      xp: 25,
+      refId: `${mid}_ep${p.ep}`,
+    })
+  }
+
   // Update watchlist & sync to AniList
   const li = items().find((i) => Number(i.id) === mid)
   const total = m.episodes ?? 0
@@ -232,6 +242,11 @@ export function finishEpisode(m: Meta, ep: number, hasNext: boolean) {
     t: Date.now(),
   }
   history.set([nextItem, ...all].slice(0, MAX_HISTORY))
+  recordProgressionActivity({
+    action: 'watch_episode',
+    xp: 25,
+    refId: `${mid}_ep${ep}`,
+  })
   markProgress(m, ep, !hasNext)
 }
 

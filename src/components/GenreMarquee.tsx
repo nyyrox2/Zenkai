@@ -15,7 +15,7 @@ export function GenreMarquee() {
       key={g.name}
       type="button"
       onClick={() => openSearch({ genre: g.name })}
-      className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card/70 px-5 py-2.5 text-sm font-medium backdrop-blur transition hover:border-transparent hover:bg-foreground hover:text-background active:scale-95"
+      className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card/70 px-5 py-2.5 text-sm font-semibold backdrop-blur transition hover:border-transparent hover:bg-foreground hover:text-background active:scale-95"
     >
       {g.name}
     </button>

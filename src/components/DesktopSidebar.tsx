@@ -13,6 +13,7 @@ import {
   Tv,
   Users,
   MessageSquare,
+  ChevronsUp,
   Heart,
   type LucideIcon,
 } from 'lucide-react'
@@ -41,6 +42,7 @@ const MAIN: Item[] = [
 ]
 
 const MORE: Item[] = [
+  { label: 'Ascension', to: '/ascension', icon: ChevronsUp, match: (p) => p.startsWith('/ascension') || p === '/missions' || p === '/quests' },
   { label: 'WatchParty', to: '/watchparty', icon: Tv, match: (p) => p.startsWith('/watchparty') || p.startsWith('/watchtogether') },
   { label: 'Community', to: '/community', icon: Users, match: (p) => p.startsWith('/community') },
   { label: 'Messages', to: '/messages', icon: MessageSquare, match: (p) => p.startsWith('/messages') },

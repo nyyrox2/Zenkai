@@ -1,25 +1,19 @@
 import { useEffect, useMemo } from 'react'
 import { fetchHome, fetchLatestEpisodes } from '../services/anilist'
-import { fetchMalTop } from '../services/jikan'
 import { useAsync } from '../hooks/useAsync'
-import { malToCard, mediaToCard } from '../lib/mappers'
+import { mediaToCard } from '../lib/mappers'
 import { getSeason, humanize } from '../lib/utils'
 import { ContinueRow } from '../components/ContinueRow'
 import { AnimeRow } from '../components/AnimeRow'
 import { LatestEpisodesRow } from '../components/LatestEpisodesRow'
 import { AppPromo } from '../components/AppPromo'
 import { ErrorState } from '../components/ErrorState'
-import { GenreMarquee } from '../components/GenreMarquee'
 import { HeroCarousel } from '../components/HeroCarousel'
 import { HeroLoader } from '../components/HeroLoader'
-
-// module-level: stable identity, so useAsync doesn't re-fire every render
-const fetchMal = () => fetchMalTop(18).catch(() => null)
 
 export default function HomePage() {
   const home = useAsync(fetchHome, [])
   const latestEpisodes = useAsync(fetchLatestEpisodes, [])
-  const malTop = useAsync(fetchMal, [])
 
   const { season, year } = getSeason()
 
@@ -40,9 +34,8 @@ export default function HomePage() {
       popular: home.data?.popular.map(mediaToCard),
       top: home.data?.top.map(mediaToCard),
       upcoming: home.data?.upcoming.map(mediaToCard),
-      mal: malTop.data?.map(malToCard),
     }),
-    [home.data, malTop.data],
+    [home.data],
   )
 
   const err = home.error?.message
@@ -62,7 +55,7 @@ export default function HomePage() {
         <HeroCarousel items={heroItems} />
       )}
 
-      <div className="relative z-10 mt-8 space-y-12 pb-20 sm:space-y-14">
+      <div className="relative z-10 mt-4 space-y-8 pb-16 sm:space-y-10">
         {/* Continue Watching Row */}
         <ContinueRow />
 
@@ -72,7 +65,6 @@ export default function HomePage() {
           loading={latestEpisodes.loading}
         />
 
-        <GenreMarquee />
 
         {/* Trending Anime Shelf */}
         <AnimeRow
@@ -121,15 +113,6 @@ export default function HomePage() {
           error={err}
           onRetry={home.reload}
           ranked
-        />
-
-        {/* MyAnimeList Top */}
-        <AnimeRow
-          id="mal"
-          eyebrow="MyAnimeList"
-          title="Top on MyAnimeList"
-          items={rows.mal}
-          loading={malTop.loading}
         />
 
         {/* Upcoming Anime */}

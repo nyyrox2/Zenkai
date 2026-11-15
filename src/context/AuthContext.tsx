@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo, t
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { setProfileStore, resetProfileStore } from '../lib/profile'
+import { syncAscensionWithCloud, clearAscensionCache } from '../lib/ascension/ascensionStore'
 import { toast } from '../lib/toast'
 
 interface AuthContextValue {
@@ -51,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           frame: data.frame || null,
           bio: data.bio || '',
         })
+        void syncAscensionWithCloud(u.id)
       } else {
         // First login for this account: initialize with this account's credentials
         setProfileUsername(cleanHandle)
@@ -278,6 +280,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       localStorage.removeItem('zk_my_sent_msgs')
       resetProfileStore()
+      clearAscensionCache()
       await supabase.auth.signOut()
       setSession(null)
       setUser(null)

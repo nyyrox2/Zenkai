@@ -1745,15 +1745,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
 
   const inIntro = intro != null && intro.end > 0 && time >= intro.start && time <= intro.end
   const inOutro = outro != null && outro.end > 0 && time >= outro.start && time <= outro.end
-  const real = inIntro ? { label: 'Skip intro', to: intro!.end } : inOutro ? { label: 'Skip outro', to: outro!.end } : null
-  // ponytail: movies/TV have no public timestamp source, so guess: TV = +85s in the first 5 min, movie = jump past credits in the last 7 min
-  const guess =
-    real || !isTmdb || intro || outro || dur < 600
-      ? null
-      : format === 'MOVIE'
-        ? dur > 3600 && dur - time <= 420 ? { label: 'Skip credits', to: dur } : null
-        : time < 300 ? { label: 'Skip intro', to: Math.min(time + 85, dur) } : null
-  const skip = real ?? guess
+  const skip = inIntro ? { label: 'Skip intro', to: intro!.end } : inOutro ? { label: 'Skip outro', to: outro!.end } : null
   const doSkip = () => {
     if (skip && castOn.current) {
       castSeek(skip.to)
@@ -1807,10 +1799,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   }, [episode, episodeKind])
 
   useEffect(() => {
-    if (autoSkip && real && skipped.current !== real.to && vid.current) {
-      skipped.current = real.to
-      if (castOn.current) castSeek(real.to)
-      else vid.current.currentTime = real.to
+    if (autoSkip && skip && skipped.current !== skip.to && vid.current) {
+      skipped.current = skip.to
+      if (castOn.current) castSeek(skip.to)
+      else vid.current.currentTime = skip.to
     }
   })
 
@@ -2231,7 +2223,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   const adj = (d: number) => setOffset((o) => Math.round((o + d) * 10) / 10)
   const avail = availableEpisodes ?? totalEpisodes
   const target = fs ? (root.current ?? document.body) : document.body
-  const seg = (s: Seg) => (s && dur > 0 && s.end > s.start ? { left: `${(s.start / dur) * 100}%`, width: `${((s.end - s.start) / dur) * 100}%` } : null)
+  const seg = (s: Seg) => (s && dur > 0 && s.end > s.start && s.start < dur ? { left: `${(s.start / dur) * 100}%`, width: `${((Math.min(s.end, dur) - s.start) / dur) * 100}%` } : null)
   const si = seg(intro)
   const so = seg(outro)
   const isPopTop = activeAnchor?.top !== undefined
@@ -2658,7 +2650,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   download
                   target="_blank"
                   rel="noreferrer"
-                  className="zp-b"
+                  className="zp-b zp-x"
                   aria-label="Download MP4"
                   title="Download video file"
                   onClick={() => flash('ok', 'Download started')}
@@ -2681,7 +2673,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                 </button>
               )}
               {pip && !casting && (
-                <button className="zp-b" onClick={togglePiP} aria-label="Picture in picture" title="Picture in picture">
+                <button className="zp-b zp-x" onClick={togglePiP} aria-label="Picture in picture" title="Picture in picture">
                   <PictureInPicture2 />
                 </button>
               )}

@@ -170,3 +170,25 @@ export async function deleteWatchRoom(roomId: string): Promise<void> {
     // ignore
   }
 }
+
+/**
+ * Movies / TV reuse the anime columns, so no migration is needed:
+ * anime_id = TMDB id, episode = season * 10000 + episode (a movie is S1 E1), server = "tmdb:<movie|tv>:<provider>".
+ */
+export const packEp = (season: number, episode: number) => season * 10000 + episode
+export const unpackEp = (n: number) => (n >= 10000 ? { s: Math.floor(n / 10000), e: n % 10000 } : { s: 1, e: n })
+export const movieServerTag = (type: 'movie' | 'tv', provider: string) => `tmdb:${type}:${provider}`
+
+export function movieRoomOf(r: Pick<WatchRoomRecord, 'anime_id' | 'episode' | 'server'>) {
+  const m = /^tmdb:(movie|tv):(.*)$/.exec(r.server ?? '')
+  if (!m) return null
+  return { type: m[1] as 'movie' | 'tv', id: r.anime_id, provider: m[2], ...unpackEp(r.episode) }
+}
+
+export const movieRoomPath = (r: Pick<WatchRoomRecord, 'anime_id' | 'episode' | 'server'>, room: string) => {
+  const m = movieRoomOf(r)
+  if (!m) return `/watch/${r.anime_id}?room=${room}&ep=${r.episode}`
+  const q = new URLSearchParams({ room, s: String(m.s), e: String(m.e) })
+  if (m.provider) q.set('p', m.provider)
+  return `/movies/watch/${m.type}/${m.id}?${q}`
+}

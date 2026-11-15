@@ -20,6 +20,8 @@ import { MovieSearchModal } from './components/MovieSearchModal'
 import { SearchModal } from './components/SearchModal'
 import { ChangelogModal } from './components/ChangelogModal'
 import { ChooseUsernameModal } from './components/ChooseUsernameModal'
+import { SystemLevelUpModal } from './components/ascension/SystemLevelUpModal'
+import { evaluateDailyLoginStreak } from './lib/ascension/ascensionStore'
 import { useTrackHistory } from './lib/backToDetails'
 import { initAniListSync } from './lib/anilist'
 import { useApplyTvMode } from './lib/keys'
@@ -64,6 +66,7 @@ const DocsPage = lazy(() => import('./pages/DocsPage'))
 const CallPage = lazy(() => import('./pages/CallPage'))
 const ExtensionGuidePage = lazy(() => import('./pages/ExtensionGuidePage'))
 const SupportPage = lazy(() => import('./pages/SupportPage'))
+const AscensionPage = lazy(() => import('./pages/AscensionPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 export default function App() {
@@ -116,6 +119,9 @@ export default function App() {
   useApplyTvMode()
   useSpatialNav()
   useEffect(() => initAniListSync(), [])
+  useEffect(() => {
+    evaluateDailyLoginStreak()
+  }, [])
   const { user } = useAuth()
   useEffect(() => {
     if (user?.id) void checkDailySync(user.id)
@@ -211,6 +217,10 @@ export default function App() {
               <Route path="/api/docs" element={<DocsPage />} />
               <Route path="/docs" element={<DocsPage />} />
               <Route path="/support" element={<SupportPage />} />
+              <Route path="/ascension" element={<AscensionPage />} />
+              <Route path="/ascend" element={<AscensionPage />} />
+              <Route path="/missions" element={<AscensionPage />} />
+              <Route path="/quests" element={<AscensionPage />} />
               <Route path="/busted" element={<BustedPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
@@ -223,6 +233,7 @@ export default function App() {
       {!bare && !isApi && !inChat && <MobileDock onOpenDrawer={() => setDrawerOpen(true)} />}
       {!bare && !isApi && section === 'movies' ? <MovieSearchModal /> : <SearchModal />}
       <Toaster />
+      <SystemLevelUpModal />
       <ShortcutsHelp />
       <ShieldGate />
       <ChangelogModal />

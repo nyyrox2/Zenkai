@@ -40,14 +40,14 @@ export function AnimeRow({
 
   return (
     <section id={id} className="cv-auto mx-auto w-full max-w-7xl">
-      <div className="mb-5 flex items-end justify-between gap-4 px-4 sm:px-6">
+      <div className="mb-3 flex items-end justify-between gap-4 px-4 sm:px-6">
         <div>
           {eyebrow && <p className="mb-1 eyebrow text-accent">{eyebrow}</p>}
-          <h2 className="font-display text-2xl font-bold tracking-tight">{title}</h2>
+          <h2 className="font-display text-2xl font-extrabold tracking-tight">{title}</h2>
         </div>
         <div className="flex items-center gap-2">
         {viewAll && (
-          <Link to={viewAll} className="rounded-full border border-border bg-card/60 px-4 py-2 text-sm font-medium transition hover:bg-foreground hover:text-background active:scale-95">
+          <Link to={viewAll} className="rounded-full border border-border bg-card/60 px-4 py-2 text-sm font-semibold transition hover:bg-foreground hover:text-background active:scale-95">
             View all
           </Link>
         )}
@@ -79,7 +79,7 @@ export function AnimeRow({
       ) : (
         <div
           ref={scroller}
-          className="no-scrollbar flex snap-x snap-proximity scroll-pl-4 scroll-pr-4 gap-4 overflow-x-auto scroll-smooth px-4 pb-4 pt-2 sm:scroll-pl-6 sm:scroll-pr-6 sm:gap-5 sm:px-6"
+          className="no-scrollbar flex snap-x snap-proximity scroll-pl-4 scroll-pr-4 gap-3 overflow-x-auto scroll-smooth px-4 pb-2 pt-1 sm:scroll-pl-6 sm:scroll-pr-6 sm:gap-3 sm:px-6"
         >
           {loading || !items
             ? Array.from({ length: 8 }).map((_, i) => (

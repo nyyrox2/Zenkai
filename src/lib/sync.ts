@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import type { HistoryItem, ListItem } from './library'
 import type { ReadingItem } from './reading'
 import { getProfile, saveProfile, syncProfileToCloud, type Profile } from './profile'
+import { ascensionCell, syncAscensionWithCloud } from './ascension/ascensionStore'
 
 export const LAST_SYNC_KEY = 'zk:cloud:last_sync'
 const ONE_DAY_MS = 24 * 60 * 60 * 1000 // 24 hours (once a day)
@@ -73,6 +74,22 @@ export async function pushWatchHistory(userId: string): Promise<{ success: boole
 
     // Also sync to public.profiles table
     void syncProfileToCloud(userId, undefined, profile)
+
+    // Sync ascension XP, level, streak & cosmetics to public.profiles table (never overwrite with stale 0)
+    const asc = ascensionCell.get()
+    if (asc.totalXp > 0 || asc.streak > 0) {
+      void supabase
+        .from('profiles')
+        .update({
+          total_xp: asc.totalXp,
+          level: asc.level,
+          login_streak: asc.streak,
+          equipped_title: asc.equippedTitle,
+          equipped_text_effect: asc.equippedTextEffect,
+          equipped_frame: asc.equippedFrame,
+        })
+        .eq('id', userId)
+    }
 
     const now = Date.now()
     localStorage.setItem(LAST_SYNC_KEY, String(now))
@@ -211,6 +228,8 @@ export async function pullWatchHistory(userId: string): Promise<{ success: boole
 
 /** Two-way sync: merge the cloud into this device first, then upload the merged result (never overwrites the cloud with a stale device). */
 export async function syncNow(userId: string): Promise<{ success: boolean; count: number; error?: string }> {
+  // Always pull authoritative ascension stats (XP, level, streak, cosmetics) from cloud first
+  await syncAscensionWithCloud(userId, true)
   const pulled = await pullWatchHistory(userId)
   return pulled.success ? pushWatchHistory(userId) : pulled
 }

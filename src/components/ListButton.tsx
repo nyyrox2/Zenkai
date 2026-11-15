@@ -38,7 +38,7 @@ export function ListButton({ item, variant = 'pill', className }: { item: Meta; 
       onClick={click}
       className={cn(
         'inline-flex items-center gap-1.5 border transition active:scale-95',
-        inList ? 'border-transparent bg-accent text-accent-fg' : 'border-border hover:bg-foreground hover:text-background',
+        inList ? '!border-transparent !bg-accent !text-accent-fg' : '!text-foreground border-border hover:!bg-foreground hover:!text-background',
         className,
       )}
     >

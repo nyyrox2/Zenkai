@@ -1,4 +1,4 @@
-import type { AniAiringEntry, AniCardMedia, AniMedia, AniMediaDetails, AniStreamingEpisode, HomeData, WatchOrderEntry } from '../types/anime'
+import type { AniAiringEntry, AniCardMedia, AniMedia, AniMediaDetails, AniRecommendationNode, AniStreamingEpisode, HomeData, WatchOrderEntry } from '../types/anime'
 import { getSeason } from '../lib/utils'
 import { fetchAnimeFallback } from './fallback'
 import { AniListDownError, markAniListDown, markAniListUp } from '../lib/anilistStatus'
@@ -371,6 +371,32 @@ export const fetchAnimeLite = (id: number): Promise<AniLite> => {
     async () => (await gql<{ Media: AniLite }>(LITE_QUERY, { id })).Media,
     () => fetchAnimeFallback(id, false) as Promise<AniLite>,
   )
+}
+
+/** "More like this": AniList's community recommendations, best rated first. Never throws, an empty list just hides the row. */
+export async function fetchRecommendations(id: number): Promise<AniRecommendationNode[]> {
+  if (getCustomShowById(id)) return []
+  const query = /* GraphQL */ `
+    query ($id: Int) {
+      Media(id: $id, type: ANIME) {
+        recommendations(sort: RATING_DESC, perPage: 14) {
+          nodes {
+            mediaRecommendation {
+              id
+              title { romaji english native }
+              coverImage { large color }
+              averageScore format episodes seasonYear
+            }
+          }
+        }
+      }
+    }
+  `
+  try {
+    return (await gql<{ Media: { recommendations: { nodes: AniRecommendationNode[] } } }>(query, { id })).Media.recommendations.nodes
+  } catch {
+    return []
+  }
 }
 
 /* ---------- Watch order (franchise walk through PREQUEL / SEQUEL / SIDE_STORY / SPIN_OFF / PARENT) ---------- */

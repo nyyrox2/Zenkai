@@ -7,6 +7,8 @@ import { cn } from '../lib/utils'
 export interface Option {
   value: string
   label: string
+  /** small tag shown at the end of the row, e.g. "Playing" */
+  hint?: string
 }
 
 /** Themed dropdown (replaces the native select). Portaled so the scrolling filter bar never clips it; keyboard + screen-reader friendly. */
@@ -16,12 +18,18 @@ export function CustomSelect({
   onChange,
   options,
   placeholder,
+  prefix,
+  className,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   options: Option[]
   placeholder: string
+  /** muted text shown in the button before the selected label */
+  prefix?: string
+  /** extra classes for the button (e.g. full width) */
+  className?: string
 }) {
   const id = useId()
   const btn = useRef<HTMLButtonElement>(null)
@@ -106,9 +114,13 @@ export function CustomSelect({
           'inline-flex h-10 shrink-0 items-center gap-2 rounded-full border bg-card/60 pl-4 pr-3 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-accent',
           value ? 'border-accent/60 text-foreground' : 'border-border text-muted',
           open && 'border-accent',
+          className,
         )}
       >
-        <span className="whitespace-nowrap">{value && selected ? selected.label : placeholder}</span>
+        <span className="flex items-center gap-2 whitespace-nowrap">
+          {prefix && <span className="text-muted">{prefix}</span>}
+          <span>{value && selected ? selected.label : placeholder}</span>
+        </span>
         <ChevronDown className={cn('size-4 transition-transform duration-200', open && 'rotate-180')} />
       </button>
 
@@ -144,8 +156,11 @@ export function CustomSelect({
                       on && 'font-semibold text-accent',
                     )}
                   >
-                    {o.label}
-                    {on && <Check className="size-4" />}
+                    <span>{o.label}</span>
+                    <span className="flex items-center gap-2">
+                      {o.hint && <span className="rounded-full bg-foreground px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-background">{o.hint}</span>}
+                      {on && <Check className="size-4" />}
+                    </span>
                   </div>
                 )
               })}

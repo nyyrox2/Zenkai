@@ -95,7 +95,7 @@ function LatestEpisodeCard({ item, onShowPreview, onKeepPreviewOpen, onClosePrev
       }}
       aria-label={`${title} Episode ${item.episode}`}
     >
-      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#121319] shadow-lg shadow-black/25 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-white/35 group-focus-visible:border-white/60 group-hover:shadow-2xl">
+      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#121319] transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-white/35 group-focus-visible:border-white/60 group-hover:shadow-2xl">
         {image ? (
           <img
             src={image}
@@ -111,7 +111,6 @@ function LatestEpisodeCard({ item, onShowPreview, onKeepPreviewOpen, onClosePrev
 
         {/* Angled cinematic vignette gradient mask (going dark at corners) */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.3)_100%)] pointer-events-none" />
 
         {/* Floating pure text for Episode with soft drop shadow (no background box) */}
         <div className="absolute bottom-2.5 left-3 pointer-events-none">
@@ -131,7 +130,7 @@ function LatestEpisodeCard({ item, onShowPreview, onKeepPreviewOpen, onClosePrev
             {jpTitle}
           </p>
         )}
-        <p className="text-[11px] text-muted font-medium">
+        <p className="text-[11px] text-muted font-semibold">
           {timeAgo}
         </p>
       </div>
@@ -186,14 +185,14 @@ export function LatestEpisodesRow({ items, loading }: LatestEpisodesRowProps) {
       <div className="mb-4 flex items-end justify-between gap-4 px-4 sm:px-6">
         <div>
           <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">Latest Episodes</h2>
-          <p className="mt-0.5 text-xs text-muted font-medium">Recently released episodes</p>
+          <p className="mt-0.5 text-xs text-muted font-semibold">Recently released episodes</p>
         </div>
         <div className="hidden gap-2 md:flex">
           <button
             type="button"
             aria-label="Scroll left"
             onClick={() => scroll(-1)}
-            className="grid size-9 place-items-center rounded-full border border-border bg-card/60 text-muted hover:text-foreground hover:bg-card-2 transition active:scale-90 shadow-sm"
+            className="grid size-9 place-items-center rounded-full border border-border bg-card/60 text-muted hover:text-foreground hover:bg-card-2 transition active:scale-90"
           >
             <ChevronLeft className="size-4" />
           </button>
@@ -201,7 +200,7 @@ export function LatestEpisodesRow({ items, loading }: LatestEpisodesRowProps) {
             type="button"
             aria-label="Scroll right"
             onClick={() => scroll(1)}
-            className="grid size-9 place-items-center rounded-full border border-border bg-card/60 text-muted hover:text-foreground hover:bg-card-2 transition active:scale-90 shadow-sm"
+            className="grid size-9 place-items-center rounded-full border border-border bg-card/60 text-muted hover:text-foreground hover:bg-card-2 transition active:scale-90"
           >
             <ChevronRight className="size-4" />
           </button>
@@ -210,7 +209,7 @@ export function LatestEpisodesRow({ items, loading }: LatestEpisodesRowProps) {
 
       <div
         ref={scroller}
-        className="[mask-image:linear-gradient(to_right,transparent,#000_16px,#000_calc(100%_-_40px),transparent)] no-scrollbar flex snap-x snap-proximity scroll-pl-4 scroll-pr-4 gap-4 overflow-x-auto scroll-smooth px-4 pb-4 pt-1 sm:scroll-pl-6 sm:scroll-pr-6 sm:gap-4.5 sm:px-6"
+        className="[mask-image:linear-gradient(to_right,transparent,#000_16px,#000_calc(100%_-_40px),transparent)] no-scrollbar flex snap-x snap-proximity scroll-pl-4 scroll-pr-4 gap-3 overflow-x-auto scroll-smooth px-4 pb-4 pt-1 sm:scroll-pl-6 sm:scroll-pr-6 sm:gap-3 sm:px-6"
       >
         {loading
           ? Array.from({ length: 6 }).map((_, i) => (

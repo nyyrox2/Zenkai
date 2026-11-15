@@ -187,15 +187,13 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
         </AnimatePresence>
 
         {/* Cinematic dark scrims */}
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/80 via-black/30 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
-        <div className="absolute inset-0 hidden lg:block bg-gradient-to-r from-black/85 via-black/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
       </div>
 
       {/* Seamless cinematic bottom dark gradient: smoothly blends hero into page background */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 -bottom-1 h-44 sm:h-64 bg-gradient-to-t from-background via-background/95 via-background/60 to-transparent z-10"
+        className="pointer-events-none absolute inset-x-0 -bottom-1 h-24 sm:h-32 bg-gradient-to-t from-background to-transparent z-10"
       />
 
       <div className="relative z-20 mx-auto flex h-full w-full max-w-7xl flex-col justify-end px-5 pb-6 sm:px-8 lg:pb-10">
@@ -208,7 +206,7 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
           >
             <Heading title={title} logo={tmdb?.logo ?? null} loaded={bundle !== null} />
 
-            <Rise i={1} className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-[13px] font-medium text-white/80 lg:justify-start">
+            <Rise i={1} className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-[13px] font-semibold text-white/80 lg:justify-start">
               <span className="inline-flex items-center gap-1.5">
                 <span aria-hidden className={cn('size-2 rounded-full', dot, item.status === 'RELEASING' && 'animate-pulse')} />
                 {formatStatus(item.status)}
@@ -246,7 +244,7 @@ export function HeroCarousel({ items }: { items: AniMedia[] }) {
               <Magnet padding={28}>
                 <Link
                   to={watchable ? `/watch/${item.id}` : `/anime/${item.id}`}
-                  className="inline-flex h-12 sm:h-13 items-center gap-2.5 rounded-full bg-white px-7 sm:px-8 text-[15px] font-bold text-black shadow-xl hover:bg-zinc-200 transition active:scale-95"
+                  className="inline-flex h-12 sm:h-13 items-center gap-2.5 rounded-full bg-white px-7 sm:px-8 text-[15px] font-bold text-black hover:bg-zinc-200 transition active:scale-95"
                 >
                   {watchable ? <Play className="size-4.5 fill-current" /> : <Info className="size-4.5" />}
                   {watchable ? 'Watch now' : 'View details'}

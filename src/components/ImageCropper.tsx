@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { Check, FlipHorizontal2, RotateCcw, RotateCw, Undo2, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Check, FlipHorizontal2, FlipVertical2, Loader2, RotateCcw, RotateCw, Sparkles, Undo2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { bytesToDataUrl, canDecodeAnimated, closeFrames, decodeFrames, encodeGif, sniffBlob, type AnimFormat } from '../lib/animatedImage'
 
 export type CropKind = 'avatar' | 'banner'
 
 /** Output size of the saved image. Avatar is square (shown round), banner is 3:1. */
 const OUT: Record<CropKind, [number, number]> = { avatar: [384, 384], banner: [1200, 400] }
+/** Animated (GIF / APNG) output is smaller so the data: url stays light enough to sync. */
+const AOUT: Record<CropKind, [number, number]> = { avatar: [256, 256], banner: [720, 240] }
 const TITLE: Record<CropKind, string> = { avatar: 'Crop profile picture', banner: 'Crop profile banner' }
 
 type V = { x: number; y: number }
@@ -44,6 +47,10 @@ export function ImageCropper({ src, kind, onApply, onClose }: { src: string; kin
   const [zoom, setZoom] = useState(1)
   const [angle, setAngle] = useState(0)
   const [flip, setFlip] = useState(false)
+  const [flipV, setFlipV] = useState(false)
+  const [anim, setAnim] = useState<AnimFormat>(null)
+  const [progress, setProgress] = useState(0)
+  const [error, setError] = useState('')
   const [c, setC] = useState<V>({ x: 0, y: 0 })
   const [busy, setBusy] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -68,9 +75,28 @@ export function ImageCropper({ src, kind, onApply, onClose }: { src: string; kin
   }, [src])
 
   useEffect(() => {
+    let live = true
+    fetch(src)
+      .then((r) => r.blob())
+      .then(sniffBlob)
+      .then((f) => live && setAnim(f))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [src])
+
+  useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return onClose()
+      const step = e.shiftKey ? 12 : 3
+      const d = ({ ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] } as Record<string, number[]>)[e.key]
+      if (!d || (e.target as HTMLElement).tagName === 'INPUT') return
+      e.preventDefault()
+      nudge.current(d[0], d[1])
+    }
     window.addEventListener('keydown', key)
     return () => {
       document.body.style.overflow = prev
@@ -85,6 +111,11 @@ export function ImageCropper({ src, kind, onApply, onClose }: { src: string; kin
   const s = base * zoom
   const cc = img ? clampCentre(c, s, w, h, dims.fw, dims.fh, a) : c
   const pan = rot(cc.x, cc.y, a) // image centre offset = -pan
+  const nudge = useRef((_x: number, _y: number) => {})
+  nudge.current = (x, y) => {
+    const d = rot(x, y, -a)
+    setC({ x: cc.x + d.x, y: cc.y + d.y })
+  }
 
   // Pointer gestures: one finger / mouse pans, two fingers pinch-zoom.
   const pts = useRef(new Map<number, V>())
@@ -125,26 +156,59 @@ export function ImageCropper({ src, kind, onApply, onClose }: { src: string; kin
     setZoom(1)
     setAngle(0)
     setFlip(false)
+    setFlipV(false)
     setC({ x: 0, y: 0 })
   }
 
-  function apply() {
-    if (!img) return
-    setBusy(true)
-    const [ow, oh] = OUT[kind]
+  /** Paint the image through the current pan / zoom / rotate / flip onto an output canvas context. */
+  function paint(g: CanvasRenderingContext2D, src: CanvasImageSource, ow: number, oh: number, scale = 1) {
     const k = ow / dims.fw
-    const canvas = document.createElement('canvas')
-    canvas.width = ow
-    canvas.height = oh
-    const g = canvas.getContext('2d')!
-    g.fillStyle = '#000'
-    g.fillRect(0, 0, ow, oh)
     g.imageSmoothingQuality = 'high'
+    g.scale(scale, scale)
     g.translate(ow / 2 - pan.x * k, oh / 2 - pan.y * k)
     g.rotate(a)
-    g.scale((flip ? -1 : 1) * s * k, s * k)
-    g.drawImage(img, -w / 2, -h / 2)
-    onApply(canvas.toDataURL('image/jpeg', 0.9))
+    g.scale((flip ? -1 : 1) * s * k, (flipV ? -1 : 1) * s * k)
+    g.drawImage(src, -w / 2, -h / 2, w, h)
+  }
+
+  async function apply() {
+    if (!img || busy) return
+    setBusy(true)
+    setError('')
+    setProgress(0)
+    try {
+      if (anim) {
+        const blob = await (await fetch(src)).blob()
+        // Browser can't decode frames: keep the original animation untouched rather than flattening it.
+        if (!canDecodeAnimated()) {
+          if (blob.size > 3 * 1048576) throw new Error('This browser cannot crop animated images and the file is over 3 MB.')
+          onApply(await bytesToDataUrl(new Uint8Array(await blob.arrayBuffer()), blob.type || 'image/gif'))
+          return
+        }
+        const [ow, oh] = AOUT[kind]
+        const frames = await decodeFrames(blob, anim)
+        try {
+          const bytes = await encodeGif(frames, ow, oh, (g, f, sc) => paint(g, f as CanvasImageSource, ow, oh, sc), { onProgress: setProgress })
+          if (bytes.byteLength > 3 * 1048576) throw new Error('Animation is too long or detailed to fit. Try a shorter GIF.')
+          onApply(await bytesToDataUrl(bytes, 'image/gif'))
+        } finally {
+          closeFrames(frames)
+        }
+        return
+      }
+      const [ow, oh] = OUT[kind]
+      const canvas = document.createElement('canvas')
+      canvas.width = ow
+      canvas.height = oh
+      const g = canvas.getContext('2d')!
+      g.fillStyle = '#000'
+      g.fillRect(0, 0, ow, oh)
+      paint(g, img, ow, oh)
+      onApply(canvas.toDataURL('image/jpeg', 0.9))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not process that image.')
+      setBusy(false)
+    }
   }
 
   const iconBtn = 'grid size-10 place-items-center rounded-full border border-border bg-card-2/60 transition hover:border-accent hover:text-accent active:scale-90'
@@ -176,7 +240,7 @@ export function ImageCropper({ src, kind, onApply, onClose }: { src: string; kin
               alt=""
               draggable={false}
               className="pointer-events-none absolute left-1/2 top-1/2 max-w-none"
-              style={{ width: w, height: h, marginLeft: -w / 2, marginTop: -h / 2, transform: `translate(${-pan.x}px, ${-pan.y}px) rotate(${angle}deg) scale(${flip ? -s : s}, ${s})` }}
+              style={{ width: w, height: h, marginLeft: -w / 2, marginTop: -h / 2, transform: `translate(${-pan.x}px, ${-pan.y}px) rotate(${angle}deg) scale(${flip ? -s : s}, ${flipV ? -s : s})` }}
             />
           )}
           {!img && <p className="absolute inset-0 grid place-items-center text-sm text-white/60">{failed ? 'Could not read that image.' : 'Loading…'}</p>}
@@ -195,7 +259,12 @@ export function ImageCropper({ src, kind, onApply, onClose }: { src: string; kin
             </div>
           </div>
         </div>
-        <p className="mt-2 text-center text-xs text-muted">Drag to move. Scroll or pinch to zoom.</p>
+        <p className="mt-2 text-center text-xs text-muted">Drag to move. Scroll or pinch to zoom. Arrow keys nudge.</p>
+        {anim && (
+          <p className="mx-auto mt-2 flex w-fit items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-semibold text-accent">
+            <Sparkles className="size-3.5" /> Animated {anim === 'gif' ? 'GIF' : anim === 'apng' ? 'APNG' : 'WebP'}: animation is kept
+          </p>
+        )}
 
         <div className="mt-3 space-y-4 rounded-2xl border border-border bg-background/40 p-4">
           <div>
@@ -243,6 +312,9 @@ export function ImageCropper({ src, kind, onApply, onClose }: { src: string; kin
               <button type="button" onClick={() => setFlip((f) => !f)} aria-pressed={flip} className={cn(iconBtn, flip && 'border-accent bg-accent/15 text-accent')} aria-label="Flip horizontally" title="Flip horizontally">
                 <FlipHorizontal2 className="size-4" />
               </button>
+              <button type="button" onClick={() => setFlipV((f) => !f)} aria-pressed={flipV} className={cn(iconBtn, flipV && 'border-accent bg-accent/15 text-accent')} aria-label="Flip vertically" title="Flip vertically">
+                <FlipVertical2 className="size-4" />
+              </button>
               <button type="button" onClick={reset} className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-semibold text-muted transition hover:text-foreground active:scale-95">
                 <Undo2 className="size-4" /> Reset
               </button>
@@ -250,12 +322,19 @@ export function ImageCropper({ src, kind, onApply, onClose }: { src: string; kin
           </div>
         </div>
 
+        {error && <p role="alert" className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>}
+        {busy && anim && (
+          <div className="mt-3" aria-live="polite">
+            <div className="mb-1 flex justify-between text-xs text-muted"><span>Processing animation…</span><span className="tabular-nums">{Math.round(progress * 100)}%</span></div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${progress * 100}%` }} /></div>
+          </div>
+        )}
         <div className="mt-4 flex items-center justify-end gap-2">
           <button type="button" onClick={onClose} className="h-11 rounded-full border border-border px-5 text-sm font-semibold transition hover:bg-card-2 active:scale-95">
             Cancel
           </button>
-          <button type="button" onClick={busy || !img ? undefined : apply} className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-6 text-sm font-bold text-background transition hover:opacity-90 active:scale-95">
-            <Check className="size-4" /> Apply
+          <button type="button" onClick={busy || !img ? undefined : apply} disabled={busy || !img} className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-6 text-sm font-bold text-background transition hover:opacity-90 active:scale-95 disabled:opacity-60">
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} {busy ? 'Working' : 'Apply'}
           </button>
         </div>
       </motion.div>

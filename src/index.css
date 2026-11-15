@@ -2,6 +2,127 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ---------- Custom Anime & Display Typography (Local woff2 fallbacks) ---------- */
+@font-face {
+  font-family: 'Dela Gothic One';
+  src: url('/fonts/dela-gothic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cinzel Decorative';
+  src: url('/fonts/cinzel-decorative.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Orbitron';
+  src: url('/fonts/orbitron.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Reggae One';
+  src: url('/fonts/reggae-one.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rampart One';
+  src: url('/fonts/rampart-one.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/fonts/chakra-petch.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Syne';
+  src: url('/fonts/syne.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rubik Glitch';
+  src: url('/fonts/rubik-glitch.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Silkscreen';
+  src: url('/fonts/silkscreen.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Shojumaru';
+  src: url('/fonts/shojumaru.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url('/fonts/bebas-neue.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Permanent Marker';
+  src: url('/fonts/permanent-marker.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nosifer';
+  src: url('/fonts/nosifer.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lacquer';
+  src: url('/fonts/lacquer.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ---------- Theme tokens ---------- */
 :root {
   --background: #ffffff;
@@ -381,4 +502,390 @@ html[data-drawer] .animate-marquee,
 html[data-drawer] .animate-card-in,
 html[data-drawer] .animate-pulse {
   animation-play-state: paused;
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+/* ============================================================================
+   ZENKAI // ASCENSION — High-End Animated Typographic Surface Shaders
+   ============================================================================ */
+
+/* Liquid Melting Sag (Fluid Organic Wave) */
+@keyframes liquid-text-melt-sag {
+  0%, 100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(1.5px) scaleY(1.03) scaleX(0.99);
+  }
+}
+
+/* 1. Diamond Shimmer (Luxury Metallic Specular Light Sweep) */
+@keyframes text-shimmer-sweep {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.effect-shimmer {
+  background: linear-gradient(
+    110deg,
+    #64748b 0%,
+    #94a3b8 20%,
+    #ffffff 38%,
+    #38bdf8 46%,
+    #ffffff 54%,
+    #cbd5e1 70%,
+    #475569 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: diamond-gleam-glide 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* ============================================================================
+   ZENKAI ASCENSION // HIGH-END TYPOGRAPHIC SURFACE SHADERS (AAA GAME QUALITY)
+   ============================================================================ */
+
+/* 1. Diamond Haute Horlogerie (Razor-Sharp 110° Platinum Specular Sweep) */
+@keyframes diamond-gleam-glide {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* 2. 100,000V High-Voltage Surge (Electric Plasma Arc with Tight Specular Corona) */
+@keyframes voltage-arc-flicker {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% {
+    color: #ffffff;
+    text-shadow: 
+      0 0 2px #ffffff,
+      0 0 6px #00f0ff,
+      0 0 12px rgba(0, 240, 255, 0.7);
+  }
+  19%, 24%, 55% {
+    color: #e0e7ff;
+    text-shadow: 
+      0 0 1px #ffffff,
+      0 0 4px #818cf8,
+      0 0 8px rgba(99, 102, 241, 0.6);
+  }
+}
+.effect-electric {
+  animation: voltage-arc-flicker 2.4s ease-in-out infinite alternate;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 3. Imperial Kyoto Sakura Sheen (Blooming Silk Luster with Tight Blush) */
+@keyframes sakura-silk-glide {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.effect-sakura {
+  background: linear-gradient(
+    110deg,
+    #9f1239 0%,
+    #f43f5e 20%,
+    #fbcfe8 45%,
+    #ffffff 50%,
+    #f472b6 55%,
+    #fb7185 80%,
+    #881337 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: sakura-silk-glide 2.4s ease-in-out infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 4. Volcanic Combustion Inferno (Multi-Layered Rising Combustion Flames) */
+@keyframes inferno-combustion-flicker {
+  0% {
+    color: #ffffff;
+    text-shadow: 
+      0 -1px 2px #ffffff,
+      0 -3px 6px #f59e0b,
+      0 -6px 12px rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    color: #fffbeb;
+    text-shadow: 
+      0 -2px 3px #ffffff,
+      1px -4px 8px #fbbf24,
+      -1px -8px 14px rgba(249, 115, 22, 0.8);
+  }
+  100% {
+    color: #fef3c7;
+    text-shadow: 
+      0 -1px 2px #ffffff,
+      -1px -3px 6px #f59e0b,
+      1px -7px 12px rgba(234, 88, 12, 0.75);
+  }
+}
+.effect-inferno {
+  animation: inferno-combustion-flicker 1.5s ease-in-out infinite alternate;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 5. Astral Monarch Domain (Solo Leveling Sovereign Dark-Matter Plasma) */
+@keyframes astral-monarch-surge {
+  0%, 100% {
+    text-shadow: 
+      0 0 2px #ffffff,
+      0 0 6px #00f0ff,
+      0 0 12px rgba(168, 85, 247, 0.65);
+  }
+  50% {
+    text-shadow: 
+      0 0 3px #ffffff,
+      0 0 8px #38bdf8,
+      0 0 16px rgba(192, 132, 252, 0.8);
+  }
+}
+.effect-pulse {
+  color: #f5f3ff;
+  animation: astral-monarch-surge 2.4s ease-in-out infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 6. Liquid Mercury Chrome (Hyper-Reflective Molten Liquid Metal) */
+@keyframes chrome-mercury-glide {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.effect-chrome {
+  background: linear-gradient(
+    135deg,
+    #0f172a 0%,
+    #94a3b8 20%,
+    #ffffff 35%,
+    #334155 48%,
+    #f8fafc 62%,
+    #64748b 80%,
+    #ffffff 100%
+  );
+  background-size: 250% 250%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: chrome-mercury-glide 3.6s ease-in-out infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 7. Imperial 24K Sovereign Gold (Bullion Luster with High-Velocity Specular Sweep) */
+@keyframes gold-specular-glide {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.effect-gold-foil {
+  background: linear-gradient(
+    110deg,
+    #451a03 0%,
+    #b45309 18%,
+    #fef08a 40%,
+    #ffffff 50%,
+    #fde047 58%,
+    #d97706 75%,
+    #78350f 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gold-specular-glide 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 8. Tokyo Cyberpunk 2077 Neon (Dual-Gas Discharge Glass Tube) */
+@keyframes tokyo-neon-discharge {
+  0%, 100% {
+    text-shadow: 
+      0 0 2px #ffffff,
+      0 0 5px #ff007f,
+      0 0 10px rgba(255, 0, 127, 0.7);
+  }
+  48%, 52% {
+    text-shadow: 
+      0 0 2px #ffffff,
+      0 0 6px #fb7185,
+      0 0 12px rgba(244, 63, 94, 0.8);
+  }
+}
+.effect-tokyo-neon {
+  color: #fff1f2;
+  animation: tokyo-neon-discharge 2.2s ease-in-out infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 9. Prismatic Secret Rare Foil (Continuous Diffraction Grating Iridescence) */
+@keyframes holo-diffraction-sweep {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.effect-holographic {
+  background: linear-gradient(
+    125deg,
+    #ff7675 0%,
+    #ffeaa7 20%,
+    #55efc4 40%,
+    #74b9ff 60%,
+    #a29bfe 80%,
+    #ff7675 100%
+  );
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: holo-diffraction-sweep 4.5s ease-in-out infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 10. Absolute Zero Glacial Cryo (Crystalline Arctic Diamond) */
+@keyframes glacial-crystal-glide {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.effect-frostbite {
+  background: linear-gradient(
+    110deg,
+    #0369a1 0%,
+    #0284c7 20%,
+    #bae6fd 45%,
+    #ffffff 50%,
+    #38bdf8 55%,
+    #7dd3fc 80%,
+    #075985 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: glacial-crystal-glide 2.4s ease-in-out infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 11. 80s Miami Outrun Synthwave (Sunset Metallic Horizon) */
+@keyframes synthwave-sunset-pulse {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.5px);
+  }
+}
+.effect-synthwave {
+  background: linear-gradient(180deg, #ffffff 0%, #fbcfe8 25%, #ff1177 48%, #1e1b4b 50%, #8b5cf6 68%, #00f0ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: synthwave-sunset-pulse 2s ease-in-out infinite alternate;
+  font-weight: 900;
+  font-style: italic;
+  display: inline-block;
+}
+
+/* 12. Matrix Overclock CRT (Green Phosphor Terminal Tube) */
+@keyframes matrix-crt-raster {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 0% 200%; }
+}
+.effect-matrix {
+  background: linear-gradient(
+    180deg,
+    #15803d 0%,
+    #22c55e 25%,
+    #bbf7d0 45%,
+    #ffffff 50%,
+    #4ade80 55%,
+    #16a34a 75%,
+    #14532d 100%
+  );
+  background-size: 100% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: matrix-crt-raster 1.6s linear infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 13. Spectral Phantom Mist (Haunting Translucent Ghost Shadows) */
+@keyframes phantom-mist-drift {
+  0%, 100% {
+    opacity: 0.85;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+.effect-ghost-mist {
+  background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 35%, #64748b 70%, #334155 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: phantom-mist-drift 2.2s ease-in-out infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 14. Cosmic God Supernova (Galaxy Singularity Stellar Plasma) */
+@keyframes supernova-stellar-drift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.effect-supernova {
+  background: linear-gradient(270deg, #00f0ff, #c084fc, #ffd700, #f43f5e, #00f0ff);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: supernova-stellar-drift 3.5s ease infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* 15. RGB Cyber Glitch (APK Max) Container */
+.effect-glitch {
+  display: inline-block;
+  position: relative;
+}
+
+/* 16. Viscous Liquid Meltdown Animations (No Detached DOM Sticks) */
+@keyframes viscous-liquid-sag {
+  0% {
+    transform: scaleY(1) translateY(0);
+  }
+  50% {
+    transform: scaleY(1.05) translateY(2px);
+  }
+  100% {
+    transform: scaleY(1) translateY(0);
+  }
+}
+.effect-melt {
+  background: linear-gradient(180deg, #ffffff 0%, #ff4d6d 22%, #e11d48 48%, #9f1239 78%, #4c0519 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: viscous-liquid-sag 3.5s ease-in-out infinite;
+  font-weight: 900;
+  display: inline-block;
+}
+
+.effect-acid {
+  background: linear-gradient(180deg, #ffffff 0%, #d9f99d 22%, #84cc16 48%, #4d7c0f 78%, #1a2e05 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: viscous-liquid-sag 3.5s ease-in-out infinite;
+  font-weight: 900;
+  display: inline-block;
 }
