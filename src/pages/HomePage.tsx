@@ -42,7 +42,7 @@ export default function HomePage() {
   const err = home.error?.message
 
   return (
-    <main className="calm">
+    <main>
       {/* Hero Carousel: 70% viewport height so content peeks through from below */}
       {home.loading ? (
         <div className="relative h-[68svh] max-h-[660px] min-h-[460px] overflow-hidden lg:h-[70svh] lg:max-h-[660px]">

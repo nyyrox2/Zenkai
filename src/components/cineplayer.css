@@ -761,3 +761,8 @@
   .zp-fs .zp-in { --u: clamp(7px, min(2.5cqw, 3.6cqh), 12px); }
   .zp-pop { max-width: min(260px, 46%); }
 }
+
+/* ---- Bolder icons + labels ---- */
+.zp svg, .zp-sw svg { stroke-width: 2.5; }
+.zp-b, .zp-t, .zp-tm { font-weight: 800; }
+.zp-row, .zp-pi, .zp-sec, .zp-ph { font-weight: 700; }

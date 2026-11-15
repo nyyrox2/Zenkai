@@ -47,7 +47,7 @@ export function AnimeRow({
         </div>
         <div className="flex items-center gap-2">
         {viewAll && (
-          <Link to={viewAll} className="rounded-sm border border-border bg-card px-4 py-2 text-sm font-semibold transition hover:bg-foreground hover:text-background">
+          <Link to={viewAll} className="rounded-full border border-border bg-card/60 px-4 py-2 text-sm font-semibold transition hover:bg-foreground hover:text-background active:scale-95">
             View all
           </Link>
         )}
@@ -56,7 +56,7 @@ export function AnimeRow({
             type="button"
             aria-label={`Scroll ${title} left`}
             onClick={() => scroll(-1)}
-            className="grid size-10 place-items-center rounded-sm border border-border bg-card transition hover:bg-foreground hover:text-background"
+            className="grid size-10 place-items-center rounded-full border border-border bg-card/60 transition hover:bg-foreground hover:text-background active:scale-90"
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -64,7 +64,7 @@ export function AnimeRow({
             type="button"
             aria-label={`Scroll ${title} right`}
             onClick={() => scroll(1)}
-            className="grid size-10 place-items-center rounded-sm border border-border bg-card transition hover:bg-foreground hover:text-background"
+            className="grid size-10 place-items-center rounded-full border border-border bg-card/60 transition hover:bg-foreground hover:text-background active:scale-90"
           >
             <ChevronRight className="size-5" />
           </button>
@@ -84,7 +84,7 @@ export function AnimeRow({
           {loading || !items
             ? Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="w-[148px] shrink-0 sm:w-[178px] lg:w-[196px]">
-                  <Skeleton className="aspect-[2/3] w-full rounded-sm" />
+                  <Skeleton className="aspect-[2/3] w-full rounded-2xl" />
                   <Skeleton className="mt-3 h-4 w-4/5" />
                   <Skeleton className="mt-2 h-3 w-1/2" />
                 </div>

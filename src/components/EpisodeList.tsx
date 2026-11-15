@@ -30,6 +30,7 @@ export function EpisodeList({
   badge = 'Now playing',
   kinds,
   onPick,
+  compact = false,
 }: {
   total: number
   /** highest episode that has aired */
@@ -43,10 +44,13 @@ export function EpisodeList({
   /** filler / mixed / recap episodes, canon is absent */
   kinds?: Map<number, EpKind>
   onPick?: (ep: number) => void
+  /** side-column mode: single tight list, small stills */
+  compact?: boolean
 }) {
   const pages = Math.ceil(total / PAGE)
   const [page, setPage] = useState(() => Math.max(0, Math.floor(((current ?? 1) - 1) / PAGE)))
-  const [card, setCard] = useState(() => localStorage.getItem('zk:eplayout') === 'card')
+  const [cardPref, setCard] = useState(() => localStorage.getItem('zk:eplayout') === 'card')
+  const card = !compact && cardPref
   const [desc, setDesc] = useState(false)
   const [q, setQ] = useState('')
   const [hideNon, setHideNon] = useState(false)
@@ -99,9 +103,9 @@ export function EpisodeList({
         <button type="button" onClick={() => setDesc((d) => !d)} aria-label="Reverse order" aria-pressed={desc} className={cn(ctl, desc && 'border-accent text-accent')}>
           <ArrowUpDown className="size-4" />
         </button>
-        <button type="button" onClick={toggleLayout} aria-label={card ? 'Switch to list' : 'Switch to cards'} className={ctl}>
+        {!compact && <button type="button" onClick={toggleLayout} aria-label={card ? 'Switch to list' : 'Switch to cards'} className={ctl}>
           {card ? <List className="size-4" /> : <LayoutGrid className="size-4" />}
-        </button>
+        </button>}
       </div>
 
       {pages > 1 && !q && (
@@ -110,8 +114,8 @@ export function EpisodeList({
         </div>
       )}
 
-      <div className="mb-3 mt-5">
-        <h2 className="font-display text-xl font-bold">Episodes</h2>
+      <div className={cn(compact ? 'mb-2 mt-3' : 'mb-3 mt-5')}>
+        <h2 className="font-display text-xl font-extrabold">Episodes</h2>
         <p className="text-sm text-muted">{q ? `${nums.length} found` : `${from}–${to} of ${total}`}</p>
         {anyKind && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -128,7 +132,7 @@ export function EpisodeList({
       {nums.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted">No episodes match.</p>
       ) : (
-        <ul className={cn('gap-3', card ? 'grid sm:grid-cols-2 2xl:grid-cols-3' : 'flex flex-col')}>
+        <ul className={cn(compact ? 'gap-1.5' : 'gap-3', card ? 'grid sm:grid-cols-2 2xl:grid-cols-3' : 'flex flex-col')}>
           {nums.map((n) => {
             const e = info.get(n)
             const aired = n <= available
@@ -140,8 +144,8 @@ export function EpisodeList({
             const name = e?.name ?? `Episode ${n}`
             const body = (
               <>
-                <div className={cn('relative shrink-0 overflow-hidden rounded-2xl bg-card-2', card ? 'aspect-video w-full' : 'aspect-video w-36 sm:w-52')}>
-                  {img && <Img src={img} alt="" loading="lazy" decoding="async" className={cn('h-full w-full object-cover transition duration-500', aired && 'group-hover:scale-105', !e?.image && 'opacity-60 blur-[1px]')} />}
+                <div className={cn('relative shrink-0 overflow-hidden rounded-xl bg-card-2', card ? 'aspect-video w-full' : compact ? 'aspect-video w-28' : 'aspect-video w-36 sm:w-52')}>
+                  {img && <Img src={img} alt="" loading="lazy" decoding="async" className={cn('h-full w-full object-cover transition duration-500', aired && '', !e?.image && 'opacity-60 blur-[1px]')} />}
                   <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                   {kind && <span className={cn('absolute left-2 top-2 rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase backdrop-blur', KIND[kind].cls, 'bg-black/70')}>{KIND[kind].label}</span>}
                   {card ? (
@@ -159,7 +163,7 @@ export function EpisodeList({
                   )}
                 </div>
                 <div className={cn('min-w-0 flex-1', card ? 'px-1 pb-1 pt-3' : 'py-0.5')}>
-                  <p className={cn('font-semibold leading-snug', card ? 'line-clamp-1 text-lg' : 'line-clamp-2 text-base')}>{name}</p>
+                  <p className={cn('font-semibold leading-snug', card ? 'line-clamp-1 text-lg' : compact ? 'line-clamp-2 text-[13px] font-bold' : 'line-clamp-2 text-base')}>{name}</p>
                   <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                     {!card && <span>Ep {n}</span>}
                     {!card && mins ? <span>· {mins} min</span> : null}
@@ -168,15 +172,15 @@ export function EpisodeList({
                     {!aired && <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-bold uppercase">Not aired</span>}
                     {on && <span className="rounded-full bg-foreground px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-background">{badge}</span>}
                   </p>
-                  {e?.overview && <p className={cn('mt-2 text-sm leading-relaxed text-muted', card ? 'line-clamp-2' : 'line-clamp-2 max-sm:hidden')}>{e.overview}</p>}
+                  {e?.overview && !compact && <p className={cn('mt-2 text-sm leading-relaxed text-muted', card ? 'line-clamp-2' : 'line-clamp-2 max-sm:hidden')}>{e.overview}</p>}
                 </div>
               </>
             )
             const cls = cn(
-              'group flex rounded-3xl border p-2.5 transition sm:p-3',
-              card ? 'flex-col' : 'items-center gap-3 sm:gap-4',
-              on ? 'border-white/40 bg-white/[0.07]' : 'border-border bg-card/60',
-              aired ? 'hover:bg-card active:scale-[0.99]' : 'cursor-not-allowed opacity-45',
+              'group flex rounded-xl border transition', compact ? 'p-1.5' : 'p-2.5 sm:p-3',
+              card ? 'flex-col' : compact ? 'items-center gap-2.5' : 'items-center gap-3 sm:gap-4',
+              on ? 'border-accent/60 bg-card-2' : 'border-border/60 bg-card/60',
+              aired ? 'hover:bg-card-2' : 'cursor-not-allowed opacity-45',
             )
             return (
               <li key={n}>

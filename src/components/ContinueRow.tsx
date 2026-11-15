@@ -21,18 +21,18 @@ function Card({ h }: { h: HistoryItem }) {
         aria-label={`Remove ${h.title} from continue watching`}
         title="Remove"
         onClick={() => removeHistory(h.id)}
-        className="absolute right-2 top-2 z-10 grid size-8 place-items-center rounded-sm bg-black/70 text-white opacity-0 transition hover:bg-accent hover:text-accent-fg focus-visible:opacity-100 group-hover/card:opacity-100 pointer-coarse:opacity-100"
+        className="absolute right-2 top-2 z-10 grid size-8 place-items-center rounded-full bg-black/70 text-white opacity-0 backdrop-blur transition hover:bg-accent hover:text-accent-fg focus-visible:opacity-100 group-hover/card:opacity-100 pointer-coarse:opacity-100"
       >
         <X className="size-4" />
       </button>
       <Link to={href} className="group block outline-none">
         <div
           style={{ backgroundColor: h.color ?? undefined }}
-          className="relative aspect-[2/3] overflow-hidden rounded-sm border border-border bg-card-2 group-focus-visible:ring-2 group-focus-visible:ring-accent"
+          className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border bg-card-2 group-focus-visible:ring-2 group-focus-visible:ring-accent"
         >
-          <Img src={h.image} alt={h.title} loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover transition-transform duration-500" />
+          <Img src={h.image} alt={h.title} loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
           <div className="absolute inset-0 grid place-items-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-            <span className="grid size-12 place-items-center rounded-sm bg-accent text-accent-fg">
+            <span className="grid size-12 place-items-center rounded-full bg-accent text-accent-fg">
               <Play className="size-5 fill-current" />
             </span>
           </div>

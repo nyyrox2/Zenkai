@@ -33,7 +33,7 @@ export function WatchInfoRail({ a, title, id, actions, footer }: { a: AniLite; t
       <motion.section {...fade} transition={{ duration: 0.2 }}>
         <Label>About</Label>
         <div className="flex gap-3">
-          <div className="relative aspect-[2/3] w-24 shrink-0 overflow-hidden bg-card-2">
+          <div className="relative aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-lg bg-card-2">
             <Img src={a.coverImage.large ?? ''} alt="" className="size-full object-cover" />
           </div>
           <div className="min-w-0">
@@ -78,10 +78,10 @@ function WatchOrder({ id }: { id: number }) {
             <Link
               to={`/watch/${e.id}`}
               aria-current={cur ? 'true' : undefined}
-              className={cn('group flex items-center gap-2.5 border-l-2 py-1.5 pl-1 pr-1.5 transition-colors hover:bg-card-2', cur ? 'border-accent bg-card-2' : 'border-transparent', !e.main && !cur && 'opacity-60 hover:opacity-100')}
+              className={cn('group flex items-center gap-2.5 rounded-md border-l-2 py-1.5 pl-1 pr-1.5 transition-colors hover:bg-card-2', cur ? 'border-accent bg-card-2' : 'border-transparent', !e.main && !cur && 'opacity-60 hover:opacity-100')}
             >
               <Rank n={i + 1} top={cur} />
-              <div className="relative aspect-[2/3] w-10 shrink-0 overflow-hidden bg-card-2">
+              <div className="relative aspect-[2/3] w-10 shrink-0 overflow-hidden rounded-lg bg-card-2">
                 <Img src={e.image ?? ''} alt="" loading="lazy" className="size-full object-cover" />
               </div>
               <span className="min-w-0 flex-1">
@@ -99,9 +99,9 @@ function WatchOrder({ id }: { id: number }) {
 function Row({ m, i }: { m: AniCardMedia; i: number }) {
   return (
     <li>
-      <Link to={`/anime/${m.id}`} className="group flex items-center gap-2.5 py-1.5 pl-1 pr-1.5 transition-colors hover:bg-card-2">
+      <Link to={`/anime/${m.id}`} className="group flex items-center gap-2.5 rounded-md py-1.5 pl-1 pr-1.5 transition-colors hover:bg-card-2">
         <Rank n={i + 1} top={i === 0} />
-        <div className="relative aspect-[2/3] w-10 shrink-0 overflow-hidden bg-card-2">
+        <div className="relative aspect-[2/3] w-10 shrink-0 overflow-hidden rounded-lg bg-card-2">
           <Img src={m.coverImage.large ?? ''} alt="" loading="lazy" className="size-full object-cover" />
         </div>
         <div className="min-w-0">
@@ -116,7 +116,7 @@ function Row({ m, i }: { m: AniCardMedia; i: number }) {
 const Skel = () => <div className="space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
 
 /** Right rail (when no watch party is open): top rated in the same genres + what is trending. */
-export function WatchRecsRail({ a, id }: { a: AniLite; id: number }) {
+export function WatchRecsRail({ a, id, cols }: { a: AniLite; id: number; cols?: boolean }) {
   const picks = useAsync(async () => {
     const own = new Set(a.genres)
     const pages = await Promise.all(a.genres.slice(0, 2).map((g) => fetchCatalog({ genre: g, sort: 'SCORE_DESC', minPopularity: 20000 }, 1)))
@@ -131,7 +131,7 @@ export function WatchRecsRail({ a, id }: { a: AniLite; id: number }) {
   const hot = (trending.data ?? []).filter((m) => !skip.has(m.id)).slice(0, 5)
 
   return (
-    <div className="space-y-5">
+    <div className={cn(cols ? 'grid gap-6 sm:grid-cols-2' : 'space-y-5')}>
       <section>
         <Label>More like this</Label>
         {picks.loading ? <Skel /> : (picks.data?.length ?? 0) > 0 ? <ul>{picks.data!.map((m, i) => <Row key={m.id} m={m} i={i} />)}</ul> : <p className="text-xs text-muted">Nothing similar found.</p>}

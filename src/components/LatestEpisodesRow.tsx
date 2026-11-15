@@ -95,13 +95,13 @@ function LatestEpisodeCard({ item, onShowPreview, onKeepPreviewOpen, onClosePrev
       }}
       aria-label={`${title} Episode ${item.episode}`}
     >
-      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-sm border border-white/10 bg-[#121319] transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-white/35 group-focus-visible:border-white/60 group-hover:shadow-2xl">
+      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#121319] transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-white/35 group-focus-visible:border-white/60 group-hover:shadow-2xl">
         {image ? (
           <img
             src={image}
             alt={title}
             loading="lazy"
-            className="size-full object-cover transition-transform duration-500 ease-out"
+            className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
           />
         ) : (
           <div className="size-full bg-[#181922] grid place-items-center text-white/20">
@@ -192,7 +192,7 @@ export function LatestEpisodesRow({ items, loading }: LatestEpisodesRowProps) {
             type="button"
             aria-label="Scroll left"
             onClick={() => scroll(-1)}
-            className="grid size-9 place-items-center rounded-sm border border-border bg-card text-muted hover:text-foreground hover:bg-card-2 transition"
+            className="grid size-9 place-items-center rounded-full border border-border bg-card/60 text-muted hover:text-foreground hover:bg-card-2 transition active:scale-90"
           >
             <ChevronLeft className="size-4" />
           </button>
@@ -200,7 +200,7 @@ export function LatestEpisodesRow({ items, loading }: LatestEpisodesRowProps) {
             type="button"
             aria-label="Scroll right"
             onClick={() => scroll(1)}
-            className="grid size-9 place-items-center rounded-sm border border-border bg-card text-muted hover:text-foreground hover:bg-card-2 transition"
+            className="grid size-9 place-items-center rounded-full border border-border bg-card/60 text-muted hover:text-foreground hover:bg-card-2 transition active:scale-90"
           >
             <ChevronRight className="size-4" />
           </button>
@@ -217,7 +217,7 @@ export function LatestEpisodesRow({ items, loading }: LatestEpisodesRowProps) {
                 key={i}
                 className="w-[230px] sm:w-[260px] md:w-[280px] shrink-0 animate-pulse space-y-2.5"
               >
-                <div className="aspect-[16/9] w-full rounded-sm bg-white/[0.05]" />
+                <div className="aspect-[16/9] w-full rounded-2xl bg-white/[0.05]" />
                 <div className="h-4 w-3/4 rounded bg-white/[0.05]" />
                 <div className="h-3 w-1/3 rounded bg-white/[0.05]" />
               </div>
