@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import Hls from 'hls.js'
 import {
-  Airplay, AudioLines, Cast, Check, CheckCircle2, ChevronDown, Download, FastForward, Flag, Languages, List, Loader2, Maximize, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
+  Airplay, AudioLines, Cast, Check, CheckCircle2, ChevronDown, Download, FastForward, Flag, Languages, List, Loader2, Maximize, MessageSquare, Minimize, Music, Pause, PictureInPicture2, Play, RotateCcw, RotateCw,
   Search, Server, Settings, SkipBack, SkipForward, TriangleAlert, Upload, Users, Volume1, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { apiUrl, fetchStream, type EpInfo, type EpKind } from '../services/api'
@@ -348,6 +348,11 @@ export interface CinePlayerProps {
   } | null
   onWatchTogetherClick?: () => void
   watchPartyActive?: boolean
+  /** party chat: toggle button (with unread badge); `chatPanel` is shown over the video in fullscreen, the page docks it beside the player otherwise */
+  onChatClick?: () => void
+  chatOpen?: boolean
+  chatUnread?: number
+  chatPanel?: React.ReactNode
   watchPartyPeersCount?: number
   /** When watching together in a room as a guest (non-host), timestamp and episode changes are host-controlled */
   isPartyGuest?: boolean
@@ -802,7 +807,7 @@ export default function CinePlayer({
   autoNext = true, onAutoNext, autoSkip = false, onAutoSkip,
   nextEpisode, episodeKind, skipFiller = false, onSkipFiller, switching = false,
   episodesInfo, fallbackImg, defaultRuntime, kinds,
-  onVideoRef, onPlayerAction, externalControl, onWatchTogetherClick, watchPartyActive, watchPartyPeersCount,
+  onVideoRef, onPlayerAction, externalControl, onWatchTogetherClick, watchPartyActive, watchPartyPeersCount, onChatClick, chatOpen = false, chatUnread = 0, chatPanel,
   isPartyGuest = false,
   qualities, currentQuality, onQualityChange, downloadUrl, fallbackStreamUrl, isTmdb = false, onStreamError,
 }: CinePlayerProps) {
@@ -1740,7 +1745,15 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
 
   const inIntro = intro != null && intro.end > 0 && time >= intro.start && time <= intro.end
   const inOutro = outro != null && outro.end > 0 && time >= outro.start && time <= outro.end
-  const skip = inIntro ? { label: 'Skip intro', to: intro!.end } : inOutro ? { label: 'Skip outro', to: outro!.end } : null
+  const real = inIntro ? { label: 'Skip intro', to: intro!.end } : inOutro ? { label: 'Skip outro', to: outro!.end } : null
+  // ponytail: movies/TV have no public timestamp source, so guess: TV = +85s in the first 5 min, movie = jump past credits in the last 7 min
+  const guess =
+    real || !isTmdb || intro || outro || dur < 600
+      ? null
+      : format === 'MOVIE'
+        ? dur > 3600 && dur - time <= 420 ? { label: 'Skip credits', to: dur } : null
+        : time < 300 ? { label: 'Skip intro', to: Math.min(time + 85, dur) } : null
+  const skip = real ?? guess
   const doSkip = () => {
     if (skip && castOn.current) {
       castSeek(skip.to)
@@ -1794,10 +1807,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   }, [episode, episodeKind])
 
   useEffect(() => {
-    if (autoSkip && skip && skipped.current !== skip.to && vid.current) {
-      skipped.current = skip.to
-      if (castOn.current) castSeek(skip.to)
-      else vid.current.currentTime = skip.to
+    if (autoSkip && real && skipped.current !== real.to && vid.current) {
+      skipped.current = real.to
+      if (castOn.current) castSeek(real.to)
+      else vid.current.currentTime = real.to
     }
   })
 
@@ -2232,6 +2245,16 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       className={cx('zp', fs && 'zp-fs', fake && 'zp-fake', (show || tour) && 'show', !playing && 'zp-paused', fb && !show && 'zp-mini')}
       onPointerMove={(e) => e.pointerType === 'mouse' && poke()}
     >
+      {fs && chatOpen && chatPanel && (
+        <div
+          className="absolute inset-y-0 right-0 z-[60] w-[24%] min-w-[280px] max-w-[380px] p-3"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          {chatPanel}
+        </div>
+      )}
       <video
         ref={vid}
         className="zp-v"
@@ -2608,6 +2631,23 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   {watchPartyActive && (
                     <span className="absolute -top-1 -right-1 flex size-3.5 items-center justify-center rounded-full bg-accent text-[8px] font-bold text-accent-fg animate-pulse">
                       {watchPartyPeersCount || 1}
+                    </span>
+                  )}
+                </button>
+              )}
+              {onChatClick && watchPartyActive && (
+                <button
+                  type="button"
+                  className={cx('zp-b relative', chatOpen && 'text-accent')}
+                  onClick={onChatClick}
+                  aria-label="Party chat"
+                  aria-pressed={chatOpen}
+                  title="Party chat"
+                >
+                  <MessageSquare />
+                  {!chatOpen && chatUnread > 0 && (
+                    <span className="absolute -top-1 -right-1 flex min-w-3.5 items-center justify-center rounded-full bg-accent px-1 text-[8px] font-bold text-accent-fg">
+                      {chatUnread > 9 ? '9+' : chatUnread}
                     </span>
                   )}
                 </button>

@@ -42,6 +42,7 @@ import {
 } from '../lib/watchRooms'
 import { WatchTogetherModal } from '../components/WatchTogetherModal'
 import { LiveReactionsOverlay } from '../components/LiveReactionsOverlay'
+import { PartyChatPanel } from '../components/PartyChatPanel'
 import { ChangeShowModal } from '../components/ChangeShowModal'
 import { Avatar } from '../components/Avatar'
 import { useAuth } from '../context/AuthContext'
@@ -53,6 +54,7 @@ import { useCompanion, LATEST_EXTENSION_VERSION } from '../lib/useCompanion'
 import { useAsync } from '../hooks/useAsync'
 import { useTmdb } from '../hooks/useTmdb'
 import { useEpisodes } from '../hooks/useEpisodes'
+import { useSkipTimes } from '../hooks/useSkipTimes'
 import { useFiller } from '../hooks/useFiller'
 import { useFlag } from '../hooks/useFlag'
 import { SERVERS, DIRECT, ACCESS_TEXT, serverById, type EmbedCtx } from '../lib/servers'
@@ -146,12 +148,22 @@ export default function WatchPage() {
   const [, setControlModeKey] = useState(0)
   const [isMicActive, setIsMicActive] = useState(false)
   const chatBottomRef = useRef<HTMLDivElement>(null)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatSeen, setChatSeen] = useState(0) // timestamp of the last message read while the panel was open
 
   const EMOJI_REACTIONS = ['🔥', '😱', '❤️', '😂', '👏', '⚡', '🍿', '⚔️']
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages])
+
+  useEffect(() => {
+    if (chatOpen) setChatSeen(Date.now())
+  }, [chatOpen, chatMessages])
+  useEffect(() => {
+    if (!room) setChatOpen(false)
+  }, [room])
+  const chatUnread = room ? chatMessages.filter((m) => m.timestamp > chatSeen && m.senderId !== room.peerId).length : 0
 
   const showNotice = (msg: string) => {
     setSyncNotice(msg)
@@ -528,6 +540,7 @@ export default function WatchPage() {
   const logo = tmdbImg(bundle?.tmdb?.logo, 'w500')
   const eps = useEpisodes(bundle?.tmdb ?? null, a?.streamingEpisodes)
   const kinds = useFiller(a)
+  const aniSkip = useSkipTimes(bundle?.mapping?.mal ?? a?.idMal, ep, a?.format !== 'MOVIE')
   const ctx: EmbedCtx = useMemo(
     () => ({
       anilistId: id,
@@ -682,11 +695,33 @@ export default function WatchPage() {
     }
   }, [currentServerInfo, audio])
 
+  const chatPanel = (glass: boolean, className?: string) =>
+    room ? (
+      <PartyChatPanel
+        glass={glass}
+        className={className}
+        messages={chatMessages}
+        selfId={room.peerId}
+        online={peers.length}
+        onClose={() => setChatOpen(false)}
+        onSend={(text) => {
+          const msg = room.sendChat(text, userProfile)
+          setChatMessages((prev) => [...prev.slice(-80), msg])
+        }}
+        onReact={(emoji) => {
+          const r = room.sendReaction(emoji, userProfile.displayName, userProfile.avatar)
+          setReactions((prev) => [...prev.slice(-30), r])
+        }}
+      />
+    ) : null
+
   return (
     <main className="relative pb-10">
       <div className="mx-auto max-w-7xl lg:px-6 lg:pt-6">
         <div className="min-w-0">
-          {/* Player */}
+          {/* Player (+ party chat docked at ~24% beside it on desktop) */}
+          <div className="lg:flex lg:items-stretch lg:gap-3">
+          <div className="min-w-0 flex-1">
           {!sessionVerified && server.kind !== 'embed' ? (
             <Frame>
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
@@ -728,8 +763,8 @@ export default function WatchPage() {
                   switching={stream.loading}
                   streamUrl={cur.d.streamUrl}
                   fallbackStreamUrl={cur.d.fallbackStreamUrl}
-                  intro={cur.d.intro}
-                  outro={cur.d.outro}
+                  intro={cur.d.intro ?? aniSkip.intro}
+                  outro={cur.d.outro ?? aniSkip.outro}
                   title={title}
                   episode={cur.ep}
                   totalEpisodes={total}
@@ -774,6 +809,10 @@ export default function WatchPage() {
                   onWatchTogetherClick={() => setWatchModalOpen(true)}
                   watchPartyActive={Boolean(room)}
                   watchPartyPeersCount={peers.length}
+                  onChatClick={() => setChatOpen((o) => !o)}
+                  chatOpen={chatOpen}
+                  chatUnread={chatUnread}
+                  chatPanel={chatPanel(true, 'h-full')}
                   isPartyGuest={Boolean(room && !room.isHost)}
                 />
                 <LiveReactionsOverlay reactions={reactions} syncNotice={syncNotice} enabled={!hideEmojiOverlay} />
@@ -806,6 +845,17 @@ export default function WatchPage() {
               </button>
             </Problem>
           )}
+
+          </div>
+          {room && chatOpen && (
+            <>
+              <aside className="relative hidden w-[24%] min-w-[260px] max-w-[360px] shrink-0 lg:block">
+                <div className="absolute inset-0">{chatPanel(false)}</div>
+              </aside>
+              <div className="fixed inset-x-0 bottom-0 z-40 h-[60svh] p-2 lg:hidden">{chatPanel(false, 'shadow-2xl shadow-black/50')}</div>
+            </>
+          )}
+          </div>
 
           {/* Title + episode nav */}
           <div className="mt-4 flex px-3 sm:px-6 lg:px-0 flex-wrap items-start justify-between gap-4">
@@ -1161,7 +1211,10 @@ export default function WatchPage() {
               )}
 
               {/* Chat View (always open for guests; for host, shown when hostTab === 'chat') */}
-              {(!room.isHost || hostTab === 'chat') && (
+              {(!room.isHost || hostTab === 'chat') && chatOpen && (
+                <p className="rounded-2xl border border-border bg-card/85 p-3 text-center text-xs text-muted">Chat is open beside the player.</p>
+              )}
+              {(!room.isHost || hostTab === 'chat') && !chatOpen && (
                 <div className="overflow-hidden rounded-3xl border border-border bg-card/85 p-3 sm:p-4 shadow-xl backdrop-blur-xl">
                   {/* Chat messages stream */}
                   <div className="h-64 sm:h-72 overflow-y-auto space-y-2 p-2.5 overscroll-contain rounded-2xl bg-card-2/60 border border-border/40">
