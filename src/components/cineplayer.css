@@ -706,3 +706,33 @@
 .zp-row>small{flex:none;display:inline;opacity:.55}
 .zp-ct{margin:6px 2px;font-size:.88em;line-height:1.45;opacity:.65}
 .zp-ct.err{color:#ff8a8a;opacity:1}
+
+/* ── Responsive scale ──────────────────────────────────────────────────────────────────────────
+   Controls: one unit (--u) taken from the player's own box, with a height-based ceiling, so a 1440p / 4K fullscreen
+   grows while a phone (portrait or landscape) stays compact. Sheets and dialogs sit outside the box, so their unit
+   follows the viewport. Everything inside already multiplies --u, so only the roots and the px widths change. */
+.zp{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.zp-in{--u:clamp(7px,min(2.5cqw,4.4cqh),clamp(14px,2cqh,24px));--tap:clamp(24px,min(7cqw,13cqh),clamp(36px,4.2cqh,56px));--fm:clamp(9px,min(2.6cqw,4.8cqh),clamp(11px,1.5cqh,16px))}
+@media (pointer:coarse){.zp-in{--tap:clamp(30px,min(7cqw,13cqh),clamp(36px,4.2cqh,56px))}}
+.zp-pop{max-width:min(calc(var(--u)*20),72%)}
+
+.zp-sw{--u:clamp(15px,calc(12px + .5vmin),21px)}
+.zp-sh{font-size:var(--u);width:min(100%,calc(var(--u)*37))}
+.zp-sw:not(.zp-sw-dlg) .zp-sh{width:min(100%,calc(var(--u)*32))}
+.zp-sw:not(.zp-sw-dlg) .zp-sh.zp-sh-wide{width:min(100%,calc(var(--u)*37))!important}
+.zp-sw-dlg .zp-sh{width:min(100%,calc(var(--u)*32))!important;height:min(calc(var(--u)*42.7),100%)!important}
+@media (orientation:landscape) and (max-height:620px){
+  .zp-sh{width:min(calc(var(--u)*28),70vw)}
+  .zp-sw:not(.zp-sw-dlg) .zp-sh,.zp-sw:not(.zp-sw-dlg) .zp-sh.zp-sh-wide{width:min(calc(var(--u)*29.3),70vw)!important}
+}
+@media (orientation:landscape) and (max-height:620px),(min-width:900px) and (min-height:621px){
+  .zp-sw-dlg .zp-sh{width:min(calc(var(--u)*50.7),100%)!important;height:min(calc(var(--u)*37.3),100%)!important}
+}
+
+/* narrow player (phone portrait, small embeds): keep the bar on one row; PiP / download stay in the browser and settings */
+@container (max-width:560px){
+  .zp-x,.zp-vol{display:none!important}
+  .zp-cr{gap:calc(var(--u)*.2)}
+  .zp-ac .zp-b.pill em{display:none}
+  .zp-b.pill{padding:0 calc(var(--u)*.7)}
+}

@@ -2650,7 +2650,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   download
                   target="_blank"
                   rel="noreferrer"
-                  className="zp-b"
+                  className="zp-b zp-x"
                   aria-label="Download MP4"
                   title="Download video file"
                   onClick={() => flash('ok', 'Download started')}
@@ -2673,7 +2673,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                 </button>
               )}
               {pip && !casting && (
-                <button className="zp-b" onClick={togglePiP} aria-label="Picture in picture" title="Picture in picture">
+                <button className="zp-b zp-x" onClick={togglePiP} aria-label="Picture in picture" title="Picture in picture">
                   <PictureInPicture2 />
                 </button>
               )}
