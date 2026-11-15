@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMedia } from '../hooks/useMedia'
-import { WatchInfoRail, WatchRecsRail } from '../components/WatchRails'
+import { WatchInfoRail } from '../components/WatchRails'
+import { Footer } from '../components/Footer'
+import { Logo } from '../components/Logo'
+import { ThemeToggle } from '../components/ThemeToggle'
+import { useSearch } from '../context/SearchContext'
 import { useBackToDetails } from '../lib/backToDetails'
 import {
   ChevronLeft,
@@ -11,6 +15,7 @@ import {
   Flag,
   Info,
   Loader2,
+  Search,
   Lock,
   Unlock,
   ShieldCheck,
@@ -85,6 +90,30 @@ import { ServerPopup, type ServerOpt } from '../components/ServerPopup'
 import { useShieldVerified, useShield, getToken } from '../lib/shield'
 import { StreamProblem } from '../components/StreamProblem'
 
+
+function WatchHeader() {
+  const { openSearch } = useSearch()
+  return (
+    <header className="flex h-14 items-center gap-3 border-b border-border/60 px-3 sm:px-4">
+      <Logo size={28} to="/home" textClassName="text-base font-extrabold" />
+      <button
+        type="button"
+        onClick={() => openSearch()}
+        className="ml-2 flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3 text-left text-sm font-semibold text-muted transition-colors hover:text-foreground sm:max-w-md"
+      >
+        <Search className="size-4 shrink-0" />
+        <span className="truncate">Search anime…</span>
+        <kbd className="ml-auto hidden rounded border border-border px-1.5 text-[10px] font-bold sm:inline">Ctrl K</kbd>
+      </button>
+      <nav className="ml-auto hidden items-center gap-1 text-sm font-bold md:flex">
+        <Link to="/home" className="rounded-md px-3 py-1.5 text-muted transition-colors hover:text-foreground">Home</Link>
+        <Link to="/browse" className="rounded-md px-3 py-1.5 text-muted transition-colors hover:text-foreground">Browse</Link>
+        <Link to="/list" className="rounded-md px-3 py-1.5 text-muted transition-colors hover:text-foreground">My List</Link>
+      </nav>
+      <ThemeToggle />
+    </header>
+  )
+}
 
 function Frame({ children }: { children: React.ReactNode }) {
   return <div data-tour="w-player" className="relative aspect-video w-full overflow-hidden bg-black lg:rounded-xl">{children}</div>
@@ -789,6 +818,8 @@ export default function WatchPage() {
   const providers = bundle?.tmdb?.watchProviders?.providers ?? []
 
   return (
+    <>
+    <WatchHeader />
     <main className="relative pb-10">
       <div className={cn('mx-auto lg:pt-0', wide ? 'grid max-w-[1800px] grid-cols-[248px_minmax(0,1fr)_320px] items-start' : 'max-w-[1400px] lg:px-4')}>
         {wide && (
@@ -1589,9 +1620,6 @@ export default function WatchPage() {
               </div>
 
               {/* Episodes */}
-              {wide && a && (
-                <section className="mt-6 px-3 sm:px-4 lg:px-0"><WatchRecsRail a={a} id={id} cols /></section>
-              )}
               {!wide && a && available > 0 && (
                 <section data-tour="w-eps" className="mt-8" aria-label="Episodes">
                   <EpisodeList total={total} available={available} current={ep} hrefFor={hrefFor} onPick={() => setLoadKind('episode')} info={eps} kinds={kinds} fallbackImg={a.bannerImage ?? a.coverImage.extraLarge} defaultRuntime={a.duration} />
@@ -1825,5 +1853,7 @@ export default function WatchPage() {
         currentAnimeId={id}
       />
     </main>
+    <Footer />
+    </>
   )
 }

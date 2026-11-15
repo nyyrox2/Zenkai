@@ -8,7 +8,6 @@ import { AnimeRow } from '../components/AnimeRow'
 import { LatestEpisodesRow } from '../components/LatestEpisodesRow'
 import { AppPromo } from '../components/AppPromo'
 import { ErrorState } from '../components/ErrorState'
-import { GenreMarquee } from '../components/GenreMarquee'
 import { HeroCarousel } from '../components/HeroCarousel'
 import { HeroLoader } from '../components/HeroLoader'
 
@@ -66,7 +65,6 @@ export default function HomePage() {
           loading={latestEpisodes.loading}
         />
 
-        <GenreMarquee />
 
         {/* Trending Anime Shelf */}
         <AnimeRow

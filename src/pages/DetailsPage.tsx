@@ -4,7 +4,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { shareMedia } from '../lib/share'
 import { useMarkDetails, useSmartBack } from '../lib/backToDetails'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, CalendarDays, Crown, ExternalLink, Heart, Play, Share2, ShieldAlert, ShieldCheck, TrendingUp, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Crown, ExternalLink, Heart, Play, Share2, ShieldAlert, ShieldCheck, TrendingUp } from 'lucide-react'
 import { fetchAnimeByMalId, fetchAnimeById, fetchWatchOrder } from '../services/anilist'
 import { tmdbImg } from '../services/api'
 import { tmdbBackdrops } from '../services/tmdbDirect'
@@ -26,12 +26,10 @@ import { BookCard, type BookCardItem } from '../components/BookCard'
 import { AnimeRow } from '../components/AnimeRow'
 import { CharacterCard } from '../components/CharacterCard'
 import { Countdown } from '../components/Countdown'
-import { DotPattern } from '../components/DotPattern'
 import { EpisodeList } from '../components/EpisodeList'
 import { Gallery } from '../components/Gallery'
 import { StarBorder } from '../components/StarBorder'
 import { ErrorState } from '../components/ErrorState'
-import { NumberTicker } from '../components/NumberTicker'
 import { Reveal } from '../components/Reveal'
 import { ScoreChart } from '../components/ScoreChart'
 import { ScoreRing } from '../components/ScoreRing'
@@ -241,8 +239,7 @@ export default function DetailsPage() {
   const studios = a.studios.edges.filter((e) => e.isMain).map((e) => e.node.name)
   const producers = (mal.data?.producers ?? []).map((p) => p.name)
   const tags = a.tags.filter((t) => !t.isMediaSpoiler).slice(0, 14)
-  const malScore = mal.data?.score ?? null
-  const ratedRank = a.rankings.find((r) => r.type === 'RATED' && r.allTime)
+    const ratedRank = a.rankings.find((r) => r.type === 'RATED' && r.allTime)
   const popularRank = a.rankings.find((r) => r.type === 'POPULAR' && r.allTime)
   const aired = [formatDate(a.startDate), formatDate(a.endDate)].filter(Boolean).join(' → ')
 
@@ -295,21 +292,20 @@ export default function DetailsPage() {
   return (
     <main>
       {/* ---------- Banner Slideshow ---------- */}
-      <div className="relative h-[40svh] min-h-[280px] w-full overflow-hidden">
+      <div className="relative h-[32svh] min-h-[220px] w-full overflow-hidden">
         <BannerSlideshow images={landscapeImages} fallback={heroImg} />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/10 to-background pointer-events-none" />
-        <DotPattern className="[mask-image:linear-gradient(to_bottom,white,transparent)] pointer-events-none" />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-background to-transparent pointer-events-none h-1/3 top-auto" />
         <button
           type="button"
           onClick={goBack}
-          className="absolute left-4 top-6 z-20 inline-flex items-center gap-2 rounded-full border border-border bg-glass px-4 py-2 text-sm font-medium backdrop-blur-xl transition hover:scale-105 active:scale-95 sm:left-6"
+          className="absolute left-4 top-6 z-20 inline-flex items-center gap-2 rounded-full border border-border bg-glass px-4 py-2 text-sm font-medium  transition sm:left-6"
         >
           <ArrowLeft className="size-4" /> Back
         </button>
       </div>
 
       {/* ---------- Body ---------- */}
-      <div className="relative mx-auto -mt-24 grid max-w-7xl gap-8 px-4 pb-16 sm:px-6 lg:-mt-32 lg:grid-cols-[290px_minmax(0,1fr)] lg:gap-12">
+      <div className="relative mx-auto -mt-20 grid max-w-7xl gap-6 px-4 pb-14 sm:px-6 lg:-mt-24 lg:grid-cols-[264px_minmax(0,1fr)] lg:gap-10">
         {/* Sidebar */}
         <aside className="lg:self-start">
           <div className="lg:sticky lg:top-24">
@@ -317,7 +313,7 @@ export default function DetailsPage() {
               initial={{ opacity: 0, y: 30, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.6, ease: 'easeOut' }}
-              className="relative mx-auto aspect-[2/3] w-44 overflow-hidden rounded-3xl border border-border bg-card-2 shadow-2xl shadow-black/30 sm:w-56 lg:w-full"
+              className="relative mx-auto aspect-[2/3] w-44 overflow-hidden rounded-2xl border border-border bg-card-2 sm:w-56 lg:w-full"
               style={{ backgroundColor: a.coverImage.color ?? undefined }}
             >
               {tb ? <Img src={tmdbImg(tmdb?.poster, 'w500') ?? a.coverImage.extraLarge ?? a.coverImage.large ?? ''} alt={title} className="h-full w-full object-cover" /> : <span aria-hidden className="skeleton absolute inset-0" />}
@@ -357,7 +353,7 @@ export default function DetailsPage() {
         </aside>
 
         {/* Main column */}
-        <div className="min-w-0 lg:pt-32">
+        <div className="min-w-0 lg:pt-24">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
             <div className="text-center lg:text-left">
               <p className="mb-2 eyebrow text-accent">
@@ -369,7 +365,7 @@ export default function DetailsPage() {
                   src={tmdbImg(tmdb.logo, 'w500') ?? ''}
                   alt=""
                   onError={() => setLogoOk(false)}
-                  className="mx-auto mb-2 max-h-24 w-auto max-w-full object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)] sm:max-h-28 lg:mx-0 lg:object-left"
+                  className="mx-auto mb-2 max-h-24 w-auto max-w-full object-contain  sm:max-h-28 lg:mx-0 lg:object-left"
                 />
               )}
               <h1 className={tmdb?.logo && logoOk ? 'sr-only' : 'font-display text-3xl font-black leading-tight tracking-tight [text-wrap:balance]'}>{title}</h1>
@@ -383,7 +379,7 @@ export default function DetailsPage() {
                   key={g}
                   type="button"
                   onClick={() => openSearch({ genre: g })}
-                  className="rounded-full border border-border bg-card/60 px-3.5 py-1.5 text-sm backdrop-blur transition hover:bg-foreground hover:text-background active:scale-95"
+                  className="rounded-lg border border-border bg-card px-3.5 py-1.5 text-sm font-semibold transition hover:bg-foreground hover:text-background"
                 >
                   {g}
                 </button>
@@ -393,13 +389,6 @@ export default function DetailsPage() {
             {/* Scores */}
             <div className="mt-8 flex items-center justify-center gap-8 lg:justify-start">
               <ScoreRing value={a.averageScore} max={100} label="AniList" suffix="%" />
-              <ScoreRing
-                value={malScore}
-                max={10}
-                label="MyAnimeList"
-                decimals={2}
-                loading={Boolean(malId) && mal.loading}
-              />
               {tmdb?.rating ? <ScoreRing value={tmdb.rating} max={10} label="TMDB" decimals={1} /> : null}
               <div className="hidden space-y-1 text-sm md:block">
                 {ratedRank && (
@@ -441,7 +430,7 @@ export default function DetailsPage() {
               {tab === 'overview' && (
                 <div className="space-y-10">
                   <section>
-                    <h2 className="mb-3 font-display text-xl font-bold">Synopsis</h2>
+                    <h2 className="mb-3 font-display text-xl font-extrabold">Synopsis</h2>
                     {synopsis ? (
                       <>
                         <p className="whitespace-pre-line leading-relaxed text-muted">{shownSynopsis}</p>
@@ -460,20 +449,7 @@ export default function DetailsPage() {
                     )}
                   </section>
 
-                  <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                    <StatCard
-                      icon={<TrendingUp className="size-3.5" />}
-                      label="MAL rank"
-                      loading={Boolean(malId) && mal.loading}
-                      value={mal.data?.rank ? <>#<NumberTicker value={mal.data.rank} /></> : '—'}
-                    />
-                    <StatCard
-                      icon={<Users className="size-3.5" />}
-                      label="Members"
-                      loading={Boolean(malId) && mal.loading}
-                      value={mal.data?.members ? compact(mal.data.members) : '—'}
-                      hint="on MyAnimeList"
-                    />
+                  <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <StatCard
                       icon={<Heart className="size-3.5" />}
                       label="Favourites"
@@ -489,30 +465,30 @@ export default function DetailsPage() {
                   </section>
 
                   <section>
-                    <h2 className="mb-3 font-display text-xl font-bold">Information</h2>
-                    <SpotlightCard>
+                    <h2 className="mb-3 font-display text-xl font-extrabold">Information</h2>
+                    <div className="overflow-hidden rounded-2xl border border-border bg-card">
                       <dl className="grid divide-y divide-border sm:grid-cols-2 sm:divide-y-0">
                         {info.map(([k, v], i) => (
                           <div
                             key={k}
-                            className={`flex items-baseline justify-between gap-4 px-5 py-3.5 text-sm ${
+                            className={`flex items-baseline justify-between gap-4 px-5 py-3 text-sm ${
                               i >= 2 ? 'sm:border-t sm:border-border' : ''
                             }`}
                           >
                             <dt className="shrink-0 text-muted">{k}</dt>
-                            <dd className="text-right font-medium">{v}</dd>
+                            <dd className="text-right font-bold">{v}</dd>
                           </div>
                         ))}
                       </dl>
-                    </SpotlightCard>
+                    </div>
                   </section>
 
                   {tags.length > 0 && (
                     <section>
-                      <h2 className="mb-3 font-display text-xl font-bold">Tags</h2>
+                      <h2 className="mb-3 font-display text-xl font-extrabold">Tags</h2>
                       <div className="flex flex-wrap gap-2">
                         {tags.map((t) => (
-                          <span key={t.name} className="rounded-full border border-border bg-card/60 px-3 py-1 text-xs text-muted">
+                          <span key={t.name} className="rounded-md border border-border bg-card px-3 py-1 text-xs font-semibold text-muted">
                             {t.name} <span className="opacity-60">{t.rank}%</span>
                           </span>
                         ))}
@@ -533,7 +509,7 @@ export default function DetailsPage() {
 
                   {a.staff.edges.length > 0 && (
                     <section>
-                      <h2 className="mb-4 font-display text-xl font-bold">Staff</h2>
+                      <h2 className="mb-4 font-display text-xl font-extrabold">Staff</h2>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {a.staff.edges.slice(0, 8).map((s) => (
                           <div key={`${s.node.id}-${s.role}`} className="flex items-center gap-3 rounded-2xl border border-border bg-card/60 p-2.5">
@@ -550,7 +526,7 @@ export default function DetailsPage() {
 
                   {tmdb && tmdb.cast.length > 0 && (
                     <section>
-                      <h2 className="mb-4 font-display text-xl font-bold">Cast</h2>
+                      <h2 className="mb-4 font-display text-xl font-extrabold">Cast</h2>
                       <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 sm:mx-0 sm:px-0">
                         {tmdb.cast.map((c) => (
                           <div key={`${c.name}-${c.character}`} className="w-28 shrink-0">
@@ -567,7 +543,7 @@ export default function DetailsPage() {
 
                   {tmdb && tmdb.backdrops.length > 1 && (
                     <section>
-                      <h2 className="mb-4 font-display text-xl font-bold">Gallery</h2>
+                      <h2 className="mb-4 font-display text-xl font-extrabold">Gallery</h2>
                       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                         {tmdb.backdrops.slice(0, 6).map((b) => (
                           <img key={b} src={tmdbImg(b, 'w500') ?? ''} alt="" loading="lazy" className="aspect-video w-full rounded-2xl border border-border object-cover" />
@@ -577,7 +553,7 @@ export default function DetailsPage() {
                   )}
 
                   {/* Where to Watch & Official Sources */}
-                  <section className="rounded-3xl border border-border bg-card/40 p-5 sm:p-6 backdrop-blur">
+                  <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <div className="flex items-center gap-2.5">
                         <div className="grid size-8 place-items-center rounded-xl bg-accent/15 text-accent">
@@ -660,7 +636,7 @@ export default function DetailsPage() {
                   </section>
 
                   {/* Legal Notice & Disclaimer */}
-                  <section className="rounded-3xl border border-border/80 bg-card/25 p-5 sm:p-6 backdrop-blur">
+                  <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
                     <div className="flex items-center gap-2.5 mb-2.5">
                       <div className="grid size-8 place-items-center rounded-xl bg-muted/15 text-muted">
                         <ShieldAlert className="size-4" />
@@ -767,7 +743,7 @@ export default function DetailsPage() {
               {tab === 'relations' && (
                 <div className="space-y-10">
                   {relations.length > 0 && (
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 xl:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-4">
                       {relations.map((r, i) => (
                         <AnimeCard key={`${r.id}-${r.caption}`} item={r} index={i} fluid />
                       ))}
@@ -776,8 +752,8 @@ export default function DetailsPage() {
                   {print.length > 0 && (
                     <div>
                       <p className="mb-1 eyebrow text-accent">Read it</p>
-                      <h3 className="mb-5 font-display text-xl font-bold">Manga &amp; novels</h3>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 xl:grid-cols-4">
+                      <h3 className="mb-5 font-display text-xl font-extrabold">Manga &amp; novels</h3>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-4">
                         {print.map((b, i) => (
                           <BookCard key={b.key} item={b} index={i} fluid />
                         ))}
@@ -797,13 +773,13 @@ export default function DetailsPage() {
                   ) : statsView ? (
                     <>
                       <SpotlightCard className="p-5 sm:p-6">
-                        <h2 className="mb-5 font-display text-xl font-bold">
+                        <h2 className="mb-5 font-display text-xl font-extrabold">
                           Score distribution <span className="ml-1 text-sm font-medium text-muted">{stats.data ? 'MyAnimeList' : 'AniList'}</span>
                         </h2>
                         <ScoreChart scores={statsView.scores} />
                       </SpotlightCard>
                       <SpotlightCard className="p-5 sm:p-6">
-                        <h2 className="mb-5 font-display text-xl font-bold">
+                        <h2 className="mb-5 font-display text-xl font-extrabold">
                           How people are watching <span className="ml-1 text-sm font-medium text-muted">{stats.data ? 'MyAnimeList' : 'AniList'}</span>
                         </h2>
                         <StatusBreakdown stats={statsView} />
@@ -853,10 +829,10 @@ function Empty({ text }: { text: string }) {
 function DetailsSkeleton() {
   return (
     <main>
-      <Skeleton className="h-[40svh] min-h-[280px] w-full rounded-none" />
+      <Skeleton className="h-[32svh] min-h-[220px] w-full rounded-none" />
       <div className="mx-auto -mt-24 grid max-w-7xl gap-8 px-4 sm:px-6 lg:-mt-32 lg:grid-cols-[290px_minmax(0,1fr)] lg:gap-12">
         <Skeleton className="mx-auto aspect-[2/3] w-44 rounded-3xl sm:w-56 lg:w-full" />
-        <div className="space-y-4 lg:pt-32">
+        <div className="space-y-4 lg:pt-24">
           <Skeleton className="mx-auto h-10 w-3/4 lg:mx-0" />
           <Skeleton className="mx-auto h-4 w-1/2 lg:mx-0" />
           <div className="flex justify-center gap-2 lg:justify-start">
