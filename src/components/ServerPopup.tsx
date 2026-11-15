@@ -22,26 +22,9 @@ export const blob = (from: number) => [r(from), '46px 18px 40px 24px / 26px 44px
 export const BLOB_T = { duration: 0.6, times: [0, 0.45, 1], ease: 'easeOut' as const }
 
 /** A circle button that morphs into the dark glass server card (circle -> rounded rectangle), then lists the servers. */
-/** Popup width + font follow the screen's smaller side (phone portrait ~250px, desktop ~320px). */
-function useScale() {
-  const calc = () => {
-    const v = typeof window === 'undefined' ? 720 : Math.min(window.innerWidth, window.innerHeight)
-    const w = Math.round(Math.min(340, Math.max(240, 0.1 * v + 215)))
-    return { w, f: Math.round(Math.min(17, Math.max(13, 0.4 * v / 30 + 4)) * 10) / 10 }
-  }
-  const [sc, setSc] = useState(calc)
-  useEffect(() => {
-    const on = () => setSc(calc())
-    window.addEventListener('resize', on)
-    return () => window.removeEventListener('resize', on)
-  }, [])
-  return sc
-}
-
 export function ServerPopup({ servers, value, onPick }: { servers: ServerOpt[]; value: string; onPick: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
-  const { w, f } = useScale()
   const cur = servers.find((s) => s.id === value)
 
   useEffect(() => {
@@ -66,9 +49,9 @@ export function ServerPopup({ servers, value, onPick }: { servers: ServerOpt[]; 
 
       <motion.div
         initial={false}
-        animate={{ width: open ? w : 44, height: open ? 'auto' : 44, borderRadius: open ? blob(22) : r(22) }}
+        animate={{ width: open ? 288 : 44, height: open ? 'auto' : 44, borderRadius: open ? blob(22) : r(22) }}
         transition={{ ...SPRING, borderRadius: open ? BLOB_T : { duration: 0.3 } }}
-        style={{ minHeight: 44, maxWidth: 'calc(100vw - 1.5rem)', fontSize: f }}
+        style={{ minHeight: 44, maxWidth: 'calc(100vw - 1.5rem)' }}
         className="absolute left-0 top-0 z-40 overflow-hidden border border-white/10 bg-neutral-900/90 shadow-xl shadow-black/40 backdrop-blur-md"
       >
         <button
@@ -81,7 +64,7 @@ export function ServerPopup({ servers, value, onPick }: { servers: ServerOpt[]; 
           <span className="grid size-11 shrink-0 place-items-center text-accent">
             <Server className="size-[18px]" />
           </span>
-          {open && <span className="text-[.85em] font-bold uppercase tracking-[0.18em] text-neutral-300">Servers</span>}
+          {open && <span className="text-xs font-bold uppercase tracking-[0.18em] text-neutral-300">Servers</span>}
         </button>
 
         <AnimatePresence>
@@ -101,14 +84,14 @@ export function ServerPopup({ servers, value, onPick }: { servers: ServerOpt[]; 
                     >
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5">
-                          <span className="truncate text-[1em] font-bold text-white">{s.name}</span>
+                          <span className="truncate text-sm font-bold text-white">{s.name}</span>
                           {s.tags?.map((t) => (
                             <span key={t} className="rounded border border-white/15 px-1 text-[9px] font-bold uppercase leading-4 text-neutral-300">
                               {t}
                             </span>
                           ))}
                         </span>
-                        <span className="block truncate text-[.85em] text-neutral-400">{s.label}</span>
+                        <span className="block truncate text-xs text-neutral-400">{s.label}</span>
                       </span>
                       {active && <Check className="size-4 shrink-0 text-accent" />}
                     </button>

@@ -28,11 +28,11 @@ function Card({ h }: { h: HistoryItem }) {
       <Link to={href} className="group block outline-none">
         <div
           style={{ backgroundColor: h.color ?? undefined }}
-          className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border bg-card-2 group-focus-visible:ring-2 group-focus-visible:ring-accent"
+          className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border bg-card-2 shadow-lg shadow-black/10 group-focus-visible:ring-2 group-focus-visible:ring-accent"
         >
           <Img src={h.image} alt={h.title} loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
           <div className="absolute inset-0 grid place-items-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-            <span className="grid size-12 place-items-center rounded-full bg-accent text-accent-fg">
+            <span className="grid size-12 place-items-center rounded-full bg-accent text-accent-fg shadow-xl">
               <Play className="size-5 fill-current" />
             </span>
           </div>
@@ -44,7 +44,7 @@ function Card({ h }: { h: HistoryItem }) {
             <div className="h-full bg-accent" style={{ width: `${pct}%` }} />
           </div>
         </div>
-        <h3 className="mt-3 line-clamp-2 text-sm font-bold leading-snug transition-colors group-hover:text-accent">{h.title}</h3>
+        <h3 className="mt-3 line-clamp-2 text-sm font-medium leading-snug transition-colors group-hover:text-accent">{h.title}</h3>
         <p className={cn("mt-1 truncate text-xs", isDone ? "font-semibold text-accent" : "text-muted")}>{left(h) ?? 'Up next'}</p>
       </Link>
     </div>

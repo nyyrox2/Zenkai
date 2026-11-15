@@ -37,16 +37,11 @@ export type SyncActionType =
   | 'PAUSE'
   | 'SEEK'
   | 'HEARTBEAT'
-  /** host state without a video position (embed servers have no <video> to time) */
-  | 'STATE'
   | 'CHANGE_EP'
   | 'CHANGE_SHOW'
   | 'CHANGE_SERVER'
   | 'CHANGE_AUDIO'
   | 'CHANGE_AUDIO_TRACK'
-
-/** what the host's heartbeat says everyone should be on */
-export type HostState = Pick<SyncPayload, 'episode' | 'server' | 'audio' | 'dub'>
 
 export interface SyncPayload {
   type: SyncActionType
@@ -57,8 +52,6 @@ export interface SyncPayload {
   animeTitle?: string
   server?: string
   audio?: 'sub' | 'dub'
-  /** movies / TV: the selected audio version (dub id) */
-  dub?: string | null
   /** the exact audio rendition picked inside a multi-audio stream (e.g. ACDN), matched by lang / label on each device */
   audioTrack?: { label: string; lang: string }
   timestamp: number
@@ -650,7 +643,7 @@ export class WatchTogetherRoom {
   // ================= Public Action Methods =================
 
   /** Broadcast playback sync (Play, Pause, Seek, Heartbeat) */
-  public sendSync(action: SyncActionType, currentTime: number, paused?: boolean, state?: HostState) {
+  public sendSync(action: SyncActionType, currentTime: number, paused?: boolean) {
     if (this.hostOnlyControl && !this.isHost) return
 
     const payload: SyncPayload = {
@@ -659,11 +652,6 @@ export class WatchTogetherRoom {
       paused,
       timestamp: Date.now(),
       senderId: this.peerId,
-    }
-    // the host's full state rides on every heartbeat: a late joiner, or a guest on the wrong server / audio, corrects itself from it
-    if (state && (action === 'HEARTBEAT' || action === 'STATE')) {
-      Object.assign(payload, state)
-      if (this.audioTrack) payload.audioTrack = this.audioTrack
     }
 
     this.broadcastP2P({ kind: 'SYNC', payload })
