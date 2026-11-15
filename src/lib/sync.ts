@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import type { HistoryItem, ListItem } from './library'
 import type { ReadingItem } from './reading'
 import { getProfile, saveProfile, syncProfileToCloud, type Profile } from './profile'
-import { ascensionCell, syncAscensionWithCloud, pushAscensionToCloud, COSMETICS_DIRTY_KEY } from './ascension/ascensionStore'
+import { ascensionCell, syncAscensionWithCloud, pushAscensionToCloud, updateProfileRow, COSMETICS_DIRTY_KEY } from './ascension/ascensionStore'
 
 export const LAST_SYNC_KEY = 'zk:cloud:last_sync'
 const ONE_DAY_MS = 24 * 60 * 60 * 1000 // 24 hours (once a day)
@@ -78,18 +78,15 @@ export async function pushWatchHistory(userId: string): Promise<{ success: boole
     // Sync ascension XP, level, streak & cosmetics to public.profiles table (never overwrite with stale 0)
     const asc = ascensionCell.get()
     if (asc.totalXp > 0 || asc.streak > 0) {
-      await supabase
-        .from('profiles')
-        .update({
-          total_xp: asc.totalXp,
-          level: asc.level,
-          login_streak: asc.streak,
-          equipped_title: asc.equippedTitle,
-          equipped_text_effect: asc.equippedTextEffect,
-          equipped_frame: asc.equippedFrame,
-          name_color: asc.equippedNameColor,
-        })
-        .eq('id', userId)
+      await updateProfileRow(userId, {
+        total_xp: asc.totalXp,
+        level: asc.level,
+        login_streak: asc.streak,
+        equipped_title: asc.equippedTitle,
+        equipped_text_effect: asc.equippedTextEffect,
+        equipped_frame: asc.equippedFrame,
+        name_color: asc.equippedNameColor,
+      }, asc.equippedFontStyle)
     }
     try { localStorage.removeItem(COSMETICS_DIRTY_KEY) } catch {}
 

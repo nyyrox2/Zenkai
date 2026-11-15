@@ -285,25 +285,39 @@ export function equipCosmetic(
  * 4. An achievement is unlocked
  * 5. User manually triggers Cloud & Sync
  */
+const NO_FONT_COL = 'zk:no_font_col'
+
+/**
+ * Update the user's `profiles` row. Also stores the equipped font style so other members see it in chat;
+ * if the database has no `equipped_font_style` column, the update is retried without it (and remembered).
+ */
+export async function updateProfileRow(userId: string, payload: Record<string, unknown>, fontStyle: string) {
+  let skip = false
+  try { skip = !!localStorage.getItem(NO_FONT_COL) } catch {}
+  let res = await supabase.from('profiles').update(skip ? payload : { ...payload, equipped_font_style: fontStyle }).eq('id', userId)
+  if (res.error && !skip && /equipped_font_style|column/i.test(`${res.error.message} ${res.error.code}`)) {
+    try { localStorage.setItem(NO_FONT_COL, '1') } catch {}
+    res = await supabase.from('profiles').update(payload).eq('id', userId)
+  }
+  return res
+}
+
 export async function pushAscensionToCloud(customState?: AscensionState) {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user?.id) return
 
     const state = customState || ascensionCell.get()
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        total_xp: state.totalXp,
-        level: state.level,
-        login_streak: state.streak,
-        last_login_date: state.lastLoginDate,
-        equipped_title: state.equippedTitle,
-        equipped_text_effect: state.equippedTextEffect,
-        equipped_frame: state.equippedFrame,
-        name_color: state.equippedNameColor,
-      })
-      .eq('id', session.user.id)
+    const { error } = await updateProfileRow(session.user.id, {
+      total_xp: state.totalXp,
+      level: state.level,
+      login_streak: state.streak,
+      last_login_date: state.lastLoginDate,
+      equipped_title: state.equippedTitle,
+      equipped_text_effect: state.equippedTextEffect,
+      equipped_frame: state.equippedFrame,
+      name_color: state.equippedNameColor,
+    }, state.equippedFontStyle)
     if (!error) {
       try { localStorage.removeItem(COSMETICS_DIRTY_KEY) } catch {}
     }
