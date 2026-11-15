@@ -248,10 +248,11 @@ export default function MovieWatchPage() {
   }
   const nextServer = list[(list.findIndex((p) => p.id === providerId) + 1) % Math.max(list.length, 1)]
 
-  const chatPanel = (glass: boolean, className?: string) =>
+  const chatPanel = (glass: boolean, className?: string, bare?: boolean) =>
     party.room ? (
       <PartyChatPanel
         glass={glass}
+        bare={bare}
         className={className}
         messages={party.chat}
         selfId={party.room.peerId}
@@ -262,6 +263,31 @@ export default function MovieWatchPage() {
       />
     ) : null
   const backdrop = details.data?.backdrop ? `https://image.tmdb.org/t/p/w1280${details.data.backdrop}` : details.data?.poster ? `https://image.tmdb.org/t/p/w500${details.data.poster}` : null
+
+  const watchPanel = (
+    <WatchTogetherModal
+        open={partyOpen}
+        onClose={() => { setPartyOpen(false); party.setChatOpen(false) }}
+        tab={party.chatOpen ? 'chat' : 'room'}
+        onTab={(t) => party.setChatOpen(t === 'chat')}
+        unread={party.unread}
+        chat={chatPanel(true, 'h-full', true)}
+        room={party.room}
+        peers={party.peers}
+        onSendReaction={party.react}
+        onCreateRoom={party.create}
+        onJoinRoom={party.join}
+        onLeaveRoom={party.leave}
+        onForceSync={party.forceSync}
+        animeTitle={title}
+        animeId={id}
+        image={backdrop}
+        episode={type === 'tv' ? episode : 1}
+        isHost={party.room ? party.room.isHost : false}
+        connectionStatus={party.status}
+        shareUrl={party.shareUrl}
+        />
+  )
 
   return (
     <main className="relative pb-10">
@@ -331,11 +357,11 @@ export default function MovieWatchPage() {
                 onVideoRef={party.setVideo}
                 onPlayerAction={party.onPlayerAction}
                 externalControl={party.external}
-                onWatchTogetherClick={() => setPartyOpen(true)}
+                onWatchTogetherClick={() => setPartyOpen((o) => !o)}
                 watchPartyActive={Boolean(party.room)}
                 watchPartyPeersCount={party.peers.length}
                 isPartyGuest={isGuest}
-                onChatClick={() => party.setChatOpen(!party.chatOpen)}
+                onChatClick={() => { const on = !(party.chatOpen && partyOpen); party.setChatOpen(on); if (on) setPartyOpen(true) }}
                 chatOpen={party.chatOpen}
                 chatUnread={party.unread}
                 chatPanel={chatPanel(true, 'h-full')}
@@ -417,14 +443,7 @@ export default function MovieWatchPage() {
         <LiveReactionsOverlay reactions={party.reactions} syncNotice={party.notice} />
       </div>
       </div>
-      {party.room && party.chatOpen && (
-        <>
-          <aside className="relative hidden w-[24%] min-w-[260px] max-w-[360px] shrink-0 lg:block">
-            <div className="absolute inset-0">{chatPanel(false)}</div>
-          </aside>
-          <div className="fixed inset-x-0 bottom-0 z-40 h-[60svh] p-2 lg:hidden">{chatPanel(false, 'shadow-2xl shadow-black/50')}</div>
-        </>
-      )}
+      {watchPanel}
       </div>
 
       {/* Title + nav */}
@@ -482,11 +501,11 @@ export default function MovieWatchPage() {
             </Link>
           )}
           {!companion.installed && <InstallHelp />}
-          <button type="button" onClick={() => setPartyOpen(true)} className={cn(pill, 'inline-flex items-center gap-1.5 border-border bg-card/60', party.room && 'text-accent')}>
+          <button type="button" onClick={() => setPartyOpen((o) => !o)} className={cn(pill, 'inline-flex items-center gap-1.5 border-border bg-card/60', party.room && 'text-accent')}>
             <Users className="size-4" /> {party.room ? `Party · ${party.peers.length}` : 'Watch Together'}
           </button>
           {party.room && (
-            <button type="button" onClick={() => party.setChatOpen(!party.chatOpen)} aria-pressed={party.chatOpen} className={cn(pill, 'relative inline-flex items-center gap-1.5 border-border bg-card/60', party.chatOpen && 'text-accent')}>
+            <button type="button" onClick={() => { const on = !(party.chatOpen && partyOpen); party.setChatOpen(on); if (on) setPartyOpen(true) }} aria-pressed={party.chatOpen} className={cn(pill, 'relative inline-flex items-center gap-1.5 border-border bg-card/60', party.chatOpen && 'text-accent')}>
               <MessageSquare className="size-4" /> Chat
               {!party.chatOpen && party.unread > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[9px] font-bold text-accent-fg">{party.unread > 9 ? '9+' : party.unread}</span>}
             </button>
@@ -580,25 +599,6 @@ export default function MovieWatchPage() {
           )}
         </section>
       )}
-
-      <WatchTogetherModal
-        open={partyOpen}
-        onClose={() => setPartyOpen(false)}
-        room={party.room}
-        peers={party.peers}
-        onSendReaction={party.react}
-        onCreateRoom={party.create}
-        onJoinRoom={party.join}
-        onLeaveRoom={party.leave}
-        onForceSync={party.forceSync}
-        animeTitle={title}
-        animeId={id}
-        image={backdrop}
-        episode={type === 'tv' ? episode : 1}
-        isHost={party.room ? party.room.isHost : false}
-        connectionStatus={party.status}
-        shareUrl={party.shareUrl}
-      />
 
       {details.error && <p className="mt-8 px-3 text-center text-sm text-muted">Couldn&rsquo;t load title details, but you can still play. <button type="button" className="underline" onClick={() => navigate(0)}>Reload</button></p>}
       </div>

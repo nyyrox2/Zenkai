@@ -21,6 +21,7 @@ export function PartyChatPanel({
   onReact,
   onClose,
   glass = false,
+  bare = false,
   className,
 }: {
   messages: WatchChatMessage[]
@@ -30,6 +31,8 @@ export function PartyChatPanel({
   onReact: (emoji: string) => void
   onClose: () => void
   glass?: boolean
+  /** inside the Watch Together panel: no own header or frame */
+  bare?: boolean
   className?: string
 }) {
   const [text, setText] = useState('')
@@ -75,12 +78,12 @@ export function PartyChatPanel({
       aria-label="Room chat"
       className={cn(
         'flex h-full min-h-0 flex-col overflow-hidden border',
-        glass ? 'rounded-2xl border-white/10 bg-black/70 text-white backdrop-blur-xl' : 'rounded-2xl border-border bg-card text-foreground shadow-xl lg:rounded-3xl',
+        bare ? 'border-0 bg-transparent text-white' : glass ? 'rounded-2xl border-white/10 bg-black/70 text-white backdrop-blur-xl' : 'rounded-2xl border-border bg-card text-foreground shadow-xl lg:rounded-3xl',
         className,
       )}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
-      <header className={cn('flex shrink-0 items-center gap-2 border-b px-3 py-2.5', line)}>
+      {!bare && <header className={cn('flex shrink-0 items-center gap-2 border-b px-3 py-2.5', line)}>
         <MessageSquare className="size-4 text-accent" />
         <h2 className="text-xs font-bold tracking-tight">Room Chat</h2>
         <span className={cn('flex items-center gap-1 text-[10px] font-semibold', glass ? 'text-white/60' : 'text-muted')}>
@@ -95,7 +98,7 @@ export function PartyChatPanel({
         >
           <X className="size-4" />
         </button>
-      </header>
+      </header>}
 
       <div className="relative min-h-0 flex-1">
         <div
@@ -136,7 +139,7 @@ export function PartyChatPanel({
                     <p
                       className={cn(
                         'w-fit max-w-full whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-xs leading-snug',
-                        own ? 'bg-accent text-accent-fg' : glass ? 'bg-white/10' : 'border border-border/60 bg-card-2',
+                        own ? (glass ? 'bg-white text-black' : 'bg-accent text-accent-fg') : glass ? 'bg-white/10' : 'border border-border/60 bg-card-2',
                       )}
                     >
                       {m.text}
@@ -197,7 +200,7 @@ export function PartyChatPanel({
             type="submit"
             disabled={!text.trim()}
             aria-label="Send"
-            className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent text-accent-fg transition hover:brightness-110 active:scale-95 disabled:opacity-40"
+            className={cn('grid size-9 shrink-0 place-items-center rounded-xl transition hover:brightness-110 active:scale-95 disabled:opacity-40', glass ? 'bg-white text-black' : 'bg-accent text-accent-fg')}
           >
             <Send className="size-4" />
           </button>

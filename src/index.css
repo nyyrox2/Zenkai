@@ -382,3 +382,8 @@ html[data-drawer] .animate-card-in,
 html[data-drawer] .animate-pulse {
   animation-play-state: paused;
 }
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
