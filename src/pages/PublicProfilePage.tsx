@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { UserX, Compass, MessageSquare, Bookmark } from 'lucide-react'
+import { UserX, Compass, MessageSquare, Bookmark, Lock } from 'lucide-react'
 import { fetchPublicProfile, type PublicUserData } from '../lib/profile'
 import { PublicProfileCard } from '../components/PublicProfileCard'
 import { useAuth } from '../context/AuthContext'
-import { useList, type ListStatus } from '../lib/library'
-import { cn } from '../lib/utils'
+import { useCustomLists, useList } from '../lib/library'
+import { WatchlistPanel } from '../components/WatchlistPanel'
 
 export default function PublicProfilePage() {
   const { username } = useParams<{ username: string }>()
   const { username: authUsername } = useAuth()
   const selfList = useList()
+  const selfLists = useCustomLists()
 
   const [loading, setLoading] = useState(true)
   const [userData, setUserData] = useState<PublicUserData | null>(null)
-  const [filter, setFilter] = useState<'all' | ListStatus>('all')
 
   useEffect(() => {
     if (!username) {
@@ -50,7 +50,6 @@ export default function PublicProfilePage() {
     authUsername.toLowerCase() === username.toLowerCase()
 
   const activeWatchlist = (isSelf ? (selfList.length > 0 ? selfList : userData?.watchlist) : userData?.watchlist) || []
-  const shown = filter === 'all' ? activeWatchlist : activeWatchlist.filter((i) => i.status === filter)
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pt-10">
@@ -78,89 +77,31 @@ export default function PublicProfilePage() {
               {/* Public Profile Card */}
               <PublicProfileCard data={userData} isSelf={isSelf} watchlist={activeWatchlist} />
 
-              {/* User Watchlist Showcase with Zenkai Theme Colors */}
               <section className="space-y-4" aria-label="User Watchlist">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <Bookmark className="size-5 text-accent fill-accent/20" />
-                    <h2 className="font-display text-xl font-bold tracking-tight text-foreground">
-                      Watchlist
-                    </h2>
+                    <Bookmark className="size-5 text-foreground" />
+                    <h2 className="font-display text-xl font-bold tracking-tight text-foreground">Watchlist</h2>
                   </div>
-                  <span className="font-mono text-xs text-muted">
-                    {activeWatchlist.length} anime
-                  </span>
+                  <span className="font-mono text-xs text-muted">{userData.watchlistPrivate && !isSelf ? 'Private' : `${activeWatchlist.length} anime`}</span>
                 </div>
-
-                {/* Filter Pills with Zenkai Theme Accent */}
-                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                  {[
-                    { id: 'all' as const, label: 'All', count: activeWatchlist.length },
-                    { id: 'watching' as const, label: 'Watching', count: activeWatchlist.filter((i) => i.status === 'watching').length },
-                    { id: 'planning' as const, label: 'Planning', count: activeWatchlist.filter((i) => i.status === 'planning').length },
-                    { id: 'completed' as const, label: 'Completed', count: activeWatchlist.filter((i) => i.status === 'completed').length },
-                    { id: 'paused' as const, label: 'Paused', count: activeWatchlist.filter((i) => i.status === 'paused').length },
-                    { id: 'dropped' as const, label: 'Dropped', count: activeWatchlist.filter((i) => i.status === 'dropped').length },
-                  ].map((f) => {
-                    const on = filter === f.id
-                    return (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => setFilter(f.id)}
-                        className={cn(
-                          'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-mono font-semibold transition active:scale-95',
-                          on
-                            ? 'bg-accent text-accent-fg font-bold shadow-md shadow-accent/25'
-                            : 'border border-[#242730] bg-card/60 text-muted hover:border-border hover:text-foreground'
-                        )}
-                      >
-                        {f.label} ({f.count})
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {/* Cards Grid */}
-                {shown.length === 0 ? (
-                  <div className="grid place-items-center rounded-3xl border border-dashed border-border/80 bg-card/20 px-6 py-14 text-center">
-                    <Bookmark className="size-10 text-muted/50 mb-2" />
-                    <p className="font-semibold text-foreground">
-                      {activeWatchlist.length === 0
-                        ? `@${userData.username} hasn’t added any anime to their public watchlist yet.`
-                        : `No anime marked "${filter}"`}
-                    </p>
+                {userData.watchlistPrivate && !isSelf ? (
+                  <div className="grid place-items-center rounded-3xl border border-dashed border-border px-6 py-14 text-center">
+                    <Lock className="size-9 text-muted/70" />
+                    <p className="mt-3 text-sm font-semibold">This watchlist is private</p>
+                    <p className="mt-1 max-w-xs text-xs text-muted">@{userData.username} chose to keep their list to themselves.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                    {shown.map((item) => (
-                      <div key={item.id} className="group/card relative">
-                        <Link to={`/anime/${item.id}`} className="block outline-none">
-                          <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border/70 bg-card-2 transition duration-200 group-hover:scale-[1.02] group-hover:border-accent/40 group-hover:shadow-2xl">
-                            <img
-                              src={item.image}
-                              alt={item.title}
-                              loading="lazy"
-                              className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                            {item.score ? (
-                              <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-400 backdrop-blur-sm">
-                                ★ {item.score}
-                              </span>
-                            ) : null}
-                            {item.progress ? (
-                              <span className="absolute bottom-2 right-2 rounded-md bg-black/80 px-2 py-0.5 text-[10px] font-mono font-semibold text-white backdrop-blur-sm">
-                                Ep {item.progress}{item.episodes ? ` / ${item.episodes}` : ''}
-                              </span>
-                            ) : null}
-                          </div>
-                          <h3 className="mt-2.5 line-clamp-1 text-xs sm:text-sm font-bold text-foreground transition-colors group-hover:text-accent">
-                            {item.title}
-                          </h3>
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
+                  <>
+                    {userData.watchlistPrivate && isSelf && (
+                      <p className="flex items-center gap-1.5 text-xs text-muted"><Lock className="size-3.5" /> Private: only you can see this list.</p>
+                    )}
+                    <WatchlistPanel
+                      items={activeWatchlist}
+                      lists={isSelf && selfLists.length ? selfLists : userData.customLists || []}
+                      emptyTitle={`@${userData.username} hasn’t added any anime to their public watchlist yet.`}
+                    />
+                  </>
                 )}
               </section>
         </div>

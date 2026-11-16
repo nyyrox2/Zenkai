@@ -106,6 +106,7 @@ export default function App() {
   const isEmbed = pathname === '/embed' || pathname.startsWith('/embed/')
   const isApi = pathname === '/api' || pathname.startsWith('/api') || pathname === '/docs'
   const isMessages = pathname.startsWith('/messages')
+  const isCommunity = pathname.startsWith('/community') // full-screen chat: no footer, no bottom dock
   const inChat = /^\/messages\/[^/]+$/.test(pathname)
   const isCall = pathname === '/call'
   const isAuth = pathname.startsWith('/auth/') || pathname === '/login'
@@ -227,10 +228,10 @@ export default function App() {
           </Suspense>
         </ErrorBoundary>
 
-        {!bare && !isApi && !isMessages && <Footer />}
+        {!bare && !isApi && !isMessages && !isCommunity && <Footer />}
       </div>
 
-      {!bare && !isApi && !inChat && <MobileDock onOpenDrawer={() => setDrawerOpen(true)} />}
+      {!bare && !isApi && !inChat && !isCommunity && <MobileDock onOpenDrawer={() => setDrawerOpen(true)} />}
       {!bare && !isApi && section === 'movies' ? <MovieSearchModal /> : <SearchModal />}
       <Toaster />
       <SystemLevelUpModal />

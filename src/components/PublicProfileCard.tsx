@@ -45,6 +45,7 @@ export function PublicProfileCard({
   const displayName = profile.name || username
 
   const listItems = watchlist && watchlist.length > 0 ? watchlist : (data.watchlist || [])
+  const hideStats = !!data.watchlistPrivate && !isSelf
   const completedCount = listItems.filter((i: any) => i.status === 'completed').length || watchlistCount
   const watchingCount = listItems.filter((i: any) => i.status === 'watching').length || historyCount
   const planningCount = listItems.filter((i: any) => i.status === 'planning' || i.status === 'plan_to_watch').length || readingCount
@@ -138,7 +139,7 @@ export function PublicProfileCard({
               ) : isSelf ? (
                 <Link
                   to="/profile"
-                  className="inline-block text-xs text-accent/80 hover:text-accent italic mt-1.5 transition"
+                  className="inline-block text-xs text-muted hover:text-foreground italic mt-1.5 transition"
                 >
                   + Add your anime quote or bio...
                 </Link>
@@ -181,7 +182,7 @@ export function PublicProfileCard({
 
                 <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-white/10 border border-white/5">
                   <div
-                    className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-accent via-rose-500 to-amber-400 shadow-[0_0_10px_rgba(244,63,94,0.5)]"
+                    className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-foreground/50 to-foreground"
                     style={{ width: `${userProgress.percent}%` }}
                   />
                 </div>
@@ -195,7 +196,7 @@ export function PublicProfileCard({
             <div className="flex items-center justify-around sm:justify-end gap-6 sm:gap-8 w-full sm:w-auto">
               <div className="text-center sm:text-right">
                 <div className="font-display text-3xl sm:text-4xl font-black text-[#F4F4F5] tracking-tight">
-                  {completedCount}
+                  {hideStats ? '—' : completedCount}
                 </div>
                 <div className="text-[10px] sm:text-[11px] font-mono font-bold tracking-widest text-[#9298A4] uppercase mt-0.5">
                   COMPLETED
@@ -204,7 +205,7 @@ export function PublicProfileCard({
 
               <div className="text-center sm:text-right">
                 <div className="font-display text-3xl sm:text-4xl font-black text-[#F4F4F5] tracking-tight">
-                  {watchingCount}
+                  {hideStats ? '—' : watchingCount}
                 </div>
                 <div className="text-[10px] sm:text-[11px] font-mono font-bold tracking-widest text-[#9298A4] uppercase mt-0.5">
                   WATCHING
@@ -213,7 +214,7 @@ export function PublicProfileCard({
 
               <div className="text-center sm:text-right">
                 <div className="font-display text-3xl sm:text-4xl font-black text-[#F4F4F5] tracking-tight">
-                  {planningCount}
+                  {hideStats ? '—' : planningCount}
                 </div>
                 <div className="text-[10px] sm:text-[11px] font-mono font-bold tracking-widest text-[#9298A4] uppercase mt-0.5">
                   PLANNING
@@ -226,7 +227,7 @@ export function PublicProfileCard({
               {isSelf ? (
                 <Link
                   to="/profile"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-4 text-xs font-bold text-accent-fg shadow-md shadow-accent/25 transition hover:brightness-110 active:scale-95"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-foreground px-4 text-xs font-bold text-background shadow-md shadow-black/30 transition hover:opacity-90 active:scale-95"
                 >
                   <Palette className="size-3.5" />
                   <span>Edit Profile</span>
@@ -234,7 +235,7 @@ export function PublicProfileCard({
               ) : (
                 <Link
                   to={`/messages/${username}`}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-4 text-xs font-bold text-accent-fg shadow-md shadow-accent/25 transition hover:brightness-110 active:scale-95"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-foreground px-4 text-xs font-bold text-background shadow-md shadow-black/30 transition hover:opacity-90 active:scale-95"
                 >
                   <MessageSquare className="size-3.5" />
                   <span>Message</span>

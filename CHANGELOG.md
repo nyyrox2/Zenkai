@@ -2,6 +2,37 @@
 
 All notable changes to the Zenkai Web application will be documented in this file.
 
+## [1.0.6] - 2026-11-16
+
+### 📚 New watchlist design
+
+- Black and white library with a clean poster grid or a compact list view.
+- Tabs for every status, Favourites (heart) and each of your custom named lists.
+- Search your list and sort by recent, A to Z or top rated.
+- Used everywhere: My List, your profile and other people's profiles. Red now stays on the Zenkai branding.
+
+### 🔒 Private watchlists
+
+- New switch on your profile: keep your watchlist public or make it private.
+- A private list is never sent to visitors. Their view shows a lock instead of your anime and your counts.
+- Protected on the server with row-level security, not just hidden in the app.
+
+### 💬 Full-screen community
+
+- The community is now a full-screen group chat with a clean top header and no bottom bar in the way.
+- Names are shown without @usernames, in each member's equipped text effect, font and colour, with their current picture and level.
+- Chat buttons (tag a show, spoiler, spin a topic, emoji) sit with the message box at the bottom.
+- Messages no longer carry a copy of your avatar, so chat loads faster.
+
+### ✨ Optimised UI
+
+- Header is clear at the top of the page and turns to light frosted glass when you scroll.
+- New bottom bar: Home, Library, Search, Browse, Community (the menu stays behind the top-left button).
+- Profile banners are now clearly visible and fade into the page.
+- Crop, rotate, zoom and flip editor for avatars and banners, with GIF and APNG support.
+- Customize edits apply when you leave the customize page, instead of on every tap.
+- Fewer requests: watchlist and continue watching sync once a day and when you sign out.
+
 ## [1.0.5] - 2026-11-13
 
 ### Removed

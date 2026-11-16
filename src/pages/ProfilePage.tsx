@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import {
   Bookmark,
   BookmarkCheck,
+  Lock,
+  LockOpen,
   ChevronRight,
   Cloud,
   Moon,
@@ -19,7 +21,9 @@ import { AniListCard } from '../components/AniListCard'
 import { ProfileEditor, ProfileHero, type SectionKey } from '../components/ProfileCustomizer'
 import { CustomSelect } from '../components/CustomSelect'
 import { DISCORD_URL, REPO_URL, TELEGRAM_URL } from '../lib/app'
-import { getPrefs, savePrefs, useList, type Audio, type ListStatus } from '../lib/library'
+import { getPrefs, savePrefs, setStatus, useCustomLists, useList, type Audio } from '../lib/library'
+import { WatchlistPanel } from '../components/WatchlistPanel'
+import { useWatchlistPrivacy } from '../lib/watchlistPrivacy'
 import { useProfile } from '../lib/profile'
 import { DIRECT } from '../lib/servers'
 import { toast } from '../lib/toast'
@@ -111,7 +115,8 @@ export default function ProfilePage() {
   const [showAuth, setShowAuth] = useState(false)
   const [editTab, setEditTab] = useState<SectionKey>('identity')
   const [activeTab, setActiveTab] = useState<TabKey>('preferences')
-  const [watchlistFilter, setWatchlistFilter] = useState<'all' | ListStatus>('all')
+  const customLists = useCustomLists()
+  const privacy = useWatchlistPrivacy(user?.id)
   const list = useList()
 
   const [prefs, setPrefs] = useState(getPrefs)
@@ -234,14 +239,14 @@ export default function ProfilePage() {
                   className={cn(
                     'inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold transition active:scale-95',
                     on
-                      ? 'border-accent bg-accent/15 text-accent shadow-sm'
+                      ? 'border-foreground/30 bg-foreground/10 text-foreground'
                       : 'border-transparent bg-transparent text-muted hover:border-border/60 hover:text-foreground'
                   )}
                 >
                   <Icon className="size-4" />
                   <span>{label}</span>
                   {badge && (
-                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-black text-accent uppercase">
+                    <span className="rounded-full bg-foreground/15 px-2 py-0.5 text-[10px] font-black text-foreground uppercase">
                       {badge}
                     </span>
                   )}
@@ -256,7 +261,7 @@ export default function ProfilePage() {
               {/* Header row: Bookmark icon + Watchlist + count */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <Bookmark className="size-5 text-accent fill-accent/20" />
+                  <Bookmark className="size-5 text-foreground" />
                   <h2 className="font-display text-xl font-bold tracking-tight text-foreground">
                     Watchlist
                   </h2>
@@ -266,95 +271,34 @@ export default function ProfilePage() {
                 </span>
               </div>
 
-              {/* Filter Pills matching Zenkai theme */}
-              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                {[
-                  { id: 'all' as const, label: 'All', count: list.length },
-                  { id: 'watching' as const, label: 'Watching', count: list.filter((i) => i.status === 'watching').length },
-                  { id: 'planning' as const, label: 'Planning', count: list.filter((i) => i.status === 'planning').length },
-                  { id: 'completed' as const, label: 'Completed', count: list.filter((i) => i.status === 'completed').length },
-                  { id: 'paused' as const, label: 'Paused', count: list.filter((i) => i.status === 'paused').length },
-                  { id: 'dropped' as const, label: 'Dropped', count: list.filter((i) => i.status === 'dropped').length },
-                ].map((f) => {
-                  const on = watchlistFilter === f.id
-                  return (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setWatchlistFilter(f.id)}
-                      className={cn(
-                        'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-mono font-semibold transition active:scale-95',
-                        on
-                          ? 'bg-accent text-accent-fg font-bold shadow-md shadow-accent/25'
-                          : 'border border-[#242730] bg-card/60 text-muted hover:border-border hover:text-foreground'
-                      )}
-                    >
-                      {f.label} ({f.count})
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Media Cards Grid */}
-              {(() => {
-                const filtered = watchlistFilter === 'all' ? list : list.filter((i) => i.status === watchlistFilter)
-                if (filtered.length === 0) {
-                  return (
-                    <div className="grid place-items-center rounded-3xl border border-dashed border-border/80 bg-card/20 px-6 py-14 text-center">
-                      <Bookmark className="size-10 text-muted/50 mb-2" />
-                      <p className="font-semibold text-foreground">
-                        {list.length === 0 ? 'Your watchlist is empty' : `No anime marked "${watchlistFilter}"`}
-                      </p>
-                      <p className="mt-1 max-w-sm text-xs text-muted">
-                        Bookmark your favorite series while browsing to track your progress here.
-                      </p>
-                      <Link
-                        to="/browse"
-                        className="mt-5 rounded-full bg-foreground px-6 py-2.5 text-xs font-bold text-background transition hover:brightness-110 active:scale-95"
-                      >
-                        Browse Anime
-                      </Link>
-                    </div>
-                  )
-                }
-
-                return (
-                  <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                    {filtered.map((item) => (
-                      <div key={item.id} className="group/card relative">
-                        <Link to={`/anime/${item.id}`} className="block outline-none">
-                          <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-border/70 bg-card-2 transition duration-200 group-hover:scale-[1.02] group-hover:border-accent/40 group-hover:shadow-2xl">
-                            <img
-                              src={item.image}
-                              alt={item.title}
-                              loading="lazy"
-                              className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-
-                            {/* Top Left Score Rating Badge */}
-                            {item.score ? (
-                              <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-400 backdrop-blur-sm">
-                                ★ {item.score}
-                              </span>
-                            ) : null}
-
-                            {/* Episode Progress Tag */}
-                            {item.progress ? (
-                              <span className="absolute bottom-2 right-2 rounded-md bg-black/80 px-2 py-0.5 text-[10px] font-mono font-semibold text-white backdrop-blur-sm">
-                                Ep {item.progress}{item.episodes ? ` / ${item.episodes}` : ''}
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <h3 className="mt-2.5 line-clamp-1 text-xs sm:text-sm font-bold text-foreground transition-colors group-hover:text-accent">
-                            {item.title}
-                          </h3>
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
+              {user && (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={privacy.priv}
+                  disabled={privacy.busy}
+                  onClick={() => void privacy.set(!privacy.priv)}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-border p-3 text-left transition hover:border-foreground/40 active:scale-[0.99] disabled:opacity-60"
+                >
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-foreground/10">
+                    {privacy.priv ? <Lock className="size-4" /> : <LockOpen className="size-4" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold">{privacy.priv ? 'Watchlist is private' : 'Watchlist is public'}</span>
+                    <span className="block text-xs text-muted">{privacy.priv ? 'Visitors see nothing, and the server never sends them your list.' : 'Anyone with your profile link can see it.'}</span>
+                  </span>
+                  <span className={'relative h-6 w-10 shrink-0 rounded-full transition ' + (privacy.priv ? 'bg-foreground' : 'bg-foreground/20')}>
+                    <span className={'absolute top-0.5 size-5 rounded-full bg-background transition-all ' + (privacy.priv ? 'left-[1.15rem]' : 'left-0.5')} />
+                  </span>
+                </button>
+              )}
+              <WatchlistPanel
+                items={list}
+                lists={customLists}
+                onStatus={setStatus}
+                emptyTitle="Your watchlist is empty"
+                emptyHint="Bookmark series while browsing to track your progress here."
+              />
             </section>
           )}
 
@@ -498,7 +442,7 @@ export default function ProfilePage() {
 
                 <Link
                   to="/ascension"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-mono font-bold text-accent transition hover:bg-accent/20"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-foreground/5 px-4 py-1.5 text-xs font-mono font-bold text-foreground transition hover:bg-foreground/10"
                 >
                   <span>Full Ascension System ➔</span>
                 </Link>
@@ -524,14 +468,14 @@ export default function ProfilePage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-bold text-foreground">{q.title}</span>
-                              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
+                              <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] font-bold text-foreground">
                                 +{q.xpReward} XP
                               </span>
                             </div>
                             <p className="text-xs text-muted mt-0.5">{q.description}</p>
                             <div className="mt-2 flex items-center gap-2.5 max-w-xs">
                               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
-                                <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${percent}%` }} />
+                                <div className="h-full rounded-full bg-foreground transition-all duration-300" style={{ width: `${percent}%` }} />
                               </div>
                               <span className="text-[11px] font-mono text-muted">{progressVal}/{q.target}</span>
                             </div>
@@ -548,7 +492,7 @@ export default function ProfilePage() {
                               type="button"
                               disabled={claimLoading === q.id}
                               onClick={() => handleClaimQuest(q.id)}
-                              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-xs font-bold text-accent-fg shadow-md shadow-accent/25 transition hover:brightness-110 active:scale-95 disabled:opacity-50"
+                              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-foreground px-3.5 text-xs font-bold text-background shadow-md shadow-black/30 transition hover:brightness-110 active:scale-95 disabled:opacity-50"
                             >
                               <Check className="size-3.5 stroke-[3]" />
                               <span>{claimLoading === q.id ? 'Claiming…' : `Claim +${q.xpReward} XP`}</span>
@@ -583,14 +527,14 @@ export default function ProfilePage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-bold text-foreground">{q.title}</span>
-                              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
+                              <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] font-bold text-foreground">
                                 +{q.xpReward} XP
                               </span>
                             </div>
                             <p className="text-xs text-muted mt-0.5">{q.description}</p>
                             <div className="mt-2 flex items-center gap-2.5 max-w-xs">
                               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border/60">
-                                <div className="h-full rounded-full bg-accent transition-all duration-300" style={{ width: `${percent}%` }} />
+                                <div className="h-full rounded-full bg-foreground transition-all duration-300" style={{ width: `${percent}%` }} />
                               </div>
                               <span className="text-[11px] font-mono text-muted">{progressVal}/{q.target}</span>
                             </div>
@@ -607,7 +551,7 @@ export default function ProfilePage() {
                               type="button"
                               disabled={claimLoading === q.id}
                               onClick={() => handleClaimQuest(q.id)}
-                              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent px-3.5 text-xs font-bold text-accent-fg shadow-md shadow-accent/25 transition hover:brightness-110 active:scale-95 disabled:opacity-50"
+                              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-foreground px-3.5 text-xs font-bold text-background shadow-md shadow-black/30 transition hover:brightness-110 active:scale-95 disabled:opacity-50"
                             >
                               <Check className="size-3.5 stroke-[3]" />
                               <span>{claimLoading === q.id ? 'Claiming…' : `Claim +${q.xpReward} XP`}</span>
@@ -632,7 +576,7 @@ export default function ProfilePage() {
                 <AuthPanel />
               ) : (
                 <div className="rounded-3xl border border-border bg-card/60 p-6 sm:p-8 shadow-lg text-center space-y-4">
-                  <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent/15 text-accent">
+                  <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-foreground/10 text-foreground">
                     <UserCheck className="size-6" />
                   </div>
                   <div>
@@ -644,7 +588,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => setShowAuth(true)}
-                    className="inline-flex h-11 items-center gap-2 rounded-full bg-accent px-6 text-sm font-bold text-accent-fg shadow-lg shadow-accent/25 transition hover:brightness-110 active:scale-95"
+                    className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-6 text-sm font-bold text-background shadow-lg shadow-black/30 transition hover:brightness-110 active:scale-95"
                   >
                     <span>Sign in or create account</span>
                     <ChevronRight className="size-4" />

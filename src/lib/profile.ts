@@ -24,6 +24,9 @@ export interface PublicUserData {
   equippedFontStyle?: string
   nameColor?: string | null
   watchlist?: any[]
+  customLists?: { id: string; name: string; createdAt: number }[]
+  /** The owner keeps their watchlist private: no list data was fetched. */
+  watchlistPrivate?: boolean
   watchlistCount?: number
   historyCount?: number
   readingCount?: number
@@ -234,23 +237,48 @@ export async function fetchPublicProfile(username: string): Promise<PublicUserDa
     let historyCount = 0
     let readingCount = 0
     let userWatchlist: any[] = []
+    let userCustomLists: { id: string; name: string; createdAt: number }[] = []
 
-    if (userId) {
+    // A private watchlist is never requested: the database returns nothing for it.
+    let watchlistPrivate = profileRow?.watchlist_private === true
+
+    if (userId && !watchlistPrivate) {
+      let viewed = false
       try {
-        const { data: stats } = await supabase
-          .from('user_sync')
-          .select('watchlist, history, reading')
-          .eq('user_id', userId)
-          .maybeSingle()
-
-        if (stats) {
-          userWatchlist = Array.isArray(stats.watchlist) ? stats.watchlist : []
-          watchlistCount = userWatchlist.length
-          historyCount = Array.isArray(stats.history) ? stats.history.length : 0
-          readingCount = Array.isArray(stats.reading) ? stats.reading.length : 0
+        const { data: pub, error } = await supabase.from('public_watchlists').select('watchlist, custom_lists, is_private').eq('user_id', userId).maybeSingle()
+        if (!error) {
+          viewed = true
+          if (pub?.is_private) {
+            watchlistPrivate = true
+          } else if (pub) {
+            userWatchlist = Array.isArray(pub.watchlist) ? pub.watchlist : []
+            userCustomLists = Array.isArray(pub.custom_lists) ? pub.custom_lists : []
+            watchlistCount = userWatchlist.length
+          }
         }
-      } catch (err) {
-        console.warn('[Profile] stats query error:', err)
+      } catch {
+        /* the view isn't set up yet: use the direct read below */
+      }
+
+      // Without the view, only your own row is readable here.
+      if (!viewed) {
+        try {
+          const { data: stats } = await supabase
+            .from('user_sync')
+            .select('watchlist, history, reading, custom_lists')
+            .eq('user_id', userId)
+            .maybeSingle()
+
+          if (stats) {
+            userWatchlist = Array.isArray(stats.watchlist) ? stats.watchlist : []
+            userCustomLists = Array.isArray(stats.custom_lists) ? stats.custom_lists : []
+            watchlistCount = userWatchlist.length
+            historyCount = Array.isArray(stats.history) ? stats.history.length : 0
+            readingCount = Array.isArray(stats.reading) ? stats.reading.length : 0
+          }
+        } catch (err) {
+          console.warn('[Profile] stats query error:', err)
+        }
       }
     }
 
@@ -273,6 +301,8 @@ export async function fetchPublicProfile(username: string): Promise<PublicUserDa
       equippedFontStyle,
       nameColor,
       watchlist: userWatchlist,
+      customLists: userCustomLists,
+      watchlistPrivate,
       watchlistCount,
       historyCount,
       readingCount,

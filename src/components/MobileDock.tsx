@@ -1,10 +1,11 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Bookmark, Clapperboard, Compass, House, Menu, Search, Tv, type LucideIcon } from 'lucide-react'
+import { Bookmark, Clapperboard, Compass, House, MessagesSquare, Search, Tv, type LucideIcon } from 'lucide-react'
 import { useSearch } from '../context/SearchContext'
 import { sectionOf } from '../lib/sections'
 import { cn } from '../lib/utils'
 
 interface MobileDockProps {
+  /** Kept for the caller; the drawer now lives behind the header's menu button. */
   onOpenDrawer?: () => void
 }
 
@@ -21,7 +22,7 @@ const movieItems: { label: string; to: string; icon: LucideIcon }[] = [
 ]
 
 /** Bottom tab bar shown on phones only — thumb-friendly navigation. */
-export function MobileDock({ onOpenDrawer }: MobileDockProps) {
+export function MobileDock(_props: MobileDockProps) {
   const { openSearch } = useSearch()
   const { pathname, search } = useLocation()
   const section = sectionOf(pathname)
@@ -34,7 +35,7 @@ export function MobileDock({ onOpenDrawer }: MobileDockProps) {
       className="fixed inset-x-3 bottom-3 z-50 md:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="mx-auto flex max-w-md items-center justify-between rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-2xl shadow-black/20">
+      <ul className="mx-auto flex max-w-md items-center justify-between rounded-full border border-white/10 bg-card/60 px-3 py-1.5 shadow-2xl shadow-black/30 backdrop-blur-2xl backdrop-saturate-150">
         {/* Left items */}
         {list.slice(0, 2).map((it) => {
           const active = section === 'movies' ? pathname + search === it.to : pathname === it.to
@@ -50,6 +51,7 @@ export function MobileDock({ onOpenDrawer }: MobileDockProps) {
               >
                 <Icon className={cn('size-5 transition-transform', active && 'scale-110')} />
                 {it.label}
+                <span aria-hidden className={cn('-mb-0.5 size-1 rounded-full bg-foreground transition-opacity', active ? 'opacity-100' : 'opacity-0')} />
               </Link>
             </li>
           )
@@ -82,21 +84,25 @@ export function MobileDock({ onOpenDrawer }: MobileDockProps) {
               >
                 <Icon className={cn('size-5 transition-transform', active && 'scale-110')} />
                 {it.label}
+                <span aria-hidden className={cn('-mb-0.5 size-1 rounded-full bg-foreground transition-opacity', active ? 'opacity-100' : 'opacity-0')} />
               </Link>
             </li>
           )
         })}
 
-        {/* Menu Drawer Button */}
+        {/* Community */}
         <li>
-          <button
-            type="button"
-            onClick={onOpenDrawer}
-            className="flex flex-col items-center gap-1 rounded-2xl px-2.5 py-1.5 text-[10px] font-medium text-muted transition hover:text-foreground active:scale-90"
+          <Link
+            to="/community"
+            className={cn(
+              'flex flex-col items-center gap-1 rounded-2xl px-2.5 py-1.5 text-[10px] font-medium transition active:scale-90',
+              pathname.startsWith('/community') ? 'text-foreground' : 'text-muted',
+            )}
           >
-            <Menu className="size-5" />
-            Menu
-          </button>
+            <MessagesSquare className={cn('size-5 transition-transform', pathname.startsWith('/community') && 'scale-110')} />
+            Community
+            <span aria-hidden className={cn('-mb-0.5 size-1 rounded-full bg-foreground transition-opacity', pathname.startsWith('/community') ? 'opacity-100' : 'opacity-0')} />
+          </Link>
         </li>
       </ul>
     </nav>
