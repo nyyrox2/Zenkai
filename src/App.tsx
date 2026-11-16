@@ -106,7 +106,6 @@ export default function App() {
   const isEmbed = pathname === '/embed' || pathname.startsWith('/embed/')
   const isApi = pathname === '/api' || pathname.startsWith('/api') || pathname === '/docs'
   const isMessages = pathname.startsWith('/messages')
-  const isCommunity = pathname.startsWith('/community') // full-screen chat: no footer, no bottom dock
   const inChat = /^\/messages\/[^/]+$/.test(pathname)
   const isCall = pathname === '/call'
   const isAuth = pathname.startsWith('/auth/') || pathname === '/login'
@@ -159,8 +158,7 @@ export default function App() {
           showNav
             ? cn(
                 sidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-56',
-                // pages that open with a full-bleed hero slide under the clear mobile header
-                pathname === '/home' || pathname === '/movies' ? 'pt-0' : 'pt-14 md:pt-0'
+                'pt-14 md:pt-0'
               )
             : 'pl-0 pt-0'
         )}
@@ -229,10 +227,10 @@ export default function App() {
           </Suspense>
         </ErrorBoundary>
 
-        {!bare && !isApi && !isMessages && !isCommunity && <Footer />}
+        {!bare && !isApi && !isMessages && <Footer />}
       </div>
 
-      {!bare && !isApi && !inChat && !isCommunity && <MobileDock onOpenDrawer={() => setDrawerOpen(true)} />}
+      {!bare && !isApi && !inChat && <MobileDock onOpenDrawer={() => setDrawerOpen(true)} />}
       {!bare && !isApi && section === 'movies' ? <MovieSearchModal /> : <SearchModal />}
       <Toaster />
       <SystemLevelUpModal />

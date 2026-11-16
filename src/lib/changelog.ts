@@ -20,16 +20,16 @@ export interface ReleaseData {
 /** Offline fallback; the real notes come from the latest GitHub release of the web repo. */
 export const CURRENT_RELEASE: ReleaseData = {
   version: pkg.version,
-  releaseDate: 'November 16, 2026',
-  title: 'New Watchlist, Full-Screen Community & a Cleaner UI',
-  tagline: 'A black-and-white watchlist with favourites and custom lists, private watchlists, a full-screen community chat, and a lighter glass interface.',
+  releaseDate: 'November 3, 2026',
+  title: 'Voice Calls, Watch Parties & Full-Screen Messaging',
+  tagline: 'Real-time voice calls, live watch party voice chat, dedicated messages view, and host room controls.',
   githubUrl: `${WEB_REPO_URL}/releases`,
   highlights: [
-    { badge: 'LIST', title: 'New Watchlist', description: 'Black and white, with status tabs, Favourites, your own named lists, search, sort and grid or list view.' },
-    { badge: 'PRIVACY', title: 'Private Watchlists', description: 'Hide your list from everyone. When it is private, the server never sends it to visitors.' },
-    { badge: 'CHAT', title: 'Full-Screen Community', description: 'A real group chat: edge to edge, your name in your equipped style, with live profiles and the chat buttons at the bottom.' },
-    { badge: 'UI', title: 'Glass Header & New Dock', description: 'The header is clear at the top and frosted when you scroll. Community now sits in the bottom bar.' },
-    { badge: 'PROFILE', title: 'Visible Banners & Animated Pictures', description: 'Sharp profile banners, a crop, rotate and flip editor, and GIF or APNG avatars and banners.' },
+    { badge: 'CALLS', title: 'Direct Voice Calling', description: 'Start one-on-one voice calls right from direct messages with dedicated call screens, speaking indicators, and call history.' },
+    { badge: 'PARTY', title: 'Watch Party Voice Chat', description: 'Talk live with friends during watch parties with individual mic and mute controls.' },
+    { badge: 'PARTY', title: 'Host Party Controls', description: 'Switch anime or episodes on the fly and keep your room alive even if you refresh.' },
+    { badge: 'INBOX', title: 'Full-Screen Messages', description: 'A distraction-free, edge-to-edge messaging experience with clickable profiles and call history cards.' },
+    { badge: 'NAVBAR', title: 'Spacious Navigation', description: 'Refined header layout with clean link spacing and instant search on all screen sizes.' },
   ],
 }
 

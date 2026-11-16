@@ -169,30 +169,18 @@ async function fetchChatProfiles(ids: string[]): Promise<Record<string, ChatProf
   return out
 }
 
-// ponytail: module-level cache survives page navigation (in-memory only); upgrade to sessionStorage/SWR if needed
-const CHAT_PROFILE_TTL = 5 * 60_000
-const chatProfileCache = new Map<string, { at: number; p: ChatProfile | null }>()
-
-/** Current name, picture and name style of everyone in the room; each profile is fetched once per TTL, new faces in one batch. */
+/** Looks up the current name, picture and name style of everyone in the room (one batched request per new face). */
 function useChatProfiles(messages: CommunityPost[]) {
-  const [, bump] = useState(0)
+  const [map, setMap] = useState<Record<string, ChatProfile>>({})
+  const asked = useRef(new Set<string>())
   useEffect(() => {
-    const now = Date.now()
-    const ids = [...new Set(messages.map((m) => m.user_id).filter((x): x is string => !!x))].filter((id) => {
-      const c = chatProfileCache.get(id)
-      return !c || now - c.at > CHAT_PROFILE_TTL
-    })
+    const ids = [...new Set(messages.map((m) => m.user_id).filter((x): x is string => !!x))].filter((id) => !asked.current.has(id))
     if (!ids.length) return
-    ids.forEach((id) => chatProfileCache.set(id, { at: now, p: chatProfileCache.get(id)?.p ?? null })) // mark in-flight
+    ids.forEach((id) => asked.current.add(id))
     void fetchChatProfiles(ids)
-      .then((got) => {
-        ids.forEach((id) => chatProfileCache.set(id, { at: Date.now(), p: got[id] ?? chatProfileCache.get(id)?.p ?? null }))
-        bump((n) => n + 1)
-      })
-      .catch(() => ids.forEach((id) => chatProfileCache.delete(id)))
+      .then((got) => setMap((prev) => ({ ...prev, ...got })))
+      .catch(() => ids.forEach((id) => asked.current.delete(id)))
   }, [messages])
-  const map: Record<string, ChatProfile> = {}
-  chatProfileCache.forEach((c, id) => { if (c.p) map[id] = c.p })
   return map
 }
 
@@ -482,7 +470,7 @@ export default function CommunityPage() {
     (anilist?.user?.name ? anilist.user.name.toLowerCase().replace(/[^a-z0-9_-]/g, '') : null) ||
     (name ? name.toLowerCase().replace(/[^a-z0-9_-]/g, '') : null)
 
-  const myAvatar = profile?.avatar || anilist?.user?.avatar || null
+  const myAvatar = profile?.avatar || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || anilist?.user?.avatar || null
   const myFrame = profile?.frame || null
 
   const [asc, setAsc] = useState(getAscensionState())
@@ -799,11 +787,11 @@ export default function CommunityPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="fixed inset-x-0 bottom-0 top-14 z-30 overflow-hidden bg-background text-foreground md:top-[4.75rem]" style={{ '--ch': channel.tint } as CSSProperties}>
+      <div className="relative min-h-dvh overflow-x-clip bg-background px-0 pb-24 pt-[4.5rem] text-foreground sm:px-4 sm:pt-[4.75rem] md:pb-8" style={{ '--ch': channel.tint } as CSSProperties}>
         {/* ambient glow follows the channel colour */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] opacity-80 [background:radial-gradient(60%_80%_at_50%_0%,color-mix(in_srgb,var(--ch)_22%,transparent),transparent_70%)]" />
 
-        <div className="relative grid h-full w-full lg:grid-cols-[15.5rem_minmax(0,1fr)] xl:grid-cols-[15.5rem_minmax(0,1fr)_20rem]">
+        <div className="relative mx-auto grid h-[calc(100dvh-9.5rem)] min-h-[26rem] w-full max-w-7xl overflow-hidden border-y border-border bg-card/90 sm:h-[calc(100dvh-10.75rem)] sm:rounded-[1.75rem] sm:border sm:shadow-2xl sm:shadow-black/30 md:h-[calc(100dvh-6.75rem)] md:max-h-[860px] lg:grid-cols-[15.5rem_minmax(0,1fr)] xl:grid-cols-[15.5rem_minmax(0,1fr)_20rem]">
           <LayoutGroup>
             {/* ------------------------------------------------ left rail (lg+) */}
             <aside className="hidden min-h-0 flex-col border-r border-border bg-card-2/40 lg:flex">
@@ -858,7 +846,7 @@ export default function CommunityPage() {
 
             {/* ------------------------------------------------------ chat */}
             <main className="relative flex min-h-0 min-w-0 flex-col">
-              <header className="border-b border-border bg-background/60 backdrop-blur-xl">
+              <header className="border-b border-border">
                 <div className="flex items-center gap-3 px-3.5 py-2.5 sm:px-5">
                   <span style={{ background: 'color-mix(in srgb, var(--ch) 20%, transparent)', color: 'var(--ch)' }} className="grid size-11 shrink-0 place-items-center rounded-full ring-2 ring-[color-mix(in_srgb,var(--ch)_35%,transparent)]">
                     <ChannelIcon className="size-5" />
@@ -1083,7 +1071,7 @@ export default function CommunityPage() {
               </div>
 
               {/* composer */}
-              <div className="border-t border-border bg-background/80 px-2.5 pt-2 backdrop-blur-xl sm:px-4" style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}>
+              <div className="border-t border-border bg-card/60 px-2.5 pb-2.5 pt-2 sm:px-4 sm:pb-3.5">
                 <AnimatePresence initial={false}>
                   {tagged && (
                     <motion.div key="tag" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
@@ -1099,7 +1087,7 @@ export default function CommunityPage() {
                   )}
                 </AnimatePresence>
 
-                <div className="no-scrollbar mb-2 flex items-center gap-1.5 overflow-x-auto">
+                <div className="mb-2 flex items-center gap-1.5">
                   <button type="button" onClick={() => { setTagQuery(''); setTagOpen(true) }} className={cn('flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition active:scale-95', tagged ? 'border-accent/50 bg-accent/10 text-accent' : 'border-border text-muted hover:text-foreground')}>
                     <Clapperboard className="size-3.5" />
                     <span>{tagged ? 'Change show' : 'Tag a show'}</span>
@@ -1112,7 +1100,7 @@ export default function CommunityPage() {
                     <Shuffle className="size-3.5" />
                     <span className="hidden min-[400px]:inline">Spin a topic</span>
                   </button>
-                  <div className="ml-1 flex shrink-0 items-center gap-0.5">
+                  <div className="no-scrollbar ml-1 hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto sm:flex">
                     {EMOJIS.map((em) => (
                       <button key={em} type="button" onClick={() => { setText((t) => (t + em).slice(0, MAX_LEN)); inputRef.current?.focus() }} className="shrink-0 rounded-full px-1.5 py-0.5 text-base transition hover:scale-125 hover:bg-foreground/10 active:scale-90" aria-label={`Add ${em}`}>
                         {em}
