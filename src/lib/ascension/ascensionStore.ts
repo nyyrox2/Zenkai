@@ -623,8 +623,8 @@ export async function evaluateDailyLoginStreak() {
           streak: nextStreak,
           longestStreak: Math.max(state.longestStreak || 0, nextStreak),
           lastLoginDate: serverResult.last_login_date || today,
-          totalXp: serverResult.new_total_xp ? Number(serverResult.new_total_xp) : state.totalXp,
-          level: serverResult.new_level ? Number(serverResult.new_level) : state.level,
+          totalXp: Math.max(Number(serverResult.new_total_xp) || 0, state.totalXp),
+          level: Math.max(Number(serverResult.new_level) || 0, state.level),
         }
         ascensionCell.set(updatedState)
         return
@@ -701,7 +701,8 @@ export async function syncAscensionWithCloud(userId: string, force: boolean = fa
       .maybeSingle()
 
     if (profile) {
-      const cloudXp = Number(profile.total_xp) || 0
+      // XP only goes up: routine XP stays local until pushed, so a stale cloud value must never overwrite it
+      const cloudXp = Math.max(Number(profile.total_xp) || 0, state.totalXp)
       const calculatedLevel = calculateLevelFromXp(cloudXp)
 
       const merged: AscensionState = sanitizeCosmeticsForLevel({

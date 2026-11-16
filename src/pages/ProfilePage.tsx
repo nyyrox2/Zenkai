@@ -112,7 +112,6 @@ export default function ProfilePage() {
   const { theme, setTheme } = useTheme()
 
   const [editing, setEditing] = useState(false)
-  const [showAuth, setShowAuth] = useState(false)
   const [editTab, setEditTab] = useState<SectionKey>('identity')
   const [activeTab, setActiveTab] = useState<TabKey>('preferences')
   const customLists = useCustomLists()
@@ -213,7 +212,7 @@ export default function ProfilePage() {
     { id: 'preferences' as const, label: 'Preferences', icon: SlidersHorizontal },
     { id: 'ascension' as const, label: 'Ascension Quests', icon: ChevronsUp, badge: `Lv.${ascensionState.level}` },
     { id: 'watchlist' as const, label: 'Watchlist', icon: Bookmark, badge: list.length > 0 ? `${list.length}` : null },
-    { id: 'account' as const, label: 'Cloud & Sync', icon: Cloud, badge: user ? 'Connected' : null },
+    { id: 'account' as const, label: user ? 'Cloud & Sync' : 'Sign in', icon: user ? Cloud : UserCheck, badge: user ? 'Connected' : null },
     { id: 'anilist' as const, label: 'AniList', icon: BookmarkCheck },
     { id: 'legal' as const, label: 'About & Legal', icon: ShieldCheck },
   ]
@@ -226,6 +225,18 @@ export default function ProfilePage() {
         <div className="space-y-6">
           {/* 1. Unified Profile Hero Header */}
           <ProfileHero me={me} onEdit={startEdit} />
+
+          {!loading && !user && activeTab !== 'account' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('account')}
+              className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card/60 px-4 py-3 text-left transition hover:border-foreground/40 active:scale-[0.99]"
+            >
+              <UserCheck className="size-5 shrink-0" />
+              <span className="min-w-0 flex-1 text-sm"><b>Sign in</b> <span className="text-muted">to back up your history, watchlist and XP across devices.</span></span>
+              <ChevronRight className="size-4 shrink-0 text-muted" />
+            </button>
+          )}
 
           {/* 2. Cohesive Section Switcher Tabs */}
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-border/60 pt-1">
@@ -572,28 +583,8 @@ export default function ProfilePage() {
             <div className="space-y-4">
               {loading ? null : user ? (
                 <AccountPanel />
-              ) : showAuth ? (
-                <AuthPanel />
               ) : (
-                <div className="rounded-3xl border border-border bg-card/60 p-6 sm:p-8 shadow-lg text-center space-y-4">
-                  <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-foreground/10 text-foreground">
-                    <UserCheck className="size-6" />
-                  </div>
-                  <div>
-                    <h2 className="font-display text-xl font-bold">Sign in to Zenkai Cloud</h2>
-                    <p className="mt-1 text-sm text-muted max-w-md mx-auto">
-                      Back up your watch history, watchlist, reading progress and custom profile across all devices.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAuth(true)}
-                    className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-6 text-sm font-bold text-background shadow-lg shadow-black/30 transition hover:brightness-110 active:scale-95"
-                  >
-                    <span>Sign in or create account</span>
-                    <ChevronRight className="size-4" />
-                  </button>
-                </div>
+                <AuthPanel />
               )}
             </div>
           )}

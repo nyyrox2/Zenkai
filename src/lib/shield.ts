@@ -233,7 +233,15 @@ const looksAutomated = () =>
   /HeadlessChrome|PhantomJS/i.test(navigator.userAgent) ||
   (!!(window as unknown as { chrome?: unknown }).chrome && !navigator.languages?.length)
 
-let slowHits = 0
+// Worker heartbeat: DevTools attached => the worker's `debugger` pauses it and the beat stops. Main thread never blocks.
+let beat = Date.now()
+function startHeartbeat() {
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob(['setInterval(()=>{postMessage(0);debugger},500)'])))
+    w.onmessage = () => (beat = Date.now())
+    document.addEventListener('visibilitychange', () => (beat = Date.now()))
+  } catch {}
+}
 function checkDevTools() {
   if (SECURITY_DISABLED || state.bot || import.meta.env.DEV) return // DEV: never stall or lock the dev's own DevTools
   const inIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -249,16 +257,7 @@ function checkDevTools() {
     if (state.devtools) set({ devtools: false })
     return
   }
-  let open = window.outerWidth - window.innerWidth > 175 || window.outerHeight - window.innerHeight > 175
-  if (!open) {
-    try {
-      const t = performance.now();
-      Function('debugger')();
-      // a busy main thread can stall this once; require two slow hits in a row
-      slowHits = performance.now() - t > 100 ? slowHits + 1 : 0
-      if (slowHits >= 2) open = true
-    } catch {}
-  }
+  const open = document.visibilityState === 'visible' && Date.now() - beat > 3000
   if (open !== state.devtools) {
     set({ devtools: open })
     if (open) {
@@ -292,6 +291,6 @@ export function startShield() {
   if (import.meta.env.DEV) return
   if (looksAutomated()) return set({ bot: true })
   window.addEventListener('keydown', onKey, true)
-  window.addEventListener('resize', checkDevTools)
+  startHeartbeat()
   window.setInterval(checkDevTools, 900)
 }

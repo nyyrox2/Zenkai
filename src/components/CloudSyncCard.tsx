@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff, History, Lock, LogOut, Mail, RefreshCw, Smartphone, BookOpen, CloudCheck, User } from 'lucide-react'
+import { AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff, History, Lock, LogOut, Mail, RefreshCw, Smartphone, BookOpen, CloudCheck, CloudDownload, CloudUpload, User } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { syncNow, getLastSyncTime, formatLastSync } from '../lib/sync'
+import { pullWatchHistory, pushWatchHistory, getLastSyncTime, formatLastSync } from '../lib/sync'
+import { syncAscensionWithCloud } from '../lib/ascension/ascensionStore'
 import { useHistory, useList } from '../lib/library'
 import { useReading } from '../lib/reading'
 import { Logo } from './Logo'
@@ -192,7 +193,7 @@ export function AccountPanel() {
     { label: 'Reading', n: useReading('novel').length + useReading('manga').length },
   ]
   const [last, setLast] = useState(getLastSyncTime)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'push' | 'pull' | null>(null)
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
@@ -203,15 +204,16 @@ export function AccountPanel() {
 
   if (!user) return null
 
-  const sync = async () => {
+  const run = (kind: 'push' | 'pull') => async () => {
     if (busy) return
-    setBusy(true)
+    setBusy(kind)
     setResult(null)
     try {
-      const r = await syncNow(user.id)
-      setResult(r.success ? { ok: true, text: 'Everything is up to date.' } : { ok: false, text: r.error ?? 'Sync failed' })
+      if (kind === 'pull') await syncAscensionWithCloud(user.id, true)
+      const r = await (kind === 'push' ? pushWatchHistory : pullWatchHistory)(user.id)
+      setResult(r.success ? { ok: true, text: kind === 'push' ? 'Pushed to the cloud.' : 'Pulled from the cloud.' } : { ok: false, text: r.error ?? `${kind} failed` })
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
@@ -236,9 +238,6 @@ export function AccountPanel() {
             <p className="truncate text-xs text-muted">{user.email}</p>
           </div>
         </div>
-        <button type="button" onClick={signOut} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3.5 text-xs font-semibold text-muted transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 active:scale-95">
-          <LogOut className="size-3.5" /> Sign out
-        </button>
       </div>
 
       <dl className="mt-5 grid grid-cols-3 gap-2.5">
@@ -250,14 +249,20 @@ export function AccountPanel() {
         ))}
       </dl>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold">Last synced: {formatLastSync(last)}</p>
-          <p className="text-xs text-muted">Syncs when you sign in and once a day. Newest progress wins on every device.</p>
+      <div className="mt-5 space-y-3 border-t border-border pt-4">
+        <div className="flex gap-2">
+          {([['push', CloudUpload, 'Push'], ['pull', CloudDownload, 'Pull']] as const).map(([k, Icon, label]) => (
+            <button key={k} type="button" onClick={run(k)} disabled={!!busy} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full bg-foreground px-4 text-sm font-bold text-background transition hover:opacity-90 active:scale-95 disabled:opacity-60">
+              {busy === k ? <RefreshCw className="size-4 animate-spin" /> : <Icon className="size-4" />} {label}
+            </button>
+          ))}
+          <button type="button" onClick={signOut} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-muted transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 active:scale-95">
+            <LogOut className="size-4" /> Sign out
+          </button>
         </div>
-        <button type="button" onClick={sync} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-bold text-background transition hover:opacity-90 active:scale-95 disabled:opacity-60">
-          <RefreshCw className={cn('size-4', busy && 'animate-spin')} /> {busy ? 'Syncing' : 'Sync now'}
-        </button>
+        <p className="text-xs text-muted">
+          Last synced: {formatLastSync(last)}. <b>Push</b> uploads this device to the cloud, <b>Pull</b> merges the cloud into this device. Auto-syncs when you sign in and once a day.
+        </p>
       </div>
 
       {result && (
