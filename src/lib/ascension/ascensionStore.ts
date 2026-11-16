@@ -337,7 +337,7 @@ export async function recordProgressionActivity({
   refId,
   periodKey,
 }: {
-  action: 'watch_episode' | 'send_message' | 'read_manga_chapter' | 'read_novel_chapter' | 'daily_login' | 'streak_milestone'
+  action: 'watch_episode' | 'watch_movie' | 'send_message' | 'read_manga_chapter' | 'read_novel_chapter' | 'daily_login' | 'streak_milestone'
   xp: number
   refId: string
   periodKey?: string
@@ -375,7 +375,7 @@ export async function recordProgressionActivity({
     }
   }
 
-  if (action === 'watch_episode') {
+  if (action === 'watch_episode' || action === 'watch_movie') {
     advanceQuest('daily_watch', 1)
     advanceQuest('weekly_watch_10', 1)
   } else if (action === 'read_manga_chapter') {

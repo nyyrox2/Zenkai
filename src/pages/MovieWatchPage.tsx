@@ -1,5 +1,6 @@
 import { toast } from '../lib/toast'
-import { useEffect, useMemo, useState } from 'react'
+import { recordProgressionActivity } from '../lib/ascension/ascensionStore'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
 import { ChevronLeft, ChevronRight, Loader2, Lock, MessageSquare, TriangleAlert, Download, Users, Zap } from 'lucide-react'
@@ -55,6 +56,20 @@ export default function MovieWatchPage() {
   const details = useAsync(() => fetchDetails(type, id), [type, id])
   const providers = useAsync(() => fetchProviders(type), [type])
   const eps = useAsync(() => (type === 'tv' ? fetchEpisodes(id, season) : Promise.resolve([])), [type, id, season])
+
+  // XP: a movie is worth 75, a TV episode 30. Native player reports progress; embeds can't, so they earn it by time on page.
+  // ponytail: idempotency lives in recordProgressionActivity, so both paths firing is harmless
+  const awardWatch = useCallback(() => {
+    void recordProgressionActivity(
+      type === 'movie'
+        ? { action: 'watch_movie', xp: 75, refId: `tmdb_movie_${id}` }
+        : { action: 'watch_episode', xp: 30, refId: `tmdb_tv_${id}_s${season}e${episode}` },
+    )
+  }, [type, id, season, episode])
+  useEffect(() => {
+    const t = window.setTimeout(awardWatch, (type === 'movie' ? 30 : 12) * 60_000)
+    return () => window.clearTimeout(t)
+  }, [awardWatch, type])
 
   const list = providers.data ?? []
   const providerId = list.find((p) => p.id === params.get('p'))?.id ?? list.find((p) => p.id === readPref())?.id ?? list[0]?.id
@@ -324,6 +339,7 @@ export default function MovieWatchPage() {
                 availableEpisodes={type === 'tv' ? lastEp : 1}
                 animeId={id}
                 isTmdb
+                onProgress={(pos, dur) => { if (dur > 0 && pos / dur >= 0.8) awardWatch() }}
                 format={type === 'movie' ? 'MOVIE' : 'TV'}
                 directSubtitles={(mbStream.data.subtitles || []).map((s, idx) => ({
                   id: s.id || `sub-${idx}`,

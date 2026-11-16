@@ -26,7 +26,7 @@ const CHANNELS = [
     label: 'general',
     icon: MessageSquare,
     desc: 'Anything anime, anytime',
-    tint: '#f43f5e',
+    tint: '#a1a1aa',
     starters: ['What are you watching right now?', 'Which anime made you cry the hardest?', 'Best opening of all time, go.', 'What anime did you drop and why?'],
   },
   {
@@ -34,7 +34,7 @@ const CHANNELS = [
     label: 'episode-talk',
     icon: Tv,
     desc: 'React to the latest episodes',
-    tint: '#38bdf8',
+    tint: '#a1a1aa',
     starters: ['That episode… I have no words.', 'Rate this week’s episode out of 10.', 'Animation of the season so far?', 'Who stole the show this week?'],
   },
   {
@@ -42,7 +42,7 @@ const CHANNELS = [
     label: 'recommendations',
     icon: Flame,
     desc: 'Hidden gems and sure bets',
-    tint: '#f59e0b',
+    tint: '#a1a1aa',
     starters: ['Recommend me something short and great.', 'A hidden gem nobody talks about:', 'Best anime to start with for a newbie?', 'Something that feels like Frieren?'],
   },
   {
@@ -50,7 +50,7 @@ const CHANNELS = [
     label: 'theories',
     icon: Sparkles,
     desc: 'Lore, predictions, spoilers',
-    tint: '#a78bfa',
+    tint: '#a1a1aa',
     starters: ['My wildest prediction is…', 'Is the villain actually right?', 'A detail everyone missed:', 'How do you think it ends?'],
   },
 ] as const
@@ -225,7 +225,7 @@ function Avatar({ name, src, frame, size = 36, animateFrame }: { name: string; s
   return (
     <span
       aria-hidden
-      style={{ ...style, background: `linear-gradient(135deg, hsl(${h} 72% 58%), hsl(${(h + 45) % 360} 70% 42%))` }}
+      style={{ ...style, background: `hsl(${h} 6% ${28 + (h % 5) * 3}%)` }}
       className="grid shrink-0 place-items-center rounded-full font-display font-black text-white ring-1 ring-white/10"
     >
       {name.charAt(0).toUpperCase()}
@@ -640,6 +640,7 @@ export default function CommunityPage() {
   async function send() {
     const content = text.trim()
     if (!content || sending) return
+    if (!user) return void signInWithGoogle()
     setSending(true)
     const author = authorName
     const displayAuthor = authorHandle ? `${author} (@${authorHandle})` : author
@@ -804,9 +805,6 @@ export default function CommunityPage() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="fixed inset-x-0 bottom-0 top-14 z-30 overflow-hidden bg-background text-foreground md:top-[4.75rem]" style={{ '--ch': channel.tint } as CSSProperties}>
-        {/* ambient glow follows the channel colour */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] opacity-80 [background:radial-gradient(60%_80%_at_50%_0%,color-mix(in_srgb,var(--ch)_22%,transparent),transparent_70%)]" />
-
         <div className="relative grid h-full w-full lg:grid-cols-[15.5rem_minmax(0,1fr)] xl:grid-cols-[15.5rem_minmax(0,1fr)_20rem]">
           <LayoutGroup>
             {/* ------------------------------------------------ left rail (lg+) */}
@@ -854,7 +852,7 @@ export default function CommunityPage() {
                 ) : (
                   <button type="button" onClick={() => void signInWithGoogle()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-3 py-2.5 text-xs font-bold text-background transition hover:opacity-90 active:scale-95">
                     <GoogleIcon className="size-4" />
-                    <span>Sign in to chat</span>
+                    <span>Log in to message</span>
                   </button>
                 )}
               </div>
@@ -864,7 +862,7 @@ export default function CommunityPage() {
             <main className="relative flex min-h-0 min-w-0 flex-col">
               <header className="border-b border-border bg-background/60 backdrop-blur-xl">
                 <div className="flex items-center gap-3 px-3.5 py-2.5 sm:px-5">
-                  <span style={{ background: 'color-mix(in srgb, var(--ch) 20%, transparent)', color: 'var(--ch)' }} className="grid size-11 shrink-0 place-items-center rounded-full ring-2 ring-[color-mix(in_srgb,var(--ch)_35%,transparent)]">
+                  <span style={{ background: 'color-mix(in srgb, var(--ch) 20%, transparent)', color: 'var(--ch)' }} className="grid size-11 shrink-0 place-items-center rounded-full border border-border">
                     <ChannelIcon className="size-5" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -874,10 +872,10 @@ export default function CommunityPage() {
                       {activeVoices} {activeVoices === 1 ? 'member' : 'members'} chatting today · {channel.desc}
                     </p>
                   </div>
-                  <button type="button" onClick={openName} className="flex items-center gap-2 rounded-full border border-border bg-card-2/60 py-1 pl-1 pr-3 text-xs font-semibold transition hover:border-accent/50 active:scale-95 lg:hidden" aria-label="Change your name">
+                  {user && <button type="button" onClick={openName} className="flex items-center gap-2 rounded-full border border-border bg-card-2/60 py-1 pl-1 pr-3 text-xs font-semibold transition hover:border-accent/50 active:scale-95 lg:hidden" aria-label="Change your name">
                     <Avatar name={name} src={myAvatar} size={26} />
                     <span className="max-w-[6.5rem] truncate">{name}</span>
-                  </button>
+                  </button>}
                   <button type="button" onClick={() => setRankOpen(true)} aria-label="Open ranking" className="grid size-10 shrink-0 place-items-center rounded-full border border-border bg-card-2/60 text-yellow-400 transition hover:border-accent/50 active:scale-90 xl:hidden">
                     <Trophy className="size-4" />
                   </button>
@@ -893,7 +891,7 @@ export default function CommunityPage() {
                     const Icon = c.icon
                     return (
                       <button key={c.id} role="tab" aria-selected={active} type="button" onClick={() => setChannelId(c.id)} className={cn('relative flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition active:scale-95', active ? 'border-transparent text-white' : 'border-border text-muted hover:text-foreground')}>
-                        {active && <motion.span layoutId="pill-ind" transition={{ type: 'spring', damping: 30, stiffness: 420 }} style={{ background: c.tint }} className="absolute inset-0 rounded-full" />}
+                        {active && <motion.span layoutId="pill-ind" transition={{ type: 'spring', damping: 30, stiffness: 420 }} className="absolute inset-0 rounded-full bg-accent" />}
                         <Icon className="relative size-3.5" />
                         <span className="relative">{c.label}</span>
                       </button>
@@ -904,7 +902,7 @@ export default function CommunityPage() {
 
               {/* messages */}
               <div className="relative min-h-0 flex-1">
-                <div ref={scrollRef} onScroll={onScroll} className="absolute inset-0 overflow-y-auto overscroll-contain px-2.5 py-4 sm:px-5 [background-image:radial-gradient(color-mix(in_srgb,var(--ch)_14%,transparent)_1px,transparent_1.5px)] [background-size:22px_22px]" style={{ overflowAnchor: 'auto' }}>
+                <div ref={scrollRef} onScroll={onScroll} className="absolute inset-0 overflow-y-auto overscroll-contain px-2.5 py-4 sm:px-5" style={{ overflowAnchor: 'auto' }}>
                   {loading ? (
                     <div className="space-y-4" aria-label="Loading messages">
                       {[0, 1, 2, 3].map((i) => (
@@ -1006,7 +1004,7 @@ export default function CommunityPage() {
                                 onDoubleClick={() => void like(msg)}
                                 className={cn(
                                   'relative w-fit max-w-full rounded-[1.25rem] px-3.5 py-2 text-[0.9rem] leading-relaxed',
-                                  isMe ? 'bg-gradient-to-br from-accent to-[color-mix(in_srgb,var(--accent)_72%,#000)] text-accent-fg shadow-md shadow-accent/20' : 'border border-border bg-card-2 text-foreground',
+                                  isMe ? 'bg-foreground text-background' : 'border border-border bg-card-2 text-foreground',
                                   last && (isMe ? 'rounded-br-md' : 'rounded-bl-md'),
                                 )}
                               >
@@ -1106,6 +1104,12 @@ export default function CommunityPage() {
                   )}
                 </AnimatePresence>
 
+                {!user ? (
+                  <button type="button" onClick={() => void signInWithGoogle()} className="mb-2 flex w-full items-center justify-center gap-2 rounded-[1.5rem] border border-border bg-card-2/70 px-4 py-3 text-sm font-bold transition hover:border-accent/60 active:scale-[0.98]">
+                    <GoogleIcon className="size-4" />
+                    <span>Log in to message</span>
+                  </button>
+                ) : (<>
                 <div className="no-scrollbar mb-2 flex items-center gap-1.5 overflow-x-auto">
                   <button type="button" onClick={() => { setTagQuery(''); setTagOpen(true) }} className={cn('flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition active:scale-95', tagged ? 'border-accent/50 bg-accent/10 text-accent' : 'border-border text-muted hover:text-foreground')}>
                     <Clapperboard className="size-3.5" />
@@ -1128,7 +1132,7 @@ export default function CommunityPage() {
                   </div>
                 </div>
 
-                <div className="flex items-end gap-2 rounded-[1.5rem] border border-border bg-card-2/70 p-1.5 pl-4 transition focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20">
+                <div className="flex items-end gap-2 rounded-[1.5rem] border border-border bg-card-2/70 p-1.5 pl-4 transition focus-within:border-accent/60 ">
                   <textarea
                     ref={inputRef}
                     value={text}
@@ -1141,11 +1145,12 @@ export default function CommunityPage() {
                     className="max-h-32 min-h-9 flex-1 resize-none self-center bg-transparent py-1.5 text-[0.95rem] leading-snug text-foreground outline-none placeholder:text-muted"
                   />
                   {text.length > MAX_LEN - 120 && <span className={cn('self-center pr-1 text-xs tabular-nums', text.length >= MAX_LEN ? 'text-red-400' : 'text-muted')}>{MAX_LEN - text.length}</span>}
-                  <button type="button" onClick={() => void send()} disabled={!text.trim() || sending} aria-label="Send message" className="grid size-10 shrink-0 place-items-center rounded-full bg-accent text-accent-fg shadow-lg shadow-accent/30 transition enabled:hover:brightness-110 enabled:active:scale-90 disabled:opacity-35">
+                  <button type="button" onClick={() => void send()} disabled={!text.trim() || sending} aria-label="Send message" className="grid size-10 shrink-0 place-items-center rounded-full bg-accent text-accent-fg transition enabled:hover:brightness-110 enabled:active:scale-90 disabled:opacity-35">
                     {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="ml-0.5 size-4" />}
                   </button>
                 </div>
                 <p className="mt-1.5 hidden px-2 text-xs text-muted sm:block">Enter to send, Shift+Enter for a new line. Double-click a message to heart it. Wrap words in ||bars|| to hide spoilers.</p>
+                </>)}
               </div>
             </main>
 
