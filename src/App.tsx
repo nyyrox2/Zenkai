@@ -159,7 +159,8 @@ export default function App() {
           showNav
             ? cn(
                 sidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-56',
-                'pt-14 md:pt-0'
+                // pages that open with a full-bleed hero slide under the clear mobile header
+                pathname === '/home' || pathname === '/movies' ? 'pt-0' : 'pt-14 md:pt-0'
               )
             : 'pl-0 pt-0'
         )}
