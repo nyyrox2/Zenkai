@@ -33,7 +33,7 @@ export function MobileHeader({ onOpenDrawer }: MobileHeaderProps) {
       )}
     >
       {/* soft top fade keeps the icons readable over banners and posters while the bar is clear */}
-      <div aria-hidden className={cn('pointer-events-none absolute inset-x-0 top-0 -z-10 h-20 bg-gradient-to-b from-background/70 to-transparent transition-opacity duration-300', scrolled && 'opacity-0')} />
+      <div aria-hidden className={cn('pointer-events-none absolute inset-x-0 top-0 -z-10 h-20 bg-gradient-to-b from-background/55 to-transparent transition-opacity duration-300', scrolled && 'opacity-0')} />
       <div className="flex items-center gap-2">
         <button
           type="button"

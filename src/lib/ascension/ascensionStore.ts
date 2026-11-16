@@ -1,5 +1,6 @@
 import { cell } from '../library'
 import { supabase } from '../supabase'
+import { toast } from '../toast'
 import {
   calculateLevelFromXp,
   getHunterRank,
@@ -336,7 +337,7 @@ export async function recordProgressionActivity({
   refId,
   periodKey,
 }: {
-  action: 'watch_episode' | 'read_manga_chapter' | 'read_novel_chapter' | 'daily_login' | 'streak_milestone'
+  action: 'watch_episode' | 'send_message' | 'read_manga_chapter' | 'read_novel_chapter' | 'daily_login' | 'streak_milestone'
   xp: number
   refId: string
   periodKey?: string
@@ -415,11 +416,48 @@ export async function recordProgressionActivity({
     void pushAscensionToCloud(nextState)
   }
 
+  const claimedXp = await autoClaimQuests()
   return {
     success: true,
-    xpAwarded: xp,
+    xpAwarded: xp + claimedXp,
     leveledUp: !!levelUp,
   }
+}
+
+const MSG_XP = 5
+const MSG_DAILY_CAP = 10 // ponytail: client-side cap like the rest of the XP; move server-side if cheating matters
+let lastMsgPush = 0
+
+/** +5 XP per chat message (10/day). Pushes to the cloud at most once a minute so the ranking stays fresh. */
+export async function awardMessageXp(messageId: string, text: string) {
+  if (text.trim().length < 3) return
+  const key = `zk:msgxp:${TODAY()}`
+  let n = 0
+  try { n = Number(localStorage.getItem(key)) || 0 } catch {}
+  if (n >= MSG_DAILY_CAP) return
+  const r = await recordProgressionActivity({ action: 'send_message', xp: MSG_XP, refId: messageId })
+  if (!r.success) return
+  try { localStorage.setItem(key, String(n + 1)) } catch {}
+  if (Date.now() - lastMsgPush > 60_000) {
+    lastMsgPush = Date.now()
+    void pushAscensionToCloud()
+  }
+}
+
+/** Claims every finished-but-unclaimed quest. Loops because claiming a daily can complete the weekly one. */
+export async function autoClaimQuests(): Promise<number> {
+  let total = 0
+  for (let i = 0; i < 5; i++) {
+    const state = ensureActiveQuests(ascensionCell.get())
+    const ready = Object.entries(state.quests).filter(([, q]) => q.completed && !q.claimed)
+    if (!ready.length) break
+    for (const [id] of ready) {
+      const before = ascensionCell.get().totalXp
+      if (await claimQuestReward(id)) total += ascensionCell.get().totalXp - before
+    }
+  }
+  if (total > 0) toast(`Quest reward claimed: +${total} XP`)
+  return total
 }
 
 // ----------------------------------------------------------------------------

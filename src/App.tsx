@@ -55,6 +55,7 @@ const MovieWatchPage = lazy(() => import('./pages/MovieWatchPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
+const RankingPage = lazy(() => import('./pages/RankingPage'))
 const CommunityPage = lazy(() => import('./pages/CommunityPage'))
 const WatchPartyPage = lazy(() => import('./pages/WatchPartyPage'))
 const AniListCallbackPage = lazy(() => import('./pages/AniListCallbackPage'))
@@ -106,6 +107,7 @@ export default function App() {
   const isEmbed = pathname === '/embed' || pathname.startsWith('/embed/')
   const isApi = pathname === '/api' || pathname.startsWith('/api') || pathname === '/docs'
   const isMessages = pathname.startsWith('/messages')
+  const isCommunity = pathname.startsWith('/community') // full-screen chat: no footer, no bottom dock
   const inChat = /^\/messages\/[^/]+$/.test(pathname)
   const isCall = pathname === '/call'
   const isAuth = pathname.startsWith('/auth/') || pathname === '/login'
@@ -158,7 +160,8 @@ export default function App() {
           showNav
             ? cn(
                 sidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-56',
-                'pt-14 md:pt-0'
+                // pages that open with a full-bleed hero slide under the clear mobile header
+                pathname === '/home' || pathname === '/movies' ? 'pt-0' : 'pt-14 md:pt-0'
               )
             : 'pl-0 pt-0'
         )}
@@ -173,6 +176,7 @@ export default function App() {
               <Route path="/top" element={<CatalogPage preset="top" />} />
               <Route path="/browse" element={<CatalogPage preset="browse" />} />
               <Route path="/list" element={<ListPage />} />
+              <Route path="/ranking" element={<RankingPage />} />
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/app" element={<AppPage />} />
               <Route path="/extension" element={<ExtensionPage />} />
@@ -227,10 +231,10 @@ export default function App() {
           </Suspense>
         </ErrorBoundary>
 
-        {!bare && !isApi && !isMessages && <Footer />}
+        {!bare && !isApi && !isMessages && !isCommunity && <Footer />}
       </div>
 
-      {!bare && !isApi && !inChat && <MobileDock onOpenDrawer={() => setDrawerOpen(true)} />}
+      {!bare && !isApi && !inChat && !isCommunity && <MobileDock onOpenDrawer={() => setDrawerOpen(true)} />}
       {!bare && !isApi && section === 'movies' ? <MovieSearchModal /> : <SearchModal />}
       <Toaster />
       <SystemLevelUpModal />

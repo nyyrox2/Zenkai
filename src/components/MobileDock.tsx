@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Bookmark, Clapperboard, Compass, House, MessagesSquare, Search, Tv, type LucideIcon } from 'lucide-react'
+import { Trophy, Clapperboard, Compass, House, MessagesSquare, Search, Tv, type LucideIcon } from 'lucide-react'
 import { useSearch } from '../context/SearchContext'
 import { sectionOf } from '../lib/sections'
 import { cn } from '../lib/utils'
@@ -11,7 +11,7 @@ interface MobileDockProps {
 
 const items: { label: string; to: string; icon: LucideIcon }[] = [
   { label: 'Home', to: '/home', icon: House },
-  { label: 'Library', to: '/list', icon: Bookmark },
+  { label: 'Ranking', to: '/ranking', icon: Trophy },
   { label: 'Browse', to: '/browse', icon: Compass },
 ]
 

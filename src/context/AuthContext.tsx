@@ -47,11 +47,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const assignedHandle = data.username || cleanHandle
         setProfileUsername(assignedHandle)
         setProfileStore({
-          name: data.display_name || userOAuthName || assignedHandle,
-          avatar: data.avatar_url || userOAuthAvatar,
+          // ponytail: existing rows are the source of truth; Google name/avatar only seed first login
+          name: data.display_name || assignedHandle,
+          avatar: data.avatar_url || null,
           banner: data.banner_url || null,
           frame: data.frame || null,
           bio: data.bio || '',
+          nameColor: data.name_color || null,
         })
         void syncAscensionWithCloud(u.id)
       } else {
@@ -109,11 +111,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 2. Listen for auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, s) => {
+    } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
       setUser(s?.user ?? null)
       if (s?.user) {
-        void syncProfile(s.user)
+        // token refreshes / metadata updates must not re-pull the profile over local edits
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') void syncProfile(s.user)
       } else {
         setProfileUsername(null)
         resetProfileStore()
