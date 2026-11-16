@@ -169,18 +169,30 @@ async function fetchChatProfiles(ids: string[]): Promise<Record<string, ChatProf
   return out
 }
 
-/** Looks up the current name, picture and name style of everyone in the room (one batched request per new face). */
+// ponytail: module-level cache survives page navigation (in-memory only); upgrade to sessionStorage/SWR if needed
+const CHAT_PROFILE_TTL = 5 * 60_000
+const chatProfileCache = new Map<string, { at: number; p: ChatProfile | null }>()
+
+/** Current name, picture and name style of everyone in the room; each profile is fetched once per TTL, new faces in one batch. */
 function useChatProfiles(messages: CommunityPost[]) {
-  const [map, setMap] = useState<Record<string, ChatProfile>>({})
-  const asked = useRef(new Set<string>())
+  const [, bump] = useState(0)
   useEffect(() => {
-    const ids = [...new Set(messages.map((m) => m.user_id).filter((x): x is string => !!x))].filter((id) => !asked.current.has(id))
+    const now = Date.now()
+    const ids = [...new Set(messages.map((m) => m.user_id).filter((x): x is string => !!x))].filter((id) => {
+      const c = chatProfileCache.get(id)
+      return !c || now - c.at > CHAT_PROFILE_TTL
+    })
     if (!ids.length) return
-    ids.forEach((id) => asked.current.add(id))
+    ids.forEach((id) => chatProfileCache.set(id, { at: now, p: chatProfileCache.get(id)?.p ?? null })) // mark in-flight
     void fetchChatProfiles(ids)
-      .then((got) => setMap((prev) => ({ ...prev, ...got })))
-      .catch(() => ids.forEach((id) => asked.current.delete(id)))
+      .then((got) => {
+        ids.forEach((id) => chatProfileCache.set(id, { at: Date.now(), p: got[id] ?? chatProfileCache.get(id)?.p ?? null }))
+        bump((n) => n + 1)
+      })
+      .catch(() => ids.forEach((id) => chatProfileCache.delete(id)))
   }, [messages])
+  const map: Record<string, ChatProfile> = {}
+  chatProfileCache.forEach((c, id) => { if (c.p) map[id] = c.p })
   return map
 }
 
@@ -470,7 +482,7 @@ export default function CommunityPage() {
     (anilist?.user?.name ? anilist.user.name.toLowerCase().replace(/[^a-z0-9_-]/g, '') : null) ||
     (name ? name.toLowerCase().replace(/[^a-z0-9_-]/g, '') : null)
 
-  const myAvatar = profile?.avatar || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || anilist?.user?.avatar || null
+  const myAvatar = profile?.avatar || anilist?.user?.avatar || null
   const myFrame = profile?.frame || null
 
   const [asc, setAsc] = useState(getAscensionState())
