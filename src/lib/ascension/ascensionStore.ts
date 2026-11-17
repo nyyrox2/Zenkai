@@ -356,6 +356,16 @@ export async function recordProgressionActivity({
     localStorage.setItem(idempotencyKey, '1')
   } catch {}
 
+  // Lifetime counters for achievements (history/reading lists are per-title and capped, so they can't count episodes/chapters)
+  const kind = action === 'watch_episode' ? 'watch' : action === 'read_manga_chapter' ? 'manga' : action === 'read_novel_chapter' ? 'novel' : null
+  if (kind) {
+    try {
+      const c = JSON.parse(localStorage.getItem('zk:ach-counts') || '{}')
+      c[kind] = (Number(c[kind]) || 0) + 1
+      localStorage.setItem('zk:ach-counts', JSON.stringify(c))
+    } catch {}
+  }
+
   const oldXp = state.totalXp
   const newXp = oldXp + xp
   const levelUp = checkLevelUp(oldXp, newXp, state)
@@ -546,25 +556,23 @@ export async function checkAchievements(customState?: AscensionState) {
   check('ach_streak_7', state.streak >= 7)
   check('ach_streak_30', state.streak >= 30)
 
-  // Check total watch count from localStorage
   try {
-    const historyRaw = localStorage.getItem('zk:watch-history')
-    if (historyRaw) {
-      const history = JSON.parse(historyRaw)
-      const count = Array.isArray(history) ? history.length : 0
-      check('ach_first_watch', count >= 1)
-      check('ach_episodes_25', count >= 25)
-      check('ach_episodes_100', count >= 100)
-      check('ach_episodes_500', count >= 500)
+    const c = JSON.parse(localStorage.getItem('zk:ach-counts') || '{}')
+    const titles = (k: string) => {
+      const v = JSON.parse(localStorage.getItem(k) || '[]')
+      return Array.isArray(v) ? v : []
     }
-
-    const readingRaw = localStorage.getItem('zk:reading')
-    if (readingRaw) {
-      const reading = JSON.parse(readingRaw)
-      const count = Object.keys(reading || {}).length
-      check('ach_first_manga', count >= 1)
-      check('ach_manga_100', count >= 100)
-    }
+    const watch = Math.max(Number(c.watch) || 0, titles('zk:history').length)
+    const reading = titles('zk:reading:v1')
+    const manga = Math.max(Number(c.manga) || 0, reading.filter((r) => r?.kind === 'manga').length)
+    const novel = Math.max(Number(c.novel) || 0, reading.filter((r) => r?.kind === 'novel').length)
+    check('ach_first_watch', watch >= 1)
+    check('ach_episodes_25', watch >= 25)
+    check('ach_episodes_100', watch >= 100)
+    check('ach_episodes_500', watch >= 500)
+    check('ach_first_manga', manga >= 1)
+    check('ach_manga_100', manga >= 100)
+    check('ach_first_novel', novel >= 1)
   } catch {}
 
   if (newlyUnlockedIds.length > 0) {

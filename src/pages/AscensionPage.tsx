@@ -16,6 +16,7 @@ import {
 import {
   ascensionCell,
   getAscensionState,
+  checkAchievements,
   claimQuestReward,
   equipCosmetic,
   type AscensionState,
@@ -60,8 +61,9 @@ export const AscensionPage: React.FC = () => {
   const [frameCategory, setFrameCategory] = useState<string>('')
   const [frameSearch, setFrameSearch] = useState<string>('')
 
-  // Subscribe to ascension store
+  // Subscribe to ascension store (and unlock anything already earned)
   useEffect(() => {
+    void checkAchievements()
     return ascensionCell.subscribe(() => {
       setState(getAscensionState())
     })
