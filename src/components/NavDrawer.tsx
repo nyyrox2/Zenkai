@@ -1,3 +1,4 @@
+import { MyName } from './MyName'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -204,8 +205,8 @@ export function NavDrawer({
                 >
                   <Avatar size={40} src={me.avatar} frame={me.frame} name={me.name} animateFrame />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-foreground">
-                      {me.name || 'Your Profile'}
+                    <p className="text-xs font-bold text-foreground">
+                      {me.name ? <MyName name={me.name} colorOverride={me.nameColor} /> : 'Your Profile'}
                     </p>
                     <p className="truncate text-[11px] text-muted">
                       @{username || user.email?.split('@')[0]}

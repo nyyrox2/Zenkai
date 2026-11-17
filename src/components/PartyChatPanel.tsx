@@ -135,8 +135,8 @@ export function PartyChatPanel({
                   <div className={cn('flex min-w-0 max-w-[85%] flex-col', own && 'items-end')}>
                     {head && (
                       <div className={cn('mb-0.5 flex items-baseline gap-1.5 px-1', own && 'flex-row-reverse')}>
-                        <span className={cn('-mx-2 -my-1 min-w-0 truncate px-2 py-1 text-[11px] font-bold', glass ? 'text-white/80' : 'text-muted')}>
-                          {styles[m.senderId] && styles[m.senderId].effect !== 'none' ? <TextEffectRenderer text={own ? 'You' : m.senderName} effectId={styles[m.senderId].effect} fontId={styles[m.senderId].font} colorId={styles[m.senderId].color ?? 'default'} /> : own ? 'You' : m.senderName}
+                        <span className={cn('-mx-4 -my-2.5 min-w-0 truncate px-4 py-2.5 text-[11px] font-bold', glass ? 'text-white/80' : 'text-muted')}>
+                          {styles[m.senderId] ? <TextEffectRenderer text={own ? 'You' : m.senderName} effectId={styles[m.senderId].effect} fontId={styles[m.senderId].font} colorId={styles[m.senderId].color ?? 'default'} /> : own ? 'You' : m.senderName}
                         </span>
                         <span className={cn('shrink-0 text-[9px]', glass ? 'text-white/40' : 'text-muted/70')}>{time(m.timestamp)}</span>
                       </div>

@@ -983,7 +983,7 @@ html[data-drawer] .animate-pulse {
 .effect-blossomstorm::before, .effect-blossomstorm::after, .effect-starfall::after, .effect-mistveil::before, .effect-mistveil::after {
   content: ''; position: absolute; pointer-events: none; -webkit-text-fill-color: initial;
 }
-.effect-blossomstorm::before, .effect-blossomstorm::after { inset: -.7em -.35em; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 28%, #000 72%, transparent); mask-image: linear-gradient(to bottom, transparent, #000 28%, #000 72%, transparent); }
+.effect-blossomstorm::before, .effect-blossomstorm::after { inset: -.5em -.7em; -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 35%, transparent 100%); mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 35%, transparent 100%); }
 .effect-blossomstorm::before {
   background-image:
     radial-gradient(ellipse 2.6px 4.2px at 14% 22%, #ffc2d8 90%, transparent 100%),
@@ -1001,16 +1001,18 @@ html[data-drawer] .animate-pulse {
 }
 
 .effect-mistveil { display: inline-block; position: relative; isolation: isolate; font-weight: 900; padding: .08em .12em; margin: -.08em -.12em; color: #e8edf5; text-shadow: 0 0 10px rgba(203,213,225,.55); }
-.effect-mistveil::before, .effect-mistveil::after { inset: -.45em -.6em; filter: blur(4px); -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent); }
-.effect-mistveil::before { z-index: -1; background-image: radial-gradient(ellipse 70px 50% at 30% 55%, rgba(203,213,225,.6), transparent 72%), radial-gradient(ellipse 90px 55% at 75% 45%, rgba(148,163,184,.55), transparent 72%); background-size: 160px 100%, 220px 100%; background-repeat: repeat-x; animation: zk-fog 14s linear infinite; }
-.effect-mistveil::after { background-image: radial-gradient(ellipse 80px 40% at 55% 60%, rgba(241,245,249,.35), transparent 72%); background-size: 170px 100%; background-repeat: repeat-x; animation: zk-fog 22s linear infinite reverse; mix-blend-mode: screen; }
+.effect-mistveil::before, .effect-mistveil::after { inset: -.5em -.7em; filter: blur(4px); -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 35%, transparent 100%); mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 35%, transparent 100%); }
+.effect-mistveil::before { z-index: -1; background-image: radial-gradient(ellipse 70px 42% at 30% 50%, rgba(203,213,225,.6), transparent 100%), radial-gradient(ellipse 90px 44% at 75% 50%, rgba(148,163,184,.55), transparent 100%); background-size: 160px 100%, 220px 100%; background-repeat: repeat-x; animation: zk-fog 14s linear infinite; }
+.effect-mistveil::after { background-image: radial-gradient(ellipse 80px 38% at 55% 50%, rgba(241,245,249,.35), transparent 100%); background-size: 170px 100%; background-repeat: repeat-x; animation: zk-fog 22s linear infinite reverse; mix-blend-mode: screen; }
 
 .effect-eclipse { display: inline-block; font-weight: 900; padding: .08em .12em; margin: -.08em -.12em; color: #07070d; -webkit-text-stroke: .6px rgba(253,224,71,.95); animation: zk-corona 3.4s ease-in-out infinite; }
 
 .effect-starfall { background-image: linear-gradient(100deg, #6366f1, #a5b4fc, #67e8f9, #c4b5fd, #6366f1); background-size: 300% 100%; animation: zk-drift 9s ease-in-out infinite; filter: drop-shadow(0 0 5px rgba(129,140,248,.55)); }
 .effect-starfall::after {
-  inset: -.5em -.3em; animation: zk-twinkle 2.2s ease-in-out infinite;
+  inset: -.5em -.7em; -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 35%, transparent 100%); mask-image: radial-gradient(ellipse closest-side at 50% 50%, #000 35%, transparent 100%); animation: zk-twinkle 2.2s ease-in-out infinite;
   background-image: radial-gradient(circle 1px at 12% 25%, #fff, transparent), radial-gradient(circle 1.2px at 47% 72%, #e0e7ff, transparent), radial-gradient(circle 1px at 83% 30%, #fff, transparent), radial-gradient(circle .9px at 66% 85%, #c7d2fe, transparent);
   background-size: 80px 50px;
 }
 @media (prefers-reduced-motion: reduce) { .effect-prism, .effect-cyberwave, .effect-blossomstorm, .effect-blossomstorm::before, .effect-blossomstorm::after, .effect-mistveil::before, .effect-mistveil::after, .effect-eclipse, .effect-starfall, .effect-starfall::after { animation: none; } }
+
+.effect-blossomstorm, .effect-mistveil, .effect-starfall { overflow: visible !important; text-overflow: clip !important; }

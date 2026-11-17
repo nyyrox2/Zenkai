@@ -262,7 +262,7 @@ export function WatchTogetherModal({
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="-mx-2 -my-1 min-w-0 truncate px-2 py-1 text-xs font-semibold">{p.userId && styles[p.userId] ? <TextEffectRenderer text={p.displayName} effectId={styles[p.userId].effect} fontId={styles[p.userId].font} colorId={styles[p.userId].color ?? 'default'} /> : p.displayName}</span>
+                          <span className="-mx-4 -my-2.5 min-w-0 truncate px-4 py-2.5 text-xs font-semibold">{p.userId && styles[p.userId] ? <TextEffectRenderer text={p.displayName} effectId={styles[p.userId].effect} fontId={styles[p.userId].font} colorId={styles[p.userId].color ?? 'default'} /> : p.displayName}</span>
                           {isSelf && <span className="text-[9px] text-white/45">you</span>}
                           {p.isHost && <Crown className="size-3 shrink-0" />}
                         </div>

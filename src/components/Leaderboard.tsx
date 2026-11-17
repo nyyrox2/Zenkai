@@ -36,7 +36,7 @@ export function Leaderboard({ limit, className }: { limit?: number; className?: 
               <span className={cn('w-6 shrink-0 text-center font-display text-sm font-black tabular-nums', MEDAL[i] ?? 'text-muted')}>{i + 1}</span>
               <Avatar name={u.name} src={u.avatar} frame={u.frame} size={36} />
               <span className="min-w-0 flex-1">
-                <span className="block -mx-3 -my-1 truncate px-3 py-1 text-sm font-semibold"><TextEffectRenderer text={u.name} effectId={st?.effect ?? 'none'} fontId={st?.font ?? 'default'} colorId={st?.color ?? 'default'} fallbackClass="text-foreground" /></span>
+                <span className="block -mx-4 -my-2.5 truncate px-4 py-2.5 text-sm font-semibold"><TextEffectRenderer text={u.name} effectId={st?.effect ?? 'none'} fontId={st?.font ?? 'default'} colorId={st?.color ?? 'default'} fallbackClass="text-foreground" /></span>
                 <span className="block truncate text-xs" style={{ color: rank.color }}>{rank.name} · {rank.title}</span>
               </span>
               <span className="shrink-0 text-right">

@@ -852,7 +852,7 @@ export const AscensionPage: React.FC = () => {
 
                         {/* Live Shader Preview on Clean Card Surface */}
                         <div className="py-4 my-0.5 flex items-center justify-center text-center">
-                          <div className="text-xl sm:text-2xl font-black tracking-wide text-center truncate max-w-full">
+                          <div className="text-xl sm:text-2xl font-black tracking-wide text-center truncate max-w-full -mx-8 px-8 -my-5 py-5">
                             <TextEffectRenderer
                               text={displayName}
                               effectId={eff.id}

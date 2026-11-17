@@ -1,3 +1,4 @@
+import { MyName } from './MyName'
 import { memo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
@@ -172,7 +173,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({ collapsed, onToggle
               <Avatar size={32} src={profile.avatar} frame={profile.frame} name={displayName} animateFrame />
             </div>
             <div className="flex min-w-0 flex-col">
-              <span className="truncate text-[13px] font-semibold text-foreground transition-colors group-hover:text-accent">{displayName}</span>
+              <span className="min-w-0 text-[13px] font-semibold text-foreground transition-colors group-hover:text-accent">{isLoggedIn ? <MyName name={displayName} colorOverride={profile.nameColor} /> : displayName}</span>
               <span className="text-[10px] font-medium text-muted">{isLoggedIn ? 'Online' : 'Not signed in'}</span>
             </div>
           </Link>

@@ -116,7 +116,7 @@ export function PublicProfileCard({
             {/* Identity Info */}
             <div className="min-w-0 flex-1 pt-1">
               {/* Name */}
-              <h1 className="font-display text-2xl sm:text-3xl font-black tracking-tight text-[#F4F4F5] truncate max-w-full -mx-4 px-4 -my-3 py-3">
+              <h1 className="font-display text-2xl sm:text-3xl font-black tracking-tight text-[#F4F4F5] truncate max-w-full -mx-6 px-6 -my-4 py-4">
                 <TextEffectRenderer
                   text={displayName}
                   effectId={userTextEffect}

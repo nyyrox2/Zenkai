@@ -155,7 +155,7 @@ export function ProfileHero({
             {/* Identity Info */}
             <div className="min-w-0 flex-1 pt-1">
               {/* Name */}
-              <h1 className="font-display text-2xl sm:text-3xl font-black tracking-tight text-[#F4F4F5] truncate max-w-full -mx-4 px-4 -my-3 py-3">
+              <h1 className="font-display text-2xl sm:text-3xl font-black tracking-tight text-[#F4F4F5] truncate max-w-full -mx-6 px-6 -my-4 py-4">
                 <TextEffectRenderer
                   text={displayName}
                   effectId={ascensionState.equippedTextEffect}
@@ -1416,7 +1416,7 @@ export function ProfileEditor({
 
                         {/* Live Shader Preview on Clean Card Surface */}
                         <div className="py-3.5 my-0.5 flex items-center justify-center text-center">
-                          <div className="text-lg sm:text-xl font-black tracking-wide text-center truncate max-w-full">
+                          <div className="text-lg sm:text-xl font-black tracking-wide text-center truncate max-w-full -mx-8 px-8 -my-5 py-5">
                             <TextEffectRenderer
                               text={name || me.name || authUsername || 'Otaku'}
                               effectId={eff.id}
