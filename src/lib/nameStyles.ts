@@ -5,6 +5,7 @@ export interface NameStyle { effect: string; font: string; color: string | null 
 
 const TTL = 5 * 60_000
 const cache = new Map<string, { at: number; s: NameStyle | null }>()
+const listeners = new Set<() => void>()
 let fontColumn = true
 const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id)
 
@@ -26,6 +27,11 @@ async function fetchStyles(ids: string[]): Promise<Record<string, NameStyle>> {
 /** Equipped name effect / font / colour for each user id (guest ids are skipped). Fetched once per TTL, new ids in one batch. */
 export function useNameStyles(userIds: (string | undefined)[]): Record<string, NameStyle> {
   const [, bump] = useState(0)
+  useEffect(() => {
+    const f = () => bump((n) => n + 1)
+    listeners.add(f)
+    return () => { listeners.delete(f) }
+  }, [])
   const key = [...new Set(userIds.filter((x): x is string => !!x && isUuid(x)))].sort().join(',')
   useEffect(() => {
     const now = Date.now()
@@ -35,7 +41,7 @@ export function useNameStyles(userIds: (string | undefined)[]): Record<string, N
     void fetchStyles(ids)
       .then((got) => {
         ids.forEach((id) => cache.set(id, { at: Date.now(), s: got[id] ?? cache.get(id)?.s ?? null }))
-        bump((n) => n + 1)
+        listeners.forEach((f) => f())
       })
       .catch(() => ids.forEach((id) => cache.delete(id)))
   }, [key])

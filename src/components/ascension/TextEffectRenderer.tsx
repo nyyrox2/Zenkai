@@ -359,7 +359,7 @@ export const TextEffectRenderer: React.FC<TextEffectRendererProps> = ({
   const combinedClasses = [
     isMaterialShader ? effectClass : (colorClass || effectClass || fallbackClass),
     isMaterialShader ? '' : effectClass,
-    className,
+    effectClass ? className.replace(/\btruncate\b/, 'break-words') : className, // ponytail: no overflow:hidden next to background-clip:text
   ].filter(Boolean).join(' ')
 
   return (

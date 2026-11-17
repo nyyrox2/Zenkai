@@ -531,7 +531,7 @@ export async function claimQuestReward(questId: string): Promise<boolean> {
 // Check & Unlock Permanent Achievements
 // ----------------------------------------------------------------------------
 
-export async function checkAchievements(customState?: AscensionState) {
+export async function checkAchievements(customState?: AscensionState, silent = false) {
   const state = customState || ascensionCell.get()
   const unlocked = new Set(state.achievements)
   let newlyUnlockedXp = 0
@@ -577,7 +577,7 @@ export async function checkAchievements(customState?: AscensionState) {
 
   if (newlyUnlockedIds.length > 0) {
     const oldXp = state.totalXp
-    const newXp = oldXp + newlyUnlockedXp
+    const newXp = oldXp + (silent ? 0 : newlyUnlockedXp) // ponytail: silent = re-mark already-earned achievements after login, no XP
     const levelUp = checkLevelUp(oldXp, newXp, state)
     const newLevel = calculateLevelFromXp(newXp)
 
@@ -733,6 +733,7 @@ export async function syncAscensionWithCloud(userId: string, force: boolean = fa
       })
 
       ascensionCell.set(merged)
+      await checkAchievements(merged, true) // achievements aren't stored in profiles; without this every login re-awarded them all
       evaluateDailyLoginStreak()
     }
   } catch (err) {
