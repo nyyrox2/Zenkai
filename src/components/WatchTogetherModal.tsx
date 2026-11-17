@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Copy, Check, Crown, Lock, Unlock, Plus, Share2, X, LogOut, RotateCw, Film, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
 import { Avatar } from './Avatar'
+import { useNameStyles } from '../lib/nameStyles'
+import { TextEffectRenderer } from './ascension/TextEffectRenderer'
 import { toast } from '../lib/toast'
 import { cn } from '../lib/utils'
 import { useMedia } from '../hooks/useMedia'
@@ -58,6 +60,7 @@ export function WatchTogetherModal({
   }, [room])
 
   const me = room ? peers.find((p) => p.peerId === room.peerId) : undefined
+  const styles = useNameStyles(peers.map((p) => p.userId))
   const selfName = me?.displayName || 'A friend'
   const inviteUrl = room ? (shareUrl ?? partyShareUrl(animeId, episode, room.roomId, selfName, animeTitle, me?.avatar)) : ''
   const card: ShareCardOpts | null = room
@@ -259,7 +262,7 @@ export function WatchTogetherModal({
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate text-xs font-semibold">{p.displayName}</span>
+                          <span className="-mx-2 -my-1 min-w-0 truncate px-2 py-1 text-xs font-semibold">{p.userId && styles[p.userId] ? <TextEffectRenderer text={p.displayName} effectId={styles[p.userId].effect} fontId={styles[p.userId].font} colorId={styles[p.userId].color ?? 'default'} /> : p.displayName}</span>
                           {isSelf && <span className="text-[9px] text-white/45">you</span>}
                           {p.isHost && <Crown className="size-3 shrink-0" />}
                         </div>

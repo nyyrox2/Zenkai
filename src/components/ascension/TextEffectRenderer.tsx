@@ -348,6 +348,12 @@ export const TextEffectRenderer: React.FC<TextEffectRendererProps> = ({
     'frost',
     'halo',
     'sakurafree',
+    'prism',
+    'cyberwave',
+    'blossomstorm',
+    'mistveil',
+    'eclipse',
+    'starfall',
   ].includes(effectId || '')
 
   const combinedClasses = [
