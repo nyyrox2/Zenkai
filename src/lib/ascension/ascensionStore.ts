@@ -294,10 +294,10 @@ const NO_FONT_COL = 'zk:no_font_col'
  */
 export async function updateProfileRow(userId: string, payload: Record<string, unknown>, fontStyle: string) {
   let skip = false
-  try { skip = !!localStorage.getItem(NO_FONT_COL) } catch {}
+  try { skip = !!sessionStorage.getItem(NO_FONT_COL) } catch {}
   let res = await supabase.from('profiles').update(skip ? payload : { ...payload, equipped_font_style: fontStyle }).eq('id', userId)
-  if (res.error && !skip && /equipped_font_style|column/i.test(`${res.error.message} ${res.error.code}`)) {
-    try { localStorage.setItem(NO_FONT_COL, '1') } catch {}
+  if (res.error && !skip && /equipped_font_style|42703|PGRST204/.test(`${res.error.message} ${res.error.code}`)) {
+    try { sessionStorage.setItem(NO_FONT_COL, '1') } catch {} // ponytail: per session, so it retries once the column is added
     res = await supabase.from('profiles').update(payload).eq('id', userId)
   }
   return res
@@ -704,7 +704,7 @@ export async function syncAscensionWithCloud(userId: string, force: boolean = fa
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('total_xp, level, login_streak, last_login_date, equipped_title, equipped_text_effect, equipped_frame, name_color')
+      .select('*')
       .eq('id', userId)
       .maybeSingle()
 
@@ -730,6 +730,7 @@ export async function syncAscensionWithCloud(userId: string, force: boolean = fa
             : 'none',
         equippedNameColor: profile.name_color || 'default',
         equippedFrame: profile.equipped_frame || null,
+        equippedFontStyle: profile.equipped_font_style || state.equippedFontStyle,
       })
 
       ascensionCell.set(merged)

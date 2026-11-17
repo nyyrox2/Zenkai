@@ -35,6 +35,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/toast'
 import { cn } from '../lib/utils'
+import { UserName } from '../components/UserName'
 import { requestMicrophoneStream } from '../lib/microphone'
 
 function timeLabel(dateString: string) {
@@ -524,7 +525,7 @@ export default function MessagesPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 sm:gap-2">
                         <h2 className="truncate font-display text-xs sm:text-sm font-bold group-hover:text-accent transition-colors">
-                          {activePartner.displayName}
+                          <UserName id={activePartner.id} name={activePartner.displayName} />
                         </h2>
                         <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">
                           @{activePartner.username}

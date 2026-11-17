@@ -16,6 +16,7 @@ import type { DirectVoiceCall, CallStatus } from '../lib/webrtcVoiceCall'
 import { cn } from '../lib/utils'
 import { requestMicrophoneStream } from '../lib/microphone'
 import { toast } from '../lib/toast'
+import { UserName } from './UserName'
 
 function formatSeconds(total: number) {
   const m = Math.floor(total / 60)
@@ -157,7 +158,7 @@ export function VoiceCallOverlay({
             </div>
 
             <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              {call.partner.displayName}
+              <UserName id={call.partner.id} name={call.partner.displayName} />
             </h2>
             <p className="mt-1 text-sm font-semibold text-zinc-400">@{call.partner.username}</p>
             <p className="mt-3 text-xs font-semibold text-zinc-400 flex items-center justify-center gap-1.5">

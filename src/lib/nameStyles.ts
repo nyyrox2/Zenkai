@@ -14,10 +14,11 @@ async function fetchStyles(ids: string[]): Promise<Record<string, NameStyle>> {
   const base = 'id, name_color, equipped_text_effect'
   const q = (cols: string) => supabase.from('profiles').select(cols as any).in('id', ids) as unknown as PromiseLike<{ data: any[] | null; error: unknown }>
   let res = await q(fontColumn ? `${base}, equipped_font_style` : base)
-  if (res.error && fontColumn) {
-    fontColumn = false
+  if (res.error && fontColumn && /equipped_font_style|42703/.test(JSON.stringify(res.error))) {
+    fontColumn = false // only when the column is really missing; a network blip must not turn fonts off for the session
     res = await q(base)
   }
+  if (res.error) throw res.error
   for (const r of res.data || []) {
     out[r.id] = { effect: r.equipped_text_effect || 'none', font: r.equipped_font_style || 'default', color: r.name_color && r.name_color !== 'default' ? r.name_color : null }
   }

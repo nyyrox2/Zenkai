@@ -20,6 +20,7 @@ import { useVoiceCall } from '../context/VoiceCallContext'
 import { Avatar } from '../components/Avatar'
 import { toast } from '../lib/toast'
 import { cn } from '../lib/utils'
+import { UserName } from '../components/UserName'
 
 function formatSeconds(total: number) {
   const m = Math.floor(total / 60)
@@ -281,7 +282,7 @@ export default function CallPage() {
 
         {/* Partner Info */}
         <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-          {activeCall.partner.displayName}
+          <UserName id={activeCall.partner.id} name={activeCall.partner.displayName} />
         </h1>
         <p className="mt-1 text-sm font-semibold text-zinc-400">@{activeCall.partner.username}</p>
 

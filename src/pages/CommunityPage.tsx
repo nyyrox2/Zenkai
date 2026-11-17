@@ -151,7 +151,7 @@ async function fetchChatProfiles(ids: string[]): Promise<Record<string, ChatProf
     const chunk = ids.slice(i, i + 50)
     const q = (cols: string) => supabase.from('profiles').select(cols as any).in('id', chunk) as unknown as PromiseLike<{ data: any[] | null; error: unknown }>
     let res = await q(fontColumn ? `${PROFILE_COLS}, equipped_font_style` : PROFILE_COLS)
-    if (res.error && fontColumn) {
+    if (res.error && fontColumn && /equipped_font_style|42703/.test(JSON.stringify(res.error))) {
       fontColumn = false // that column isn't in this database: carry on without fonts
       res = await q(PROFILE_COLS)
     }
