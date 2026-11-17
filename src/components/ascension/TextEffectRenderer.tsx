@@ -343,6 +343,11 @@ export const TextEffectRenderer: React.FC<TextEffectRendererProps> = ({
     'frostbite',
     'sakura',
     'shimmer',
+    'aurora',
+    'sunset',
+    'frost',
+    'halo',
+    'sakurafree',
   ].includes(effectId || '')
 
   const combinedClasses = [

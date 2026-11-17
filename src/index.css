@@ -889,3 +889,18 @@ html[data-drawer] .animate-pulse {
   font-weight: 900;
   display: inline-block;
 }
+
+/* Free shaders: padded so glows never clip, gradients drift via background-position */
+@keyframes zk-drift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes zk-halo { 0%,100% { text-shadow: 0 0 6px rgba(199,210,254,.55), 0 0 14px rgba(129,140,248,.35); } 50% { text-shadow: 0 0 8px rgba(224,231,255,.8), 0 0 20px rgba(129,140,248,.5); } }
+.effect-aurora, .effect-sunset, .effect-frost, .effect-blossom {
+  display: inline-block; font-weight: 900; padding: .08em .12em; margin: -.08em -.12em;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+  animation: zk-drift 7s ease-in-out infinite;
+}
+.effect-aurora { background-image: linear-gradient(100deg, #2dd4bf, #60a5fa, #a78bfa, #f472b6, #2dd4bf); background-size: 300% 100%; }
+.effect-sunset { background-image: linear-gradient(100deg, #fbbf24, #fb7185, #c026d3, #6d28d9, #fb7185); background-size: 300% 100%; }
+.effect-frost { background-image: linear-gradient(100deg, #e0f2fe, #7dd3fc, #ffffff, #38bdf8, #e0f2fe); background-size: 300% 100%; animation-duration: 5s; }
+.effect-blossom { background-image: linear-gradient(100deg, #fbcfe8, #f9a8d4, #ffffff, #f472b6, #fbcfe8); background-size: 300% 100%; animation-duration: 9s; }
+.effect-halo { display: inline-block; color: #f5f7ff; font-weight: 900; animation: zk-halo 3.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .effect-aurora, .effect-sunset, .effect-frost, .effect-blossom, .effect-halo { animation: none; } }
