@@ -879,14 +879,14 @@ export async function resolveMovieBoxStream({
     const fileBase = [matched.title, epTag, dubTag, `[${qualityTag}]`].filter(Boolean).join(' ').trim();
     const downloadFileName = `${fileBase}.mp4`;
     const isDirectAppCdn = !s.url.includes('bcdnxw') && /hakunaymatata|aoneroom/.test(s.url);
-    const midman = (midmanUrl || 'https://zenkai-movies-production.up.railway.app').replace(/\/+$/, '');
+    const midman = (midmanUrl || '').replace(/\/+$/, ''); // set VITE_MOVIEBOX_PROXY_URL; without it everything goes through the edge proxy
     const midmanProxyUrl = `${midman}/proxy?url=${encodeURIComponent(s.url)}${isDirectAppCdn ? '' : '&referer=' + encodeURIComponent('https://123moviesfree.club/')}`;
     const baseProxy = (proxyBase || '/proxy').replace(/\?url=.*$/, '').replace(/\/+$/, '');
     const edgeProxyUrl = `${baseProxy}?url=${encodeURIComponent(s.url)}${isDirectAppCdn ? '' : '&referer=' + encodeURIComponent('https://123moviesfree.club/')}`;
 
     // Direct App CDN (movies) -> Railway midman proxy (Singapore)
     // Web Mirror CDN (bcdnxw for TV series & dubs) -> Local/Edge proxy
-    const effectiveProxyUrl = isDirectAppCdn ? midmanProxyUrl : edgeProxyUrl;
+    const effectiveProxyUrl = isDirectAppCdn && midman ? midmanProxyUrl : edgeProxyUrl;
     const isHls = /\.m3u8/i.test(s.url);
     const streamUrl = isHls ? `${effectiveProxyUrl}&seg=1` : effectiveProxyUrl;
     const downloadUrl = `${effectiveProxyUrl}&dl=1&fn=${encodeURIComponent(downloadFileName)}`;

@@ -86,8 +86,8 @@ const toItem = (r: RawItem, fallback: MediaType): MovieItem | null => {
 
 const mem = new Map<string, Promise<unknown>>()
 
-const RAILWAY_URL = 'https://zenkai-movies-production.up.railway.app'
-const LOVABLE_PROXY_URL = 'https://webpage-launchpad.lovable.app/api/public/proxy'
+// MovieBox stream service (Railway or the Hugging Face Space): set VITE_MOVIEBOX_PROXY_URL; when unset the Pages worker is used
+const RAILWAY_URL = ((import.meta.env.VITE_MOVIEBOX_PROXY_URL as string | undefined) || '').replace(/\/+$/, '')
 
 async function get<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
   const qs = new URLSearchParams()
@@ -98,29 +98,7 @@ async function get<T>(path: string, params: Record<string, string | number | und
   if (hit) return hit as Promise<T>
 
   const p = (async () => {
-    // 1. Fetch via Railway through Lovable Edge Proxy (bypasses ISP blocks, Cloudflare 100k limits, and anti-bot checks)
-    const sub = path.startsWith('movies/') ? path.slice('movies/'.length) : path
-    const railwayUrl = `${RAILWAY_URL}/api/movies/${sub}${tail}`
-    const lovableUrl = `${LOVABLE_PROXY_URL}?url=${encodeURIComponent(railwayUrl)}`
-
-    try {
-      const res = await fetch(lovableUrl, { signal: AbortSignal.timeout(6000) })
-      if (res.ok) {
-        const data = await res.json().catch(() => null)
-        if (data && !data.error) return data as T
-      }
-    } catch {}
-
-    // 2. Direct Railway fallback
-    try {
-      const res = await fetch(railwayUrl, { signal: AbortSignal.timeout(6000) })
-      if (res.ok) {
-        const data = await res.json().catch(() => null)
-        if (data && !data.error) return data as T
-      }
-    } catch {}
-
-    // 3. Cloudflare Pages Worker fallback
+    // TMDB data comes from our own Pages worker (it holds the TMDB keys); the Railway/Space service only resolves streams
     const res = await fetch(url).catch(() => null)
     const data = res ? ((await res.json().catch(() => null)) as T | { error?: string } | null) : null
     if (!res || !res.ok || !data) throw new Error((data as { error?: string } | null)?.error ?? `Request failed`)
@@ -319,7 +297,6 @@ export interface MovieStreamResult {
   referer: string
 }
 
-const MOVIEBOX_SERVICE_URL = ((import.meta.env.VITE_MOVIEBOX_PROXY_URL as string | undefined) || 'https://zenkai-movies-production.up.railway.app').replace(/\/+$/, '')
 
 // When the Zenkai extension is installed it injects window.__ZENKAI_COMPANION__.
 // We use that to send the correct Referer/Origin so the MovieBox CDN accepts direct requests.
@@ -358,8 +335,8 @@ export async function fetchMovieBoxStream(p: {
   let resOk = false
 
   // 1. Primary: Direct Railway midman call (fast, global US MovieBox profile, direct streaming proxy)
-  if (MOVIEBOX_SERVICE_URL) {
-    const railwayUrl = `${MOVIEBOX_SERVICE_URL}/api/movies/stream?${qs}`
+  if (RAILWAY_URL) {
+    const railwayUrl = `${RAILWAY_URL}/api/movies/stream?${qs}`
     try {
       const res = await fetch(railwayUrl, {
         signal: AbortSignal.timeout(8000),
@@ -469,7 +446,7 @@ export async function fetchMovieBoxStream(p: {
       return apiUrl(u.startsWith('/proxy') ? u : `/proxy?url=${encodeURIComponent(rawUrl || u)}&referer=${encodeURIComponent('https://123moviesfree.club/')}`)
     }
 
-    return MOVIEBOX_SERVICE_URL ? `${MOVIEBOX_SERVICE_URL}${u}` : apiUrl(u)
+    return RAILWAY_URL ? `${RAILWAY_URL}${u}` : apiUrl(u)
   }
 
   const resolveStreamUrl = (u?: string, rawUrl?: string) => {

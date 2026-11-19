@@ -266,7 +266,7 @@ async function proxy(request, url, proxyBase = "/proxy", env = null) {
   const midmanUrl = (
     env?.VITE_MOVIEBOX_PROXY_URL || 
     env?.MOVIEBOX_PROXY_URL || 
-    (typeof process !== "undefined" ? (process.env?.VITE_MOVIEBOX_PROXY_URL || process.env?.MOVIEBOX_PROXY_URL) : "") || "https://zenkai-movies-production.up.railway.app"
+    (typeof process !== "undefined" ? (process.env?.VITE_MOVIEBOX_PROXY_URL || process.env?.MOVIEBOX_PROXY_URL) : "")
   )?.replace(/\/+$/, "");
 
   let up;

@@ -73,20 +73,5 @@ export async function tmdbFetch(endpoint, env = null) {
     }
   } catch (_e) {}
 
-  // Tier 3: Resilient midman fallback via Railway
-  try {
-    const railwayUrl = `https://zenkai-movies-production.up.railway.app/api/movies/${clean}`;
-    const res = await fetch(railwayUrl, {
-      headers: {
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && !data.error) return data;
-    }
-  } catch (_e) {}
-
   throw new Error(`TMDB fetch failed for ${endpoint}`);
 }
