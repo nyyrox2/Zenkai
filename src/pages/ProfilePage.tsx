@@ -5,10 +5,7 @@ import {
   Lock,
   LockOpen,
   ChevronRight,
-  Cloud,
   Moon,
-  ShieldCheck,
-  SlidersHorizontal,
   Sun,
   UserCheck,
   ChevronsUp,
@@ -39,8 +36,6 @@ import {
   DAILY_QUEST_TEMPLATES,
   WEEKLY_QUEST_TEMPLATES,
 } from '../lib/ascension/types'
-
-type TabKey = 'watchlist' | 'preferences' | 'ascension' | 'account' | 'anilist' | 'legal'
 
 const h2 = 'font-display text-xl font-bold'
 
@@ -112,7 +107,6 @@ export default function ProfilePage() {
 
   const [editing, setEditing] = useState(false)
   const [editTab, setEditTab] = useState<SectionKey>('identity')
-  const [activeTab, setActiveTab] = useState<TabKey>('preferences')
   const customLists = useCustomLists()
   const privacy = useWatchlistPrivacy(user?.id)
   const list = useList()
@@ -182,43 +176,12 @@ export default function ProfilePage() {
     document.title = editing ? 'Edit Profile — Zenkai' : 'Profile — Zenkai'
     document.documentElement.dataset.zkMono = ''
     if (location.hash === '#legal') {
-      setActiveTab('legal')
       window.setTimeout(() => document.getElementById('legal')?.scrollIntoView({ behavior: 'smooth' }), 150)
     }
     return () => {
       delete document.documentElement.dataset.zkMono
     }
   }, [editing])
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const sectionIds = ['preferences', 'account', 'ascension', 'watchlist', 'legal'] as const
-      const scrollPosition = window.scrollY + 140
-      for (const id of sectionIds) {
-        const el = document.getElementById(id)
-        if (el) {
-          const top = el.offsetTop
-          const height = el.offsetHeight
-          if (scrollPosition >= top && scrollPosition < top + height) {
-            setActiveTab(id)
-            break
-          }
-        }
-      }
-    }
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  const scrollTo = (id: string) => {
-    setActiveTab(id as any)
-    const el = document.getElementById(id)
-    if (el) {
-      const yOffset = -72
-      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset
-      window.scrollTo({ top: y, behavior: 'smooth' })
-    }
-  }
 
   const startEdit = (tab?: SectionKey) => {
     if (tab) setEditTab(tab)
@@ -237,27 +200,19 @@ export default function ProfilePage() {
     toast(`${label} ${v ? 'on' : 'off'}`)
   }
 
-  const SECTIONS = [
-    { id: 'preferences' as const, label: 'Preferences', icon: SlidersHorizontal },
-    { id: 'account' as const, label: user ? 'Cloud & Sync' : 'Sign in', icon: user ? Cloud : UserCheck, badge: user ? 'Connected' : null },
-    { id: 'ascension' as const, label: 'Ascension Quests', icon: ChevronsUp, badge: `Lv.${ascensionState.level}` },
-    { id: 'watchlist' as const, label: 'Watchlist', icon: Bookmark, badge: list.length > 0 ? `${list.length}` : null },
-    { id: 'legal' as const, label: 'About & Legal', icon: ShieldCheck },
-  ]
-
   return (
     <main className="mx-auto w-full min-w-0 max-w-4xl space-y-6 px-4 pb-28 pt-6 sm:px-6 sm:pt-8 md:pt-10">
       {editing ? (
         <ProfileEditor me={me} initialTab={editTab} onClose={() => setEditing(false)} />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* 1. Unified Profile Hero Header */}
           <ProfileHero me={me} onEdit={startEdit} />
 
           {!loading && !user && (
             <button
               type="button"
-              onClick={() => scrollTo('account')}
+              onClick={() => document.getElementById('account')?.scrollIntoView({ behavior: 'smooth' })}
               className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card/60 px-4 py-3 text-left transition hover:border-foreground/40 active:scale-[0.99]"
             >
               <UserCheck className="size-5 shrink-0" />
@@ -266,38 +221,10 @@ export default function ProfilePage() {
             </button>
           )}
 
-          {/* Section Navigation Jump Pills */}
-          <div className="sticky top-16 z-20 flex gap-2 overflow-x-auto pb-1.5 pt-1.5 no-scrollbar border-b border-border/60 bg-background/80 backdrop-blur">
-            {SECTIONS.map(({ id, label, icon: Icon, badge }) => {
-              const on = activeTab === id
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => scrollTo(id)}
-                  className={cn(
-                    'inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold transition active:scale-95',
-                    on
-                      ? 'border-foreground/30 bg-foreground/10 text-foreground shadow-sm'
-                      : 'border-transparent bg-transparent text-muted hover:border-border/60 hover:text-foreground'
-                  )}
-                >
-                  <Icon className="size-4" />
-                  <span>{label}</span>
-                  {badge && (
-                    <span className="rounded-full bg-foreground/15 px-2 py-0.5 text-[10px] font-black text-foreground uppercase">
-                      {badge}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
           {/* 1. Player & App Preferences */}
           <section
             id="preferences"
-            className="scroll-mt-28 rounded-3xl border border-border bg-card/60 p-5 sm:p-7 shadow-lg"
+            className="scroll-mt-20 rounded-3xl border border-border bg-card/60 p-5 sm:p-7 shadow-lg"
             aria-label="Settings & Preferences"
           >
             <div className="mb-5 flex items-center justify-between">
@@ -418,7 +345,7 @@ export default function ProfilePage() {
           </section>
 
           {/* 2. Cloud & Sync + AniList */}
-          <section id="account" className="scroll-mt-28 space-y-4" aria-label="Account and cloud sync">
+          <section id="account" className="scroll-mt-20 space-y-4" aria-label="Account and cloud sync">
             {loading ? null : user ? (
               <AccountPanel />
             ) : (
@@ -428,7 +355,7 @@ export default function ProfilePage() {
           </section>
 
           {/* 3. Ascension Daily & Weekly Quests */}
-          <section id="ascension" className="scroll-mt-28 rounded-3xl border border-border/60 bg-card-2/40 p-5 sm:p-7 shadow-xl space-y-6" aria-label="Ascension Quests">
+          <section id="ascension" className="scroll-mt-20 rounded-3xl border border-border/60 bg-card-2/40 p-5 sm:p-7 shadow-xl space-y-6" aria-label="Ascension Quests">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/50 pb-4">
               <div>
                 <h2 className="font-display text-lg font-bold flex items-center gap-2 text-foreground">
@@ -568,7 +495,7 @@ export default function ProfilePage() {
           </section>
 
           {/* 4. Watchlist Section */}
-          <section id="watchlist" className="scroll-mt-28 space-y-4" aria-label="Watchlist">
+          <section id="watchlist" className="scroll-mt-20 space-y-4" aria-label="Watchlist">
             {/* Header row: Bookmark icon + Watchlist + count */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -615,7 +542,7 @@ export default function ProfilePage() {
           {/* 5. About & Legal */}
           <section
             id="legal"
-            className="scroll-mt-28 rounded-3xl border border-border bg-card/60 p-6 sm:p-8 shadow-lg space-y-6 text-sm leading-relaxed text-muted"
+            className="scroll-mt-20 rounded-3xl border border-border bg-card/60 p-6 sm:p-8 shadow-lg space-y-6 text-sm leading-relaxed text-muted"
             aria-label="About and legal"
           >
             <h2 className={h2}>About &amp; Legal</h2>
