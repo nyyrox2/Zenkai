@@ -435,7 +435,6 @@ export async function fetchMovieBoxStream(p: {
     }
   }
 
-  const hasCompanion = isCompanionActive()
   const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
   const resolveProxyStreamUrl = (u?: string, rawUrl?: string) => {
@@ -467,7 +466,7 @@ export async function fetchMovieBoxStream(p: {
     if (!u) return u
 
     // If Zenkai Companion extension is active, use the raw CDN stream DIRECTLY with zero proxies!
-    if (hasCompanion) {
+    if (isCompanionActive()) {
       let directUrl = rawUrl
       if (!directUrl && u.includes('url=')) {
         try {

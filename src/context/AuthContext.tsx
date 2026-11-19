@@ -121,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setProfileUsername(null)
         resetProfileStore()
+        clearAscensionCache()
       }
       setLoading(false)
     })

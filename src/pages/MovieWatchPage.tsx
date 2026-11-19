@@ -98,6 +98,8 @@ export default function MovieWatchPage() {
     return () => window.clearInterval(t)
   }, [sessionVerified])
 
+  const companion = useCompanion()
+
   // MovieBox direct stream extraction
   const mbStream = useAsync(
     () =>
@@ -113,7 +115,7 @@ export default function MovieWatchPage() {
             imdbId: details.data.imdbId,
           })
         : Promise.resolve(null),
-    [sessionVerified, isMovieBox, type, id, season, episode, details.data?.title, details.data?.year, selectedDub, details.data?.imdbId]
+    [sessionVerified, isMovieBox, type, id, season, episode, details.data?.title, details.data?.year, selectedDub, details.data?.imdbId, companion.installed]
   )
 
   const [dubCache, setDubCache] = useState<{ id: number; dubs: MovieDub[] } | null>(null)
@@ -146,7 +148,6 @@ export default function MovieWatchPage() {
   })
   const isGuest = Boolean(party.room && !party.room.isHost)
 
-  const companion = useCompanion()
   const availableStreams = mbStream.data?.streams || []
   const activeStream = useMemo(() => {
     if (!availableStreams.length) return null
