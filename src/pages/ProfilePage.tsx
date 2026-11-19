@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Bookmark,
   Lock,
   LockOpen,
   ChevronRight,
@@ -17,8 +16,7 @@ import { AniListCard } from '../components/AniListCard'
 import { ProfileEditor, ProfileHero, type SectionKey } from '../components/ProfileCustomizer'
 import { CustomSelect } from '../components/CustomSelect'
 import { DISCORD_URL, REPO_URL, TELEGRAM_URL } from '../lib/app'
-import { getPrefs, savePrefs, setStatus, useCustomLists, useList, type Audio } from '../lib/library'
-import { WatchlistPanel } from '../components/WatchlistPanel'
+import { getPrefs, savePrefs, type Audio } from '../lib/library'
 import { useWatchlistPrivacy } from '../lib/watchlistPrivacy'
 import { useProfile } from '../lib/profile'
 import { DIRECT } from '../lib/servers'
@@ -107,9 +105,7 @@ export default function ProfilePage() {
 
   const [editing, setEditing] = useState(false)
   const [editTab, setEditTab] = useState<SectionKey>('identity')
-  const customLists = useCustomLists()
   const privacy = useWatchlistPrivacy(user?.id)
-  const list = useList()
 
   const [prefs, setPrefs] = useState(getPrefs)
   const [autoNext, setAutoNext] = useFlag('zk:autonext', true)
@@ -342,6 +338,58 @@ export default function ProfilePage() {
                 label="Episode cards"
               />
             </Row>
+
+            <Row
+              title="Watchlist visibility"
+              hint={
+                user
+                  ? privacy.priv
+                    ? 'Private — visitors cannot see your saved anime on your public profile.'
+                    : 'Public — anyone with your public profile link can view your watchlist.'
+                  : 'Sign in to sync and share your watchlist across devices.'
+              }
+            >
+              <div className="inline-flex gap-1 rounded-full border border-border bg-card/60 p-1">
+                <button
+                  type="button"
+                  disabled={privacy.busy}
+                  onClick={() => {
+                    if (!user) {
+                      toast('Sign in first to share your watchlist publicly.', 'info')
+                      return
+                    }
+                    if (privacy.priv) void privacy.set(false)
+                  }}
+                  aria-pressed={!privacy.priv}
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition disabled:opacity-60',
+                    !privacy.priv ? 'bg-foreground text-background' : 'text-muted hover:text-foreground'
+                  )}
+                >
+                  <LockOpen className="size-3.5" />
+                  <span>Public</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={privacy.busy}
+                  onClick={() => {
+                    if (!user) {
+                      toast('Sign in first to manage cloud privacy settings.', 'info')
+                      return
+                    }
+                    if (!privacy.priv) void privacy.set(true)
+                  }}
+                  aria-pressed={privacy.priv}
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition disabled:opacity-60',
+                    privacy.priv ? 'bg-foreground text-background' : 'text-muted hover:text-foreground'
+                  )}
+                >
+                  <Lock className="size-3.5" />
+                  <span>Private</span>
+                </button>
+              </div>
+            </Row>
           </section>
 
           {/* 2. Cloud & Sync + AniList */}
@@ -494,52 +542,7 @@ export default function ProfilePage() {
             </div>
           </section>
 
-          {/* 4. Watchlist Section */}
-          <section id="watchlist" className="scroll-mt-20 space-y-4" aria-label="Watchlist">
-            {/* Header row: Bookmark icon + Watchlist + count */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Bookmark className="size-5 text-foreground" />
-                <h2 className="font-display text-xl font-bold tracking-tight text-foreground">
-                  Watchlist
-                </h2>
-              </div>
-              <span className="font-mono text-xs text-muted">
-                {list.length} anime
-              </span>
-            </div>
-
-            {user && (
-              <button
-                type="button"
-                role="switch"
-                aria-checked={privacy.priv}
-                disabled={privacy.busy}
-                onClick={() => void privacy.set(!privacy.priv)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-border p-3 text-left transition hover:border-foreground/40 active:scale-[0.99] disabled:opacity-60"
-              >
-                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-foreground/10">
-                  {privacy.priv ? <Lock className="size-4" /> : <LockOpen className="size-4" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">{privacy.priv ? 'Watchlist is private' : 'Watchlist is public'}</span>
-                  <span className="block text-xs text-muted">{privacy.priv ? 'Visitors see nothing, and the server never sends them your list.' : 'Anyone with your profile link can see it.'}</span>
-                </span>
-                <span className={'relative h-6 w-10 shrink-0 rounded-full transition ' + (privacy.priv ? 'bg-foreground' : 'bg-foreground/20')}>
-                  <span className={'absolute top-0.5 size-5 rounded-full bg-background transition-all ' + (privacy.priv ? 'left-[1.15rem]' : 'left-0.5')} />
-                </span>
-              </button>
-            )}
-            <WatchlistPanel
-              items={list}
-              lists={customLists}
-              onStatus={setStatus}
-              emptyTitle="Your watchlist is empty"
-              emptyHint="Bookmark series while browsing to track your progress here."
-            />
-          </section>
-
-          {/* 5. About & Legal */}
+          {/* 4. About & Legal */}
           <section
             id="legal"
             className="scroll-mt-20 rounded-3xl border border-border bg-card/60 p-6 sm:p-8 shadow-lg space-y-6 text-sm leading-relaxed text-muted"
