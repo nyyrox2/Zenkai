@@ -266,7 +266,11 @@ async function proxy(request, url, proxyBase = "/proxy", env = null) {
   const midmanUrl = (
     env?.VITE_MOVIEBOX_PROXY_URL || 
     env?.MOVIEBOX_PROXY_URL || 
-    (typeof process !== "undefined" ? (process.env?.VITE_MOVIEBOX_PROXY_URL || process.env?.MOVIEBOX_PROXY_URL) : "")
+    env?.VITE_RAILWAY_URL ||
+    env?.RAILWAY_URL ||
+    env?.VITE_BACKEND_URL ||
+    env?.BACKEND_URL ||
+    (typeof process !== "undefined" ? (process.env?.VITE_MOVIEBOX_PROXY_URL || process.env?.MOVIEBOX_PROXY_URL || process.env?.VITE_RAILWAY_URL || process.env?.VITE_BACKEND_URL) : "")
   )?.replace(/\/+$/, "");
 
   let up;
@@ -838,7 +842,11 @@ export async function handle(request, env) {
     const midmanUrl = (
       env?.VITE_MOVIEBOX_PROXY_URL || 
       env?.MOVIEBOX_PROXY_URL || 
-      (typeof process !== "undefined" ? (process.env?.VITE_MOVIEBOX_PROXY_URL || process.env?.MOVIEBOX_PROXY_URL) : "")
+      env?.VITE_RAILWAY_URL ||
+      env?.RAILWAY_URL ||
+      env?.VITE_BACKEND_URL ||
+      env?.BACKEND_URL ||
+      (typeof process !== "undefined" ? (process.env?.VITE_MOVIEBOX_PROXY_URL || process.env?.MOVIEBOX_PROXY_URL || process.env?.VITE_RAILWAY_URL || process.env?.VITE_BACKEND_URL) : "")
     )?.replace(/\/+$/, "");
 
     try {

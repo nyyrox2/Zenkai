@@ -86,8 +86,13 @@ const toItem = (r: RawItem, fallback: MediaType): MovieItem | null => {
 
 const mem = new Map<string, Promise<unknown>>()
 
-// MovieBox stream service (Railway or the Hugging Face Space): set VITE_MOVIEBOX_PROXY_URL; when unset the Pages worker is used
-const RAILWAY_URL = ((import.meta.env.VITE_MOVIEBOX_PROXY_URL as string | undefined) || '').replace(/\/+$/, '')
+// MovieBox stream service (Hugging Face Space, Railway, or custom proxy): set VITE_MOVIEBOX_PROXY_URL; when unset the Pages worker is used
+const RAILWAY_URL = (
+  (import.meta.env.VITE_MOVIEBOX_PROXY_URL as string | undefined) ||
+  (import.meta.env.VITE_RAILWAY_URL as string | undefined) ||
+  (import.meta.env.VITE_BACKEND_URL as string | undefined) ||
+  ''
+).replace(/\/+$/, '')
 
 async function get<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
   const qs = new URLSearchParams()
@@ -344,7 +349,16 @@ export async function fetchMovieBoxStream(p: {
       })
       if (res.ok) {
         const d = await res.json().catch(() => null)
-        if (d && d.success === true && d.streams?.length > 0) {
+        if (d && d.success === true && (d.streams?.length > 0 || d.streamUrl)) {
+          if (!d.streams?.length && d.streamUrl) {
+            d.streams = [{
+              quality: d.quality || '1080p',
+              format: d.format || 'MP4',
+              url: d.rawStreamUrl || d.streamUrl,
+              streamUrl: d.streamUrl,
+              downloadUrl: d.downloadUrl,
+            }]
+          }
           data = d
           resOk = true
         } else if (d?.embedServers?.length && !data) {
