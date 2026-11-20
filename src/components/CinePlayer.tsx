@@ -200,13 +200,14 @@ const loadVideoFilters = (): VideoFilters => {
   }
 }
 
-const ANIME4K_MODES: Array<{ id: Anime4KMode; label: string; desc: string }> = [
-  { id: 'modeA', label: 'Mode A', desc: 'Balanced restoration & 2× upscale (Best for 720p/1080p anime)' },
-  { id: 'modeB', label: 'Mode B', desc: 'Soft restoration (Reduces compression ringing & artifacts)' },
-  { id: 'modeC', label: 'Mode C', desc: 'Sharp outlines & high detail for crisp modern animation' },
-  { id: 'modeAA', label: 'Mode AA', desc: 'Double-pass ultra restoration for maximum clean detail' },
-  { id: 'denoise', label: 'Denoise', desc: 'Artifact removal & debanding + 2× CNN upscale' },
-  { id: 'fast', label: 'Fast CNN', desc: 'Lightweight 2× neural net (low battery / integrated GPU)' },
+// Main presets run heaviest / highest quality first; the two extras (cleanup and lightweight) sit in their own group below.
+const ANIME4K_MODES: Array<{ id: Anime4KMode; label: string; desc: string; extra?: boolean }> = [
+  { id: 'modeAA', label: 'Mode AA', desc: 'Highest quality · heaviest. Double-pass restoration for maximum clean detail' },
+  { id: 'modeA', label: 'Mode A', desc: 'High quality. Balanced restoration & 2× upscale (best for 720p/1080p anime)' },
+  { id: 'modeB', label: 'Mode B', desc: 'Medium. Soft restoration (reduces compression ringing & artifacts)' },
+  { id: 'modeC', label: 'Mode C', desc: 'Lighter. Sharp outlines & detail for clean modern animation' },
+  { id: 'denoise', label: 'Denoise', desc: 'Artifact removal & debanding + 2× CNN upscale', extra: true },
+  { id: 'fast', label: 'Light', desc: 'Lightweight 2× neural net (low battery / integrated GPU)', extra: true },
 ]
 const EP_PAGE = 25
 const fmtAir = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null)
@@ -1037,6 +1038,15 @@ export default function CinePlayer({
     return m && ['modeA', 'modeB', 'modeC', 'modeAA', 'denoise', 'fast'].includes(m) ? m : 'modeA'
   })
   const [upErr, setUpErr] = useState<string | null>(null)
+  const [upWarn, setUpWarn] = useState<string | null>(null)
+  const upRef = useRef(up) // read inside the stream-loading effect, which must not re-run when the toggle flips
+  upRef.current = up
+  // WebGPU can only sample a plain-file video that is CORS-enabled, so ask for it whenever the upscaler is on
+  const setFileSrc = (v: HTMLVideoElement, url: string) => {
+    if (upRef.current) v.crossOrigin = 'anonymous'
+    else v.removeAttribute('crossorigin')
+    v.src = url
+  }
   const [vkey, setVkey] = useState(0)
   const cv = useRef<HTMLCanvasElement>(null)
   const setUp = (on: boolean) => {
@@ -1326,7 +1336,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       })
     } else if (isFileSrc(streamUrl) || v.canPlayType('application/vnd.apple.mpegurl')) {
       const cleanUrl = isFileSrc(streamUrl) ? streamUrl.replace(/([?&])seg=1(&|$)/, (_m, a, b) => (b ? a : '')) : streamUrl
-      v.src = cleanUrl
+      setFileSrc(v, cleanUrl)
       v.addEventListener('loadedmetadata', onMeta)
       v.addEventListener('error', onVideoError)
     } else {
@@ -1339,7 +1349,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       if (fallbackStreamUrl && fallbackStreamUrl !== v.src && !triedFallback.current) {
         triedFallback.current = true;
         console.warn('[CinePlayer] Direct stream encountered error, seamlessly falling back to proxy stream:', fallbackStreamUrl);
-        v.src = fallbackStreamUrl;
+        setFileSrc(v, fallbackStreamUrl);
         v.load();
         v.play().catch(() => {});
         return;
@@ -1770,17 +1780,37 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     let dead = false
     let stop: (() => void) | undefined
     setUpErr(null)
-    startUpscale(v, c, {
-      mode: upMode,
-      onSlow: (reason) => {
-        if (!dead && reason) setUpErr(reason)
-      },
-    })
-      .then((s) => (dead ? s() : (stop = s)))
-      .catch((e: unknown) => {
+    setUpWarn(null)
+    ;(async () => {
+      // A plain file already loaded without CORS is "tainted" for WebGPU: reload it once with CORS, keeping position and play state.
+      if (!hls.current && v.currentSrc && v.crossOrigin !== 'anonymous') {
+        const t = v.currentTime
+        const playing = !v.paused
+        v.crossOrigin = 'anonymous'
+        v.src = v.currentSrc
+        await new Promise<void>((r) => {
+          v.addEventListener('loadedmetadata', () => r(), { once: true })
+          setTimeout(r, 4000)
+        })
         if (dead) return
-        setUpErr(e instanceof Error ? e.message : 'Upscaler initialization failed')
+        if (t > 0) v.currentTime = t
+        if (playing) v.play().catch(() => {})
+      }
+      const s = await startUpscale(v, c, {
+        mode: upMode,
+        onSlow: (reason) => {
+          if (!dead && reason) setUpErr(reason)
+        },
+        onWarn: (msg) => {
+          if (!dead) setUpWarn(msg)
+        },
       })
+      if (dead) s()
+      else stop = s
+    })().catch((e: unknown) => {
+      if (dead) return
+      setUpErr(e instanceof Error ? e.message : 'Upscaler initialization failed')
+    })
     return () => {
       dead = true
       stop?.()
@@ -3390,9 +3420,21 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           </button>
           {up && (
             <>
-              <p className="zp-sec">Anime4K Model / Shader Preset</p>
+              <p className="zp-sec">Preset (highest → lightest)</p>
               <div className="zp-pg">
-                {ANIME4K_MODES.map((m) => (
+                {ANIME4K_MODES.filter((m) => !m.extra).map((m) => (
+                  <button
+                    key={m.id}
+                    className={cx('zp-pi', upMode === m.id && 'on')}
+                    onClick={() => setUpMode(m.id)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <p className="zp-sec">Cleanup &amp; light</p>
+              <div className="zp-pg">
+                {ANIME4K_MODES.filter((m) => m.extra).map((m) => (
                   <button
                     key={m.id}
                     className={cx('zp-pi', upMode === m.id && 'on')}
@@ -3420,7 +3462,9 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               ? 'This browser has no WebGPU, so the upscaler is unavailable.'
               : upErr
                 ? `Upscaler note: ${upErr}. Try selecting another preset or re-toggling.`
-                : 'Runs in real-time on your GPU with WebGPU neural shaders. Best on 720p–1080p anime.'}
+                : upWarn
+                  ? upWarn
+                  : 'Runs in real-time on your GPU with WebGPU neural shaders. Works on anime and movies up to 1080p.'}
           </p>
 
 
