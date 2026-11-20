@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Trophy, Clapperboard, Compass, House, MessagesSquare, Search, Tv, type LucideIcon } from 'lucide-react'
+import { Trophy, Clapperboard, Compass, House, Search, Tv, type LucideIcon } from 'lucide-react'
 import { useSearch } from '../context/SearchContext'
 import { sectionOf } from '../lib/sections'
 import { cn } from '../lib/utils'
@@ -89,21 +89,6 @@ export function MobileDock(_props: MobileDockProps) {
             </li>
           )
         })}
-
-        {/* Community */}
-        <li>
-          <Link
-            to="/community"
-            className={cn(
-              'flex flex-col items-center gap-1 rounded-2xl px-2.5 py-1.5 text-[10px] font-medium transition active:scale-90',
-              pathname.startsWith('/community') ? 'text-foreground' : 'text-muted',
-            )}
-          >
-            <MessagesSquare className={cn('size-5 transition-transform', pathname.startsWith('/community') && 'scale-110')} />
-            Community
-            <span aria-hidden className={cn('-mb-0.5 size-1 rounded-full bg-foreground transition-opacity', pathname.startsWith('/community') ? 'opacity-100' : 'opacity-0')} />
-          </Link>
-        </li>
       </ul>
     </nav>
   )

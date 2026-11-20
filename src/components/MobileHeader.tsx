@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, Search } from 'lucide-react'
+import { Menu, Search, MessagesSquare } from 'lucide-react'
 import { Logo } from './Logo'
 import { Avatar } from './Avatar'
 import { ThemeToggle } from './ThemeToggle'
@@ -47,6 +47,13 @@ export function MobileHeader({ onOpenDrawer }: MobileHeaderProps) {
       </div>
 
       <div className="flex items-center gap-1.5">
+        <Link
+          to="/community"
+          aria-label="Community"
+          className={chip}
+        >
+          <MessagesSquare className="size-4" />
+        </Link>
         <button
           type="button"
           onClick={() => openSearch()}
