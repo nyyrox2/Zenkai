@@ -115,7 +115,7 @@
   },
   {
     "id": 3,
-    "priority": 1,
+    "priority": 10,
     "action": {
       "type": "modifyHeaders",
       "requestHeaders": [
@@ -153,6 +153,11 @@
           "header": "Access-Control-Expose-Headers",
           "operation": "set",
           "value": "Content-Range, Content-Length, Accept-Ranges"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
         }
       ]
     },
@@ -164,12 +169,6 @@
         "media",
         "xmlhttprequest",
         "other"
-      ],
-      "excludedRequestDomains": [
-        "127.0.0.1",
-        "localhost",
-        "pages.dev",
-        "zenkai.cfd"
       ]
     }
   },
@@ -302,7 +301,7 @@
   },
   {
     "id": 7,
-    "priority": 2,
+    "priority": 10,
     "action": {
       "type": "modifyHeaders",
       "requestHeaders": [
@@ -340,6 +339,11 @@
           "header": "Access-Control-Expose-Headers",
           "operation": "set",
           "value": "Content-Range, Content-Length, Accept-Ranges, Date, Server"
+        },
+        {
+          "header": "Cross-Origin-Resource-Policy",
+          "operation": "set",
+          "value": "cross-origin"
         }
       ]
     },
@@ -351,12 +355,6 @@
         "media",
         "xmlhttprequest",
         "other"
-      ],
-      "excludedRequestDomains": [
-        "127.0.0.1",
-        "localhost",
-        "pages.dev",
-        "zenkai.cfd"
       ]
     }
   },

@@ -34,6 +34,7 @@ export interface LevelUpEvent {
 }
 
 export interface AscensionState {
+  userId?: string | null
   totalXp: number
   level: number
   streak: number
@@ -82,6 +83,7 @@ const CURRENT_WEEK = () => {
 }
 
 const defaultState: AscensionState = {
+  userId: null,
   totalXp: 0,
   level: 1,
   streak: 0,
@@ -631,8 +633,8 @@ export async function evaluateDailyLoginStreak() {
           streak: nextStreak,
           longestStreak: Math.max(state.longestStreak || 0, nextStreak),
           lastLoginDate: serverResult.last_login_date || today,
-          totalXp: Math.max(Number(serverResult.new_total_xp) || 0, state.totalXp),
-          level: Math.max(Number(serverResult.new_level) || 0, state.level),
+          totalXp: Number(serverResult.new_total_xp) || state.totalXp,
+          level: Number(serverResult.new_level) || state.level,
         }
         ascensionCell.set(updatedState)
         return
@@ -693,12 +695,18 @@ export async function evaluateDailyLoginStreak() {
 
 export async function syncAscensionWithCloud(userId: string, force: boolean = false) {
   try {
-    const state = ascensionCell.get()
+    let state = ascensionCell.get()
     const now = Date.now()
     const THROTTLE_MS = 30 * 1000
 
+    // If local state was bound to another account (or guest), wipe local state completely to prevent cross-account bleed
+    const isDifferentUser = state.userId && state.userId !== userId
+    if (isDifferentUser || !state.userId) {
+      state = { ...defaultState, userId }
+    }
+
     // Short 30s throttle to avoid duplicate calls within the same render cycle unless forced
-    if (!force && state.lastSyncedAt > 0 && now - state.lastSyncedAt < THROTTLE_MS) {
+    if (!force && !isDifferentUser && state.lastSyncedAt > 0 && now - state.lastSyncedAt < THROTTLE_MS) {
       return
     }
 
@@ -709,12 +717,13 @@ export async function syncAscensionWithCloud(userId: string, force: boolean = fa
       .maybeSingle()
 
     if (profile) {
-      // XP only goes up: routine XP stays local until pushed, so a stale cloud value must never overwrite it
-      const cloudXp = Math.max(Number(profile.total_xp) || 0, state.totalXp)
+      // Cloud profile is authoritative for this user account. Never pull/compare XP across different accounts.
+      const cloudXp = Number(profile.total_xp) || 0
       const calculatedLevel = calculateLevelFromXp(cloudXp)
 
       const merged: AscensionState = sanitizeCosmeticsForLevel({
         ...state,
+        userId,
         totalXp: cloudXp,
         level: calculatedLevel,
         streak: Number(profile.login_streak) || 0,

@@ -23,7 +23,10 @@ export type Anime4KMode = 'modeA' | 'modeB' | 'modeC' | 'modeAA' | 'denoise' | '
 
 export interface UpscaleOptions {
   mode?: Anime4KMode
+  /** Fatal: the upscaler stopped (GPU lost, video unreadable). */
   onSlow?: (reason?: string) => void
+  /** Non-fatal hint, e.g. the GPU can't keep up with this preset. */
+  onWarn?: (message: string) => void
 }
 
 /**
@@ -37,6 +40,7 @@ export async function startUpscale(
   optionsOrSlow?: (() => void) | UpscaleOptions,
 ): Promise<() => void> {
   const onSlow = typeof optionsOrSlow === 'function' ? optionsOrSlow : optionsOrSlow?.onSlow
+  const onWarn = typeof optionsOrSlow === 'object' ? optionsOrSlow.onWarn : undefined
   const mode = typeof optionsOrSlow === 'object' ? optionsOrSlow.mode : 'modeA'
 
   if (!gpuSupported) throw new Error('WebGPU is not available in this browser')
@@ -140,10 +144,31 @@ export async function startUpscale(
     }
   })
 
+  // Frames offered vs. skipped because the GPU still had 2 in flight: a high skip rate means this preset is too heavy here.
+  let offered = 0
+  let skipped = 0
+  let warned = false
+  let fails = 0
+
+  const fatal = (msg: string) => {
+    if (!alive) return
+    alive = false
+    onSlow?.(msg)
+  }
+
   const draw = () => {
-    if (!alive || video.readyState < 2) return
+    if (!alive || video.readyState < 2 || document.hidden) return // nothing to show while the tab is hidden: don't burn GPU
     // Allow pipelining (up to 2 command buffers in flight) so GPU never starves, but prevent memory backlog
-    if (inFlight >= 2) return
+    offered++
+    if (inFlight >= 2) {
+      skipped++
+      if (!warned && offered >= 90 && skipped / offered > 0.2) {
+        warned = true
+        onWarn?.('Your GPU is dropping frames on this preset. A lighter one (Mode A, B, C or Light) will play smoother.')
+      }
+      if (offered >= 90) offered = skipped = 0
+      return
+    }
 
     inFlight++
     try {
@@ -174,6 +199,7 @@ export async function startUpscale(
       rp.end()
 
       device.queue.submit([enc.finish()])
+      fails = 0
       device.queue
         .onSubmittedWorkDone()
         .then(() => {
@@ -182,8 +208,12 @@ export async function startUpscale(
         .catch(() => {
           inFlight = Math.max(0, inFlight - 1)
         })
-    } catch {
+    } catch (e) {
       inFlight = Math.max(0, inFlight - 1)
+      // Used to be swallowed: a cross-origin video made every frame fail silently and left a blank canvas over the player.
+      const msg = e instanceof Error ? e.message : String(e)
+      if (e instanceof DOMException && e.name === 'SecurityError') fatal('The GPU is not allowed to read this video (cross-origin stream)')
+      else if (++fails >= 5) fatal(msg || 'GPU frame error')
     }
   }
 
