@@ -892,6 +892,9 @@ export default function WatchPage() {
                   switching={stream.loading}
                   streamUrl={cur.d.streamUrl}
                   fallbackStreamUrl={cur.d.fallbackStreamUrl}
+                  downloadUrl={(cur.d as any).downloadUrl || (cur.d.streamUrl?.includes('.mp4') ? cur.d.streamUrl : undefined)}
+                  rawDownloadUrl={(cur.d as any).rawStreamUrl || (cur.d.streamUrl?.includes('.mp4') ? cur.d.streamUrl : undefined)}
+                  downloadFileName={`${title} - Episode ${cur.ep} [${cur.audio.toUpperCase()}].mp4`}
                   intro={cur.d.intro ?? aniSkip.intro}
                   outro={cur.d.outro ?? aniSkip.outro}
                   title={title}

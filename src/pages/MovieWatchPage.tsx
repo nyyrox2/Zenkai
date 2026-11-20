@@ -31,6 +31,7 @@ import { WatchTogetherModal } from '../components/WatchTogetherModal'
 import { LiveReactionsOverlay } from '../components/LiveReactionsOverlay'
 import { useMovieParty } from '../hooks/useMovieParty'
 import { useMovieSkipTimes } from '../hooks/useMovieSkipTimes'
+import { downloadMedia } from '../lib/download'
 
 const pill = 'rounded-full border px-4 py-2 text-sm font-semibold transition active:scale-95'
 const PREF = 'zk:movie-server:v1'
@@ -165,8 +166,33 @@ export default function MovieWatchPage() {
     ? (activeStream?.rawStreamUrl || activeStream?.url || activeStream?.streamUrl || '')
     : (activeStream?.proxyStreamUrl || activeStream?.streamUrl || mbStream.data?.streamUrl || '')
   const fallbackStreamUrl = activeStream?.proxyStreamUrl || mbStream.data?.proxyStreamUrl || ''
-  // always the proxied attachment link (dl=1); raw CDN urls just play in the browser instead of downloading
+  
+  const isMovie = type === 'movie'
+  const rawTitle = details.data?.title || 'Movie'
+  const releaseYear = details.data?.year || ''
+
+  const computedDownloadFileName = useMemo(() => {
+    const q = activeStream?.quality || mbStream.data?.quality || 'HD'
+    const activeDub = dubs.find((d) => d.id === curDub)
+    const dubTag = activeDub && activeDub.id !== 'default' ? `[${activeDub.label}]` : ''
+    if (isMovie) {
+      return [rawTitle, releaseYear ? `(${releaseYear})` : '', dubTag, `[${q}].mp4`].filter(Boolean).join(' ').trim()
+    }
+    const epTag = `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`
+    return [rawTitle, epTag, dubTag, `[${q}].mp4`].filter(Boolean).join(' ').trim()
+  }, [isMovie, rawTitle, releaseYear, dubs, curDub, season, episode, activeStream?.quality, mbStream.data?.quality])
+
+  const activeDownloadFileName = activeStream?.downloadFileName || mbStream.data?.downloadFileName || computedDownloadFileName
+  const activeRawUrl = activeStream?.rawStreamUrl || activeStream?.url || mbStream.data?.rawStreamUrl || ''
   const activeDownloadUrl = activeStream?.downloadUrl || mbStream.data?.downloadUrl || ''
+
+  const handleTriggerDownload = useCallback(() => {
+    downloadMedia({
+      url: activeDownloadUrl,
+      rawUrl: activeRawUrl,
+      filename: activeDownloadFileName,
+    })
+  }, [activeDownloadUrl, activeRawUrl, activeDownloadFileName])
 
   // Standard embed iframe stream resolution (Videasy, Vidzee, etc.)
   const src = useAsync(
@@ -354,10 +380,15 @@ export default function MovieWatchPage() {
                   size: s.size,
                   sizeLabel: s.sizeLabel,
                   downloadUrl: s.downloadUrl,
+                  downloadFileName: s.downloadFileName || computedDownloadFileName,
+                  rawUrl: s.rawStreamUrl || s.url,
                 }))}
                 currentQuality={activeStream?.quality || mbStream.data?.quality}
                 onQualityChange={(q: { label: string }) => setSelectedQuality(q.label)}
                 downloadUrl={activeDownloadUrl}
+                downloadFileName={activeDownloadFileName}
+                rawDownloadUrl={activeRawUrl}
+                onDownload={handleTriggerDownload}
                 servers={list.flatMap(expand)}
                 serverId={serverValue}
                 onServer={pickAny}
@@ -557,19 +588,16 @@ export default function MovieWatchPage() {
             />
           )
         )}
-        {isMovieBox && activeDownloadUrl && (
-          <a
-            href={activeDownloadUrl}
-            download={activeStream?.downloadFileName || `${title}.mp4`}
-            target="_blank"
-            rel="noreferrer"
-            onClick={() => toast(`Starting download${activeStream ? `: ${activeStream.quality}` : ''}`)}
+        {isMovieBox && (activeDownloadUrl || activeRawUrl) && (
+          <button
+            type="button"
+            onClick={handleTriggerDownload}
             className="ml-auto inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold transition hover:bg-foreground/[0.06] active:scale-95"
           >
             <Download className="size-4 text-accent" />
             Download
             {activeStream && <span className="text-xs text-muted">{activeStream.quality}{activeStream.sizeLabel ? ` · ${activeStream.sizeLabel}` : ''}</span>}
-          </a>
+          </button>
         )}
       </section>
 

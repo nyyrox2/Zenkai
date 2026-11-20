@@ -914,6 +914,7 @@ export async function resolveMovieBoxStream({
     title: matched.title,
     streamUrl: bestStream.streamUrl,
     downloadUrl: bestStream.downloadUrl,
+    downloadFileName: bestStream.downloadFileName,
     rawStreamUrl: bestStream.url,
     quality: bestStream.quality,
     format: bestStream.format,
