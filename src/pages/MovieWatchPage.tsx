@@ -168,7 +168,7 @@ export default function MovieWatchPage() {
   const fallbackStreamUrl = activeStream?.proxyStreamUrl || mbStream.data?.proxyStreamUrl || ''
   
   const isMovie = type === 'movie'
-  const rawTitle = details.data?.title || 'Movie'
+  const rawTitle = details.data?.title || mbStream.data?.title || 'Movie'
   const releaseYear = details.data?.year || ''
 
   const computedDownloadFileName = useMemo(() => {
@@ -182,7 +182,7 @@ export default function MovieWatchPage() {
     return [rawTitle, epTag, dubTag, `[${q}].mp4`].filter(Boolean).join(' ').trim()
   }, [isMovie, rawTitle, releaseYear, dubs, curDub, season, episode, activeStream?.quality, mbStream.data?.quality])
 
-  const activeDownloadFileName = activeStream?.downloadFileName || mbStream.data?.downloadFileName || computedDownloadFileName
+  const activeDownloadFileName = computedDownloadFileName || activeStream?.downloadFileName || mbStream.data?.downloadFileName || 'video.mp4'
   const activeRawUrl = activeStream?.rawStreamUrl || activeStream?.url || mbStream.data?.rawStreamUrl || ''
   const activeDownloadUrl = activeStream?.downloadUrl || mbStream.data?.downloadUrl || ''
 

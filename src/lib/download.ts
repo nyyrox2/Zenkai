@@ -3,8 +3,8 @@ import { toast } from './toast'
 
 export interface DownloadMediaOptions {
   url?: string             // Proxied or direct download URL
-  rawUrl?: string          // Direct raw CDN URL (for companion)
-  filename?: string        // Desired filename, e.g. "The Odyssey (2026) [1080p].mp4"
+  rawUrl?: string          // Direct raw CDN URL
+  filename?: string        // Desired filename, e.g. "Fitoor (2016) [1080p].mp4"
 }
 
 export function sanitizeDownloadFilename(name?: string): string {
@@ -18,35 +18,23 @@ export function sanitizeDownloadFilename(name?: string): string {
 }
 
 /**
- * Triggers a direct download:
- * 1. If Zenkai Companion extension is active and has direct-download capability:
- *    Downloads directly from the raw CDN URL via Chrome Downloads API (wire speed, zero proxy load, exact filename).
- * 2. Fallback (proxy mode or extension without direct-download):
- *    Downloads via the backend proxy with ?dl=1&fn=... and Content-Disposition: attachment header.
- *    Uses a hidden anchor element WITHOUT target="_blank" so it starts downloading immediately
- *    without opening the proxy website or a new tab.
+ * Triggers a direct download with proper movie/series/anime filename:
+ * 
+ * Protected CDNs (such as hakunaymatata, aoneroom, bcdnxw) strictly reject direct browser
+ * downloads with HTTP 428/403 anti-bot protection unless fetched with specialized headers (ExoPlayer UA).
+ * Therefore, downloads must route through the dedicated backend proxy (/proxy?url=...&dl=1&fn=...)
+ * which pipes the stream with Content-Disposition: attachment; filename="<Title>.mp4".
+ * 
+ * 1. If Zenkai Companion extension (>= 1.3.0) is active:
+ *    Triggers download via Chrome Downloads API using the verified proxy attachment URL.
+ * 2. Fallback (no extension or older extension):
+ *    Triggers download via a programmatic hidden anchor click without target="_blank",
+ *    saving directly to the user's Downloads folder without leaving the page.
  */
 export function downloadMedia({ url, rawUrl, filename }: DownloadMediaOptions): void {
   const cleanName = sanitizeDownloadFilename(filename)
 
-  // 1. Direct CDN download via Zenkai Companion extension
-  if (isCompanionActive() && companionHas('direct-download')) {
-    const directTarget = rawUrl || (url && !url.includes('/proxy') ? url : undefined)
-    if (directTarget && (directTarget.startsWith('http://') || directTarget.startsWith('https://'))) {
-      toast(`Downloading via Extension: ${cleanName}`, 'info')
-      window.dispatchEvent(
-        new CustomEvent('zenkai:extension-download', {
-          detail: {
-            url: directTarget,
-            filename: cleanName,
-          },
-        })
-      )
-      return
-    }
-  }
-
-  // 2. Fallback: Download via backend proxy with dl=1 and custom filename
+  // 1. Resolve effective proxy download URL
   let targetUrl = url
   if (!targetUrl && rawUrl) {
     targetUrl = `/proxy?url=${encodeURIComponent(rawUrl)}&dl=1&fn=${encodeURIComponent(cleanName)}`
@@ -70,20 +58,58 @@ export function downloadMedia({ url, rawUrl, filename }: DownloadMediaOptions): 
     return
   }
 
-  toast(`Starting download: ${cleanName}`, 'info')
+  // 2. Helper to trigger native browser anchor download
+  const triggerAnchorDownload = () => {
+    const a = document.createElement('a')
+    a.href = targetUrl!
+    a.download = cleanName
+    a.rel = 'noopener noreferrer'
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    setTimeout(() => {
+      try {
+        document.body.removeChild(a)
+      } catch {}
+    }, 2000)
+  }
 
-  // Programmatically trigger download using a hidden link
-  // Since the response returns Content-Disposition: attachment, the browser stays on the page and begins downloading
-  const a = document.createElement('a')
-  a.href = targetUrl
-  a.download = cleanName
-  a.rel = 'noopener noreferrer'
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  setTimeout(() => {
-    try {
-      document.body.removeChild(a)
-    } catch {}
-  }, 2000)
+  // 3. If Zenkai Companion extension is installed with direct-download capability:
+  if (isCompanionActive() && companionHas('direct-download')) {
+    toast(`Downloading: ${cleanName}`, 'info')
+    
+    // Listen for extension response; fall back to anchor if extension encounters an issue
+    let completed = false
+    const onResult = (e: Event) => {
+      completed = true
+      window.removeEventListener('zenkai:extension-download-result', onResult)
+      const detail = (e as CustomEvent)?.detail
+      if (detail && detail.ok === false) {
+        console.warn('[zenkai:download] Extension download failed, falling back to browser download:', detail.error)
+        triggerAnchorDownload()
+      }
+    }
+    window.addEventListener('zenkai:extension-download-result', onResult)
+    setTimeout(() => {
+      window.removeEventListener('zenkai:extension-download-result', onResult)
+      if (!completed) {
+        // If extension didn't respond within 1.5s, trigger anchor download
+        triggerAnchorDownload()
+      }
+    }, 1500)
+
+    window.dispatchEvent(
+      new CustomEvent('zenkai:extension-download', {
+        detail: {
+          url: targetUrl,
+          filename: cleanName,
+        },
+      })
+    )
+    return
+  }
+
+  // 4. Default / Fallback: Native browser anchor download
+  toast(`Downloading: ${cleanName}`, 'info')
+  triggerAnchorDownload()
 }
