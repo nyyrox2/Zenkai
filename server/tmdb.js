@@ -50,7 +50,7 @@ export async function tmdbFetch(endpoint, env = null) {
         Authorization: `Bearer ${token}`,
         "User-Agent": UA,
       },
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(8000),
     });
     if (res.ok) {
       return await res.json();
@@ -66,7 +66,7 @@ export async function tmdbFetch(endpoint, env = null) {
         Authorization: `Bearer ${token}`,
         "User-Agent": UA,
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
     if (res.ok) {
       return await res.json();

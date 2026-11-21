@@ -131,8 +131,7 @@ async function loadMovies(): Promise<ShowcaseImage[]> {
     return (await res.json()) as Raw
   }
   try {
-    // our own API first; the public TMDB proxy as a fallback so the card never stays empty
-    const d = await load('https://aniversee.vercel.app/api/tmdb/trending/movie/week').catch(() => load(apiUrl('/api/movies/trending/movie/week')))
+    const d = await load(apiUrl('/api/movies/trending/movie/week'))
     return (d.results ?? [])
       .filter((m) => m.poster_path)
       .map((m) => ({ src: `https://image.tmdb.org/t/p/w780${m.poster_path}`, wide: m.backdrop_path ? `https://image.tmdb.org/t/p/w1280${m.backdrop_path}` : null, title: m.title ?? 'Movie' }))

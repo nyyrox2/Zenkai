@@ -576,7 +576,7 @@ export default function WatchPage() {
     }
   }
 
-  const bundle = useTmdb(a?.id, title, a?.format)
+  const bundle = useTmdb(a?.id, title, a?.format, a?.title?.romaji ?? null)
   const logo = tmdbImg(bundle?.tmdb?.logo, 'w500')
   const eps = useEpisodes(bundle?.tmdb ?? null, a?.streamingEpisodes)
   const kinds = useFiller(a)

@@ -126,25 +126,238 @@ export const mapOf = (anilistId) =>
   });
 
 /* ====================================================================
- * TMDB details + artwork (through the same aniversee.vercel.app proxy)
+ * TMDB details + artwork & intelligent Season resolution
  * ==================================================================== */
-const cleanTitle = (t = "") =>
-  t
-    .replace(/\s*\(\d{4}\)\s*$/g, "")
-    .replace(/\s*(Final Season|Season\s+\d+|\d+(st|nd|rd|th)\s+Season|Cour\s+\d+|Part\s+\d+)\s*$/gi, "")
-    .replace(/\s*:\s*$/, "")
-    .trim();
+export function resolveAnimeSeason(title, altTitle = "") {
+  const t = `${title || ""} ${altTitle || ""}`.toLowerCase();
 
-export async function tmdbFor(anilistId, title, format, env = null) {
+  // 1. Franchise-specific arc/season mappings:
+  // Demon Slayer (Kimetsu no Yaiba)
+  if (t.includes("kimetsu no yaiba") || t.includes("demon slayer")) {
+    if (t.includes("hashira geiko") || t.includes("hashira training")) return 5;
+    if (t.includes("katanakaji") || t.includes("swordsmith village")) return 4;
+    if (t.includes("yuukaku") || t.includes("entertainment district")) return 3;
+    if (t.includes("mugen train") || t.includes("mugen ressha")) return 2;
+    return 1;
+  }
+  // Jujutsu Kaisen
+  if (t.includes("jujutsu kaisen")) {
+    if (t.includes("2nd season") || t.includes("season 2") || t.includes("shibuya") || t.includes("kaigyoku")) return 2;
+    return 1;
+  }
+  // Bleach
+  if (t.includes("bleach")) {
+    if (t.includes("thousand-year") || t.includes("sennen kessen") || t.includes("thousand year")) return 2;
+  }
+  // Attack on Titan (Shingeki no Kyojin)
+  if (t.includes("shingeki no kyojin") || t.includes("attack on titan")) {
+    if (t.includes("final season") || t.includes("the final") || t.includes("season 4") || t.includes("4th season")) return 4;
+    if (t.includes("season 3") || t.includes("3rd season")) return 3;
+    if (t.includes("season 2") || t.includes("2nd season")) return 2;
+    return 1;
+  }
+  // Dr. Stone
+  if (t.includes("dr. stone") || t.includes("dr stone")) {
+    if (t.includes("science future")) return 4;
+    if (t.includes("new world")) return 3;
+    if (t.includes("stone wars")) return 2;
+    return 1;
+  }
+  // Kaguya-sama
+  if (t.includes("kaguya-sama") || t.includes("kaguya sama")) {
+    if (t.includes("ultra romantic")) return 3;
+    if (t.includes("season 2") || t.includes("2nd season") || t.includes("?")) return 2;
+    return 1;
+  }
+  // Mob Psycho 100
+  if (t.includes("mob psycho 100")) {
+    if (t.includes("iii") || t.includes("3")) return 3;
+    if (t.includes("ii") || t.includes("2")) return 2;
+    return 1;
+  }
+  // Sword Art Online
+  if (t.includes("sword art online")) {
+    if (t.includes("war of underworld") || t.includes("alicization")) return 3;
+    if (t.includes("ii") || t.includes("2")) return 2;
+    return 1;
+  }
+  // Gintama
+  if (t.includes("gintama")) {
+    if (t.includes("the final") || t.includes("the semi-final")) return 7;
+    if (t.includes("shirogane") || t.includes("silver soul")) return 6;
+    if (t.includes("porori")) return 5;
+    if (t.includes("season 4") || t.includes("2017") || t.includes("gintama.")) return 4;
+    if (t.includes("°") || t.includes("season 3") || t.includes("2015")) return 3;
+    if (t.includes("enchousen") || t.includes("'") || t.includes("season 2") || t.includes("2011")) return 2;
+    return 1;
+  }
+  // Re:Zero
+  if (t.includes("re:zero") || t.includes("re: zero")) {
+    if (t.includes("season 3") || t.includes("3rd season") || t.includes("3rd")) return 3;
+    if (t.includes("season 2") || t.includes("2nd season") || t.includes("2nd")) return 2;
+    return 1;
+  }
+  // Slime (That Time I Got Reincarnated as a Slime / Tensei shitara Slime Datta Ken)
+  if (t.includes("reincarnated as a slime") || t.includes("slime datta ken")) {
+    if (t.includes("season 3") || t.includes("3rd season")) return 3;
+    if (t.includes("season 2") || t.includes("2nd season")) return 2;
+    return 1;
+  }
+  // Vinland Saga
+  if (t.includes("vinland saga")) {
+    if (t.includes("season 2") || t.includes("2nd season")) return 2;
+    return 1;
+  }
+  // Mushoku Tensei
+  if (t.includes("mushoku tensei")) {
+    if (t.includes("season 2") || t.includes("2nd season") || t.includes(" ii")) return 2;
+    return 1;
+  }
+  // One Punch Man
+  if (t.includes("one punch man") || t.includes("one-punch man")) {
+    if (t.includes("season 2") || t.includes("2nd season") || t.includes("2")) return 2;
+    return 1;
+  }
+  // Blue Exorcist (Ao no Exorcist)
+  if (t.includes("blue exorcist") || t.includes("ao no exorcist")) {
+    if (t.includes("yuki no hate") || t.includes("beyond the snow")) return 4;
+    if (t.includes("shimane illuminati")) return 3;
+    if (t.includes("kyoto saga") || t.includes("kyoto")) return 2;
+    return 1;
+  }
+  // The Rising of the Shield Hero (Tate no Yuusha)
+  if (t.includes("shield hero") || t.includes("tate no yuusha")) {
+    if (t.includes("season 3") || t.includes("3rd season")) return 3;
+    if (t.includes("season 2") || t.includes("2nd season")) return 2;
+    return 1;
+  }
+  // Classroom of the Elite
+  if (t.includes("classroom of the elite") || t.includes("youkoso jitsuryoku")) {
+    if (t.includes("season 3") || t.includes("3rd season") || t.includes(" 3")) return 3;
+    if (t.includes("season 2") || t.includes("2nd season") || t.includes(" ii") || t.includes(" 2")) return 2;
+    return 1;
+  }
+
+  // 2. Generic regex for Season N, Nth Season, Part N, Cour N
+  const regex = /\b(?:season\s*(\d+)|(\d+)(?:st|nd|rd|th)\s*season|part\s*(\d+)|cour\s*(\d+))\b/i;
+  const match = t.match(regex);
+  if (match) {
+    const num = parseInt(match[1] || match[2] || match[3] || match[4], 10);
+    if (!isNaN(num) && num > 0 && num <= 30) return num;
+  }
+
+  // 3. Roman numerals at word boundaries: II -> 2, III -> 3, IV -> 4, V -> 5, VI -> 6
+  if (/\b(?:vi|6th)\b/i.test(t)) return 6;
+  if (/\b(?:v|5th)\b/i.test(t)) return 5;
+  if (/\b(?:iv|4th)\b/i.test(t)) return 4;
+  if (/\b(?:iii|3rd)\b/i.test(t)) return 3;
+  if (/\b(?:ii|2nd)\b/i.test(t)) return 2;
+
+  return null;
+}
+
+export function findMatchingSeason(seasons, title, romaji = "", baseShowName = "") {
+  if (!Array.isArray(seasons) || seasons.length === 0) return null;
+  const fullText = `${title || ""} ${romaji || ""}`.toLowerCase();
+  const baseName = (baseShowName || "").toLowerCase().trim();
+
+  // 1. Sort non-special seasons with specific arc names by length (longest name first)
+  // so specific arcs ("Swordsmith Village Arc", "Thousand-Year Blood War") match before short/generic names
+  const arcCandidates = seasons
+    .filter((s) => s.season_number > 0)
+    .sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
+
+  for (const s of arcCandidates) {
+    const sName = (s.name || "").toLowerCase().trim();
+    if (sName.length >= 3 && !/^season\s+\d+$/i.test(sName)) {
+      if (baseName && sName === baseName) continue;
+      const coreName = sName.replace(/\s*(?:arc|saga|hen|part\s*\d+|cour\s*\d+)\s*$/i, "").trim();
+      if (fullText.includes(sName) || (coreName.length >= 3 && fullText.includes(coreName))) {
+        return s.season_number;
+      }
+    }
+  }
+
+  // 2. Numeric season detection (e.g. Season 2, Season 3, 3rd Season, Part 2, II, III)
+  const detected = resolveAnimeSeason(title, romaji);
+  if (detected && seasons.some((s) => s.season_number === detected)) {
+    return detected;
+  }
+
+  // 3. Check if TMDB season names have numeric patterns matching detected season
+  if (detected) {
+    const numMatch = seasons.find((s) => {
+      const sName = (s.name || "").toLowerCase();
+      return (
+        sName.includes(`season ${detected}`) ||
+        sName.includes(`${detected}nd season`) ||
+        sName.includes(`${detected}rd season`) ||
+        sName.includes(`${detected}th season`)
+      );
+    });
+    if (numMatch) return numMatch.season_number;
+  }
+
+  return detected || null;
+}
+
+export const cleanTitle = (t = "") => {
+  let s = (t || "").trim();
+  s = s.replace(/\s*\(\d{4}\)\s*$/g, "");
+  s = s
+    .replace(/\s*[-–:]\s*(?:The\s+)?Final\s+Season.*$/i, "")
+    .replace(/\s*[-–:]\s*Season\s+\d+.*$/i, "")
+    .replace(/\s*[-–:]\s*\d+(?:st|nd|rd|th)\s+Season.*$/i, "")
+    .replace(/\s*[-–:]\s*(?:Part|Cour)\s+\d+.*$/i, "")
+    .replace(/\s*[-–:]\s*(?:Swordsmith Village|Entertainment District|Hashira Training|Mugen Train|Shibuya|New World|Stone Wars|Ultra Romantic|War of Underworld|Alicization|Kyoto Saga|Shimane Illuminati|Thousand-Year Blood War).*$/i, "")
+    .replace(/\s*(Final Season|Season\s+\d+|\d+(st|nd|rd|th)\s+Season|Cour\s+\d+|Part\s+\d+)\s*$/gi, "")
+    .replace(/\s*[-–:]\s*$/, "")
+    .trim();
+  return s || t.trim();
+};
+
+export async function tmdbFor(anilistId, title, format, env = null, romaji = "") {
   const map = anilistId ? await mapOf(anilistId) : null;
   let ref = map?.tmdb ? { id: map.tmdb.id, type: map.tmdb.type, season: map.tmdb.season } : null;
+
+  const detectedSeason = resolveAnimeSeason(title, romaji);
+  if (ref && !ref.season && detectedSeason) {
+    ref.season = detectedSeason;
+  }
 
   if (!ref && title) {
     try {
       const want = format === "MOVIE" ? "movie" : "tv";
-      const res = await tmdbFetch(`search/multi?query=${encodeURIComponent(cleanTitle(title) || title)}`, env);
-      const hit = res.results?.find((r) => r.media_type === want) || res.results?.find((r) => r.media_type === "tv" || r.media_type === "movie");
-      if (hit) ref = { id: hit.id, type: hit.media_type, season: null };
+
+      // 1. If title or romaji contains a specific sequel/spin-off subtitle, try exact title search first
+      // Some sequel seasons have their OWN TMDB entry (e.g. Bleach TYBW, Fairy Tail 100 Years Quest, Tokyo Ghoul:re, Steins;Gate 0)
+      const hasSpecificSubtitle = /[:\-\–]|100\s*years|thousand\s*year|final|re:|0|saga|season|arc/i.test(title);
+      let hit = null;
+
+      if (hasSpecificSubtitle && want === "tv") {
+        try {
+          const directRes = await tmdbFetch(`search/multi?query=${encodeURIComponent(title.trim())}`, env);
+          hit = directRes.results?.find((r) => {
+            if (r.media_type !== "tv") return false;
+            const rName = (r.name || r.title || "").toLowerCase();
+            const tName = title.toLowerCase();
+            return rName.includes(tName) || tName.includes(rName);
+          });
+          if (hit) {
+            ref = { id: hit.id, type: "tv", season: 1 };
+          }
+        } catch {}
+      }
+
+      // 2. If no dedicated sequel entry matched, search for parent franchise title
+      if (!ref) {
+        const cleaned = cleanTitle(title);
+        const res = await tmdbFetch(`search/multi?query=${encodeURIComponent(cleaned || title)}`, env);
+        hit = res.results?.find((r) => r.media_type === want) || res.results?.find((r) => r.media_type === "tv" || r.media_type === "movie");
+        if (hit) {
+          ref = { id: hit.id, type: hit.media_type, season: detectedSeason || null };
+        }
+      }
     } catch {}
   }
   if (!ref) return { map, tmdb: null };
@@ -152,6 +365,36 @@ export async function tmdbFor(anilistId, title, format, env = null) {
   const d = await tmdbFetch(
     `${ref.type}/${ref.id}?language=en-US&append_to_response=images,videos,credits,external_ids,content_ratings,release_dates&include_image_language=en,null`, env
   );
+
+  // Match season against TMDB show's seasons list
+  if (ref.type === "tv" && Array.isArray(d.seasons) && d.seasons.length > 0) {
+    const matched = findMatchingSeason(d.seasons, title, romaji, d.name || d.title);
+    if (matched) {
+      ref.season = matched;
+    } else if (ref.season && ref.season > 1) {
+      const exists = d.seasons.some((s) => s.season_number === ref.season);
+      if (!exists && d.number_of_seasons === 1) {
+        ref.season = 1;
+      }
+    }
+  }
+
+  // Fetch season-specific metadata if season > 1
+  let seasonOverview = null;
+  let seasonPoster = null;
+  if (ref.type === "tv" && ref.season && ref.season > 1) {
+    try {
+      const seasonData = await tmdbFetch(`tv/${ref.id}/season/${ref.season}?language=en-US`, env);
+      if (seasonData) {
+        if (seasonData.overview && seasonData.overview.trim()) {
+          seasonOverview = seasonData.overview.trim();
+        }
+        if (seasonData.poster_path) {
+          seasonPoster = seasonData.poster_path;
+        }
+      }
+    } catch {}
+  }
 
   const pngs = (d.images?.logos || []).filter((l) => l.file_path && !l.file_path.toLowerCase().endsWith(".svg"));
   const logo = pngs.sort((a, b) => (b.iso_639_1 === "en") - (a.iso_639_1 === "en") || b.vote_average - a.vote_average)[0]?.file_path ?? null;
@@ -170,13 +413,13 @@ export async function tmdbFor(anilistId, title, format, env = null) {
       id: ref.id,
       name: d.name || d.title || null,
       type: ref.type,
-      season: ref.season,
+      season: ref.season || 1,
       imdbId: d.external_ids?.imdb_id || map?.imdb || null,
       logo,
       backdrop: d.backdrop_path || backdrops[0] || null,
-      poster: d.poster_path || null,
+      poster: seasonPoster || d.poster_path || null,
       backdrops,
-      overview: d.overview || null,
+      overview: seasonOverview || d.overview || null,
       tagline: d.tagline || null,
       rating: d.vote_average ? Math.round(d.vote_average * 10) / 10 : null,
       votes: d.vote_count || null,
@@ -789,9 +1032,10 @@ export async function handle(request, env) {
   if (path === "/api/tmdb") {
     const id = parseInt(q("id", "0"), 10);
     const title = q("title");
+    const romaji = q("romaji") || "";
     if (!id && !title) return json({ error: "Missing id or title" }, 400);
     try {
-      const r = await cached(`tmdb:${id}:${title}`, 24 * 3600e3, () => tmdbFor(id, title, q("format").toUpperCase(), env));
+      const r = await cached(`tmdb:${id}:${title}:${romaji}`, 24 * 3600e3, () => tmdbFor(id, title, q("format").toUpperCase(), env, romaji));
       return json({ success: !!r?.tmdb, mapping: r?.map ?? null, tmdb: r?.tmdb ?? null }, 200, 86400);
     } catch {
       return json({ success: false, mapping: null, tmdb: null }, 200, 300);

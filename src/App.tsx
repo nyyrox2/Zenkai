@@ -63,6 +63,7 @@ const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage'))
 const FindPage = lazy(() => import('./pages/FindPage'))
 const BustedPage = lazy(() => import('./pages/BustedPage'))
 const EmbedPage = lazy(() => import('./pages/EmbedPage'))
+const EmbedProfilePage = lazy(() => import('./pages/EmbedProfilePage'))
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const CallPage = lazy(() => import('./pages/CallPage'))
 const ExtensionGuidePage = lazy(() => import('./pages/ExtensionGuidePage'))
@@ -215,6 +216,8 @@ export default function App() {
               <Route path="/anime/:id" element={<DetailsPage />} />
               <Route path="/mal/:id" element={<DetailsPage />} />
               <Route path="/embed" element={<EmbedPage />} />
+              <Route path="/embed/profile" element={<EmbedProfilePage />} />
+              <Route path="/embed/profile/:username" element={<EmbedProfilePage />} />
               <Route path="/embed/:id" element={<EmbedPage />} />
               <Route path="/embed/:id/:ep" element={<EmbedPage />} />
               <Route path="/api" element={<DocsPage />} />

@@ -41,7 +41,11 @@ export function useWatchlistPrivacy(userId: string | undefined) {
       setBusy(true)
       const prev = priv
       setPriv(next)
-      const { error } = await supabase.from('profiles').update({ watchlist_private: next }).eq('id', userId)
+      let { error } = await supabase.from('profiles').update({ watchlist_private: next }).eq('id', userId)
+      if (error) {
+        const res2 = await supabase.from('profiles').update({ is_watchlist_private: next }).eq('id', userId)
+        error = res2.error
+      }
       if (error) {
         setPriv(prev)
         toast('Could not save that setting. Run supabase/watchlist_privacy.sql first.', 'error')

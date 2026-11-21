@@ -130,7 +130,12 @@ export default function DetailsPage() {
   const mal = useAsync(() => (malId ? fetchMalFull(malId).catch(() => null) : Promise.resolve(null)), [malId])
   const stats = useAsync(() => (malId ? fetchMalStats(malId).catch(() => null) : Promise.resolve(null)), [malId])
 
-  const tb = useTmdb(anime.data?.id, anime.data ? pickTitle(anime.data.title) : '', anime.data?.format)
+  const tb = useTmdb(
+    anime.data?.id,
+    anime.data ? pickTitle(anime.data.title) : '',
+    anime.data?.format,
+    anime.data?.title?.romaji ?? null,
+  )
   const tmdb = tb?.tmdb ?? null
   const eps = useEpisodes(tmdb, anime.data?.streamingEpisodes)
   const kinds = useFiller(anime.data, tab === 'episodes')

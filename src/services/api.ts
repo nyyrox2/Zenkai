@@ -90,12 +90,12 @@ export interface TmdbBundle {
 const tmdbMem = new Map<string, Promise<TmdbBundle>>()
 const DAY = 24 * 3600e3
 
-export function fetchTmdb(anilistId: number, title: string, format?: string | null): Promise<TmdbBundle> {
-  const key = String(anilistId)
+export function fetchTmdb(anilistId: number, title: string, format?: string | null, romaji?: string | null): Promise<TmdbBundle> {
+  const key = `${anilistId}:${title}:${romaji || ''}`
   const hit = tmdbMem.get(key)
   if (hit) return hit
 
-  const lsKey = `zk:tmdb:v2:${key}`
+  const lsKey = `zk:tmdb:v3:${key}`
   try {
     const raw = localStorage.getItem(lsKey)
     if (raw) {
@@ -110,10 +110,10 @@ export function fetchTmdb(anilistId: number, title: string, format?: string | nu
     /* ignore corrupt cache */
   }
 
-  const q = new URLSearchParams({ id: key, title, format: format ?? '' })
+  const q = new URLSearchParams({ id: String(anilistId), title, format: format ?? '', romaji: romaji ?? '' })
   // Browser first (like Movies: no Worker request, no Worker -> proxy hop), the server route is the fallback.
   const viaServer = () => getJson<{ mapping: Mapping | null; tmdb: Tmdb | null }>(`/api/tmdb?${q}`)
-  const p = tmdbDirect(anilistId, title, format)
+  const p = tmdbDirect(anilistId, title, format, romaji)
     .then((r) => (r.tmdb ? r : viaServer()))
     .catch(viaServer)
     .then((r) => {
