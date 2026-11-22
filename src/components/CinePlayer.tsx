@@ -21,6 +21,7 @@ import {
   airplayPicker, airplaySupported, castLoad, castRequest, castSeek, castSetVolume, castStop, castToggleMute, castTogglePlay, castUrl, getCast, initCast, onCastFinished, useCast,
 } from '../lib/cast'
 import { isCompanionActive } from '../lib/useCompanion'
+import { downloadMedia } from '../lib/download'
 import { forFetch } from '../lib/acdnClient'
 import { ACCESS_CLASS, ACCESS_TEXT, type ServerAccess } from '../lib/servers'
 import './cineplayer.css'
@@ -363,10 +364,15 @@ export interface CinePlayerProps {
     size?: number
     sizeLabel?: string | null
     downloadUrl?: string
+    downloadFileName?: string
+    rawUrl?: string
   }[]
   currentQuality?: string
-  onQualityChange?: (quality: { label: string; url: string; size?: number; sizeLabel?: string | null; downloadUrl?: string }) => void
+  onQualityChange?: (quality: { label: string; url: string; size?: number; sizeLabel?: string | null; downloadUrl?: string; downloadFileName?: string; rawUrl?: string }) => void
   downloadUrl?: string
+  downloadFileName?: string
+  rawDownloadUrl?: string
+  onDownload?: () => void
   fallbackStreamUrl?: string
   isTmdb?: boolean
   /** called when the direct stream fails to load (e.g. dead URL, CORS, DNS error) */
@@ -810,7 +816,7 @@ export default function CinePlayer({
   episodesInfo, fallbackImg, defaultRuntime, kinds,
   onVideoRef, onPlayerAction, externalControl, onWatchTogetherClick, watchPartyActive, watchPartyPeersCount, onChatClick, chatOpen = false, chatUnread = 0, chatPanel,
   isPartyGuest = false,
-  qualities, currentQuality, onQualityChange, downloadUrl, fallbackStreamUrl, isTmdb = false, onStreamError,
+  qualities, currentQuality, onQualityChange, downloadUrl, downloadFileName, rawDownloadUrl, onDownload, fallbackStreamUrl, isTmdb = false, onStreamError,
 }: CinePlayerProps) {
   const isMovie = format === 'MOVIE' || (totalEpisodes <= 1 && format !== 'TV')
   const cleanEpTitle = episodeTitle?.trim()
@@ -2674,19 +2680,27 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   )}
                 </button>
               )}
-              {downloadUrl && (
-                <a
-                  href={downloadUrl}
-                  download
-                  target="_blank"
-                  rel="noreferrer"
+              {(downloadUrl || onDownload) && (
+                <button
+                  type="button"
                   className="zp-b zp-x"
                   aria-label="Download MP4"
                   title="Download video file"
-                  onClick={() => flash('ok', 'Download started')}
+                  onClick={() => {
+                    if (onDownload) {
+                      onDownload()
+                    } else if (downloadUrl) {
+                      downloadMedia({
+                        url: downloadUrl,
+                        rawUrl: rawDownloadUrl,
+                        filename: downloadFileName || `${title || 'video'}.mp4`,
+                      })
+                    }
+                    flash('ok', 'Download started')
+                  }}
                 >
                   <Download />
-                </a>
+                </button>
               )}
               <button className="zp-b" data-tour="p-set" onClick={() => (closePop(), setSheet('set'))} aria-label="Settings" title="Settings">
                 <Settings />
@@ -2792,15 +2806,21 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                         {lvl === l.i && <Check className="size-3.5 shrink-0 text-accent text-[var(--a,#dc143c)]" />}
                       </motion.button>
                     ))}
-                    {downloadUrl && (
+                    {(downloadUrl || onDownload) && (
                       <div className="mt-2 pt-2 border-t border-white/10">
-                        <a
-                          href={downloadUrl}
-                          download
-                          target="_blank"
-                          rel="noreferrer"
-                          className="zp-row flex items-center justify-between text-accent font-semibold hover:bg-white/10 rounded-lg px-2 py-1.5 transition text-xs"
+                        <button
+                          type="button"
+                          className="zp-row flex w-full items-center justify-between text-accent font-semibold hover:bg-white/10 rounded-lg px-2 py-1.5 transition text-xs"
                           onClick={() => {
+                            if (onDownload) {
+                              onDownload()
+                            } else if (downloadUrl) {
+                              downloadMedia({
+                                url: downloadUrl,
+                                rawUrl: rawDownloadUrl,
+                                filename: downloadFileName || `${title || 'video'}.mp4`,
+                              })
+                            }
                             flash('ok', 'Download started')
                             closePop()
                           }}
@@ -2808,7 +2828,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                           <span className="flex items-center gap-2">
                             <Download className="size-3.5" /> Download MP4
                           </span>
-                        </a>
+                        </button>
                       </div>
                     )}
                   </div>

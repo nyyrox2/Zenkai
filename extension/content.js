@@ -4,7 +4,7 @@
 (function () {
   const meta = {
     installed: true,
-    version: '1.2.0',
+    version: '1.3.0',
     name: 'Zenkai Stream Companion',
     active: true,
     capabilities: [
@@ -19,7 +19,9 @@
       'cors-bypass',
       'p2p-residential',
       // 1.2.0: the web app resolves IP-bound ACDN streams in this browser (see rules 36-40)
-      'acdn-client'
+      'acdn-client',
+      // 1.3.0: direct zero-proxy file download directly from CDN with custom naming
+      'direct-download'
     ]
   };
 
@@ -44,5 +46,26 @@
   // 3. Keep polling ping responder for dynamic checks
   window.addEventListener('zenkai:ping-companion', () => {
     window.dispatchEvent(new CustomEvent('zenkai:companion-pong', { detail: meta }));
+  });
+
+  // 4. Direct zero-proxy file download handler
+  window.addEventListener('zenkai:extension-download', (e) => {
+    const detail = (e && e.detail) || {};
+    if (!detail.url) return;
+    chrome.runtime.sendMessage(
+      {
+        type: 'ZENKAI_DOWNLOAD',
+        url: detail.url,
+        filename: detail.filename || 'video.mp4',
+      },
+      (res) => {
+        const ok = Boolean(res && res.ok);
+        window.dispatchEvent(
+          new CustomEvent('zenkai:extension-download-result', {
+            detail: { ok, error: res?.error, id: detail.id },
+          })
+        );
+      }
+    );
   });
 })();

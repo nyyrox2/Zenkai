@@ -9,6 +9,7 @@ import {
   UserCheck,
   ChevronsUp,
   Check,
+  MessagesSquare,
 } from 'lucide-react'
 import { AccountPanel, AuthPanel } from '../components/CloudSyncCard'
 import { useAuth } from '../context/AuthContext'
@@ -216,6 +217,30 @@ export default function ProfilePage() {
               <ChevronRight className="size-4 shrink-0 text-muted" />
             </button>
           )}
+
+          {/* Zenkai Community Lounge Link */}
+          <Link
+            to="/community"
+            className="flex w-full items-center justify-between gap-4 rounded-3xl border border-border bg-card/60 p-4 sm:p-5 shadow-lg transition hover:border-foreground/40 active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-foreground/10 text-foreground">
+                <MessagesSquare className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <span>Zenkai Lounge</span>
+                  <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                    Live
+                  </span>
+                </h3>
+                <p className="text-xs text-muted truncate mt-0.5">
+                  Global chats, anime theories, recommendations &amp; episode reactions.
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted" />
+          </Link>
 
           {/* 1. Player & App Preferences */}
           <section

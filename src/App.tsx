@@ -14,6 +14,7 @@ import { PageLoader } from './components/PageLoader'
 import { ShieldGate } from './components/ShieldGate'
 import { ApiIntro } from './components/ApiIntro'
 import { WelcomeNotes } from './components/WelcomeNotes'
+import { PreReleaseNotice } from './components/PreReleaseNotice'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { Toaster } from './components/Toaster'
 import { MovieSearchModal } from './components/MovieSearchModal'
@@ -242,6 +243,7 @@ export default function App() {
       <ShieldGate />
       <ChangelogModal />
       <ChooseUsernameModal />
+      <PreReleaseNotice enabled={!isApi && !isEmbed && !reader && !isWatchPath(pathname) && !isCall && !isMessages && pathname !== '/busted'} />
       <WelcomeNotes enabled={!isApi && !isEmbed && !reader && !isWatchPath(pathname) && !isCall && !isMessages && pathname !== '/busted'} />
       {!isApi && !isEmbed && !reader && !isWatchPath(pathname) && pathname !== '/busted' && <ApiIntro />}
     </div>

@@ -41,7 +41,7 @@ const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "*",
   "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
-  "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
+  "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges, Content-Disposition",
   "Access-Control-Allow-Private-Network": "true",
 };
 
@@ -399,7 +399,7 @@ async function proxy(request, url, proxyBase = "/proxy", env = null) {
   if (isDownload) {
     const fn = url.searchParams.get("fn") || t.pathname.split("/").pop() || "video.mp4";
     const cleanFn = fn.replace(/[^\w\s\-\.\(\)\[\]]/gi, "").trim() || "video.mp4";
-    out.set("Content-Disposition", `attachment; filename="${cleanFn}"`);
+    out.set("Content-Disposition", `attachment; filename="${cleanFn}"; filename*=UTF-8''${encodeURIComponent(cleanFn)}`);
     out.set("Content-Type", "application/octet-stream");
   } else if (type) {
     out.set("Content-Type", type);
