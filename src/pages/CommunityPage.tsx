@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as RKeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'framer-motion'
-import { ArrowDown, Clapperboard, Crown, EyeOff, Flame, Heart, Loader2, MessageSquare, Pencil, Play, Search, Send, Shuffle, Sparkles, Trash2, Trophy, Tv, Users, X } from 'lucide-react'
+import { ArrowDown, Clapperboard, Crown, EyeOff, Flame, Heart, Loader2, MessageSquare, MoreHorizontal, Pencil, Play, Reply, Search, Send, Shuffle, Sparkles, Trophy, Tv, Users, X } from 'lucide-react'
 import { DiscordIcon, GithubIcon, TelegramIcon } from '../components/BrandIcons'
 import { DISCORD_URL, REPO_URL, TELEGRAM_URL } from '../lib/app'
 import { useAniList } from '../lib/anilist'
@@ -14,7 +14,9 @@ import type { AniMedia } from '../types/anime'
 import { cn, pickTitle } from '../lib/utils'
 import { awardMessageXp } from '../lib/ascension/ascensionStore'
 import { Leaderboard } from '../components/Leaderboard'
-import { createCommunityPost, deleteCommunityPost, getCommunityPosts, likeCommunityPost, supabase, updateCommunityPost, type CommunityPost } from '../lib/supabase'
+import { createCommunityPost, deleteCommunityPost, getCommunityPosts, getCommunityReactions, likeCommunityPost, supabase, toggleCommunityReaction, updateCommunityPost, type CommunityPost, type ReactionMap } from '../lib/supabase'
+import { MediaBlock, parseContent, previewOf } from '../components/ChatMedia'
+import { Emoji, MsgMenu, REACTIONS, holdProps } from '../components/ChatMenu'
 import { TextEffectRenderer } from '../components/ascension/TextEffectRenderer'
 import { ascensionCell, getAscensionState } from '../lib/ascension/ascensionStore'
 
@@ -257,6 +259,32 @@ function RichText({ text }: { text: string }) {
     <p className="whitespace-pre-wrap break-words">
       {parts.map((p, i) => (p.length > 4 && p.startsWith('||') && p.endsWith('||') ? <Spoiler key={i}>{p.slice(2, -2)}</Spoiler> : <span key={i}>{p}</span>))}
     </p>
+  )
+}
+
+/** Text, spoilers, links, GIFs, images and videos in one message. */
+function MessageBody({ text, onMedia }: { text: string; onMedia?: () => void }) {
+  return (
+    <div className="space-y-1.5">
+      {parseContent(text).map((s, i) =>
+        s.t === 'text' ? <RichText key={i} text={s.v} /> : s.t === 'media' ? <MediaBlock key={i} m={s} onLoad={onMedia} /> : (
+          <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="block break-all underline underline-offset-2 opacity-90">{s.url}</a>
+        ),
+      )}
+    </div>
+  )
+}
+
+/** Small quoted block above a reply; tap jumps to the original. */
+function ReplyQuote({ name, text, mine, onJump }: { name: string; text: string; mine: boolean; onJump?: () => void }) {
+  return (
+    <button type="button" onClick={onJump} disabled={!onJump} className={cn('mb-1.5 flex w-full max-w-[15rem] items-stretch gap-2 rounded-lg px-2 py-1 text-left text-xs', mine ? 'bg-background/10' : 'bg-foreground/5')}>
+      <span className={cn('w-0.5 shrink-0 rounded-full', mine ? 'bg-background/50' : 'bg-accent')} />
+      <span className="min-w-0">
+        <span className="block truncate font-bold">{name}</span>
+        <span className="block truncate opacity-75">{text || 'Message'}</span>
+      </span>
+    </button>
   )
 }
 
@@ -514,7 +542,11 @@ export default function CommunityPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
-  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [reacts, setReacts] = useState<ReactionMap>({})
+  const reactBusy = useRef(0)
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [replyTo, setReplyTo] = useState<CommunityPost | null>(null)
+  const [flash, setFlash] = useState<string | null>(null)
 
   const [tagOpen, setTagOpen] = useState(false)
   const [tagQuery, setTagQuery] = useState('')
@@ -539,6 +571,8 @@ export default function CommunityPage() {
 
   const channel = CHANNELS.find((c) => c.id === channelId) ?? CHANNELS[0]
   const chatProfiles = useChatProfiles(messages)
+  const nameOf = (m: CommunityPost) => (m.user_id && chatProfiles[m.user_id]?.name) || splitAuthor(m.username || 'Otaku').name
+  const byId = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages])
 
 
   useEffect(() => {
@@ -572,11 +606,15 @@ export default function CommunityPage() {
     stick.current = true
     setLoading(true)
     setMessages([])
+    setReacts({})
+    setReplyTo(null)
     setUnseen(0)
 
     const pull = async () => {
-      const data = [...(await getCommunityPosts(channelId))].sort(byTime)
+      const [posts, rx] = await Promise.all([getCommunityPosts(channelId), getCommunityReactions(channelId)])
+      const data = [...posts].sort(byTime)
       if (!alive) return
+      if (rx && reactBusy.current === 0) setReacts(rx)
       const settled = latest.current.filter((m) => !isTemp(m.id))
       if (!firstLoad.current) {
         if (signature(settled) === signature(data)) return
@@ -661,12 +699,16 @@ export default function CommunityPage() {
       likes: 0,
       pinned: false,
       edited: false,
+      reply_to: replyTo?.id ?? null,
+      reply_snap: replyTo ? { name: nameOf(replyTo), text: previewOf(replyTo.content) } : null,
     }
+    const replying = replyTo
     fresh.current.add(tempId)
     stick.current = true
     setMessages((prev) => [...prev, optimistic])
     setText('')
     setTagged(null)
+    setReplyTo(null)
     try {
       const real = await createCommunityPost({
         user_id: user?.id || null,
@@ -679,6 +721,8 @@ export default function CommunityPage() {
         anime_title: optimistic.anime_title || undefined,
         anime_id: optimistic.anime_id || undefined,
         anime_image: optimistic.anime_image || undefined,
+        reply_to: optimistic.reply_to,
+        reply_snap: optimistic.reply_snap,
       })
       if (real) {
         fresh.current.add(real.id)
@@ -699,6 +743,7 @@ export default function CommunityPage() {
       toast(err instanceof Error && err.message ? err.message : 'Could not send that message', 'error')
       setMessages((prev) => prev.filter((m) => m.id !== tempId))
       setText(content)
+      setReplyTo(replying)
     } finally {
       setSending(false)
     }
@@ -764,7 +809,6 @@ export default function CommunityPage() {
   }
 
   async function remove(id: string) {
-    setConfirmId(null)
     const ok = await deleteCommunityPost(id)
     if (!ok) {
       if (!user) return toast('Sign in to permanently manage or delete your posts', 'info')
@@ -772,6 +816,41 @@ export default function CommunityPage() {
     }
     setMessages((prev) => prev.filter((m) => m.id !== id))
   }
+
+  const bump = (list: ReactionMap[string] = [], emoji: string, on: boolean) => {
+    const r = list.find((x) => x.emoji === emoji)
+    if (!r) return on ? [...list, { emoji, n: 1, mine: true }] : list
+    const n = r.n + (on ? 1 : -1)
+    return n <= 0 ? list.filter((x) => x !== r) : list.map((x) => (x === r ? { ...r, n, mine: on } : x))
+  }
+
+  async function react(m: CommunityPost, emoji: string) {
+    if (!user) return void signInWithGoogle()
+    if (isTemp(m.id)) return
+    const had = !!reacts[m.id]?.find((r) => r.emoji === emoji)?.mine
+    setReacts((p) => ({ ...p, [m.id]: bump(p[m.id], emoji, !had) }))
+    reactBusy.current++
+    const ok = await toggleCommunityReaction(m.id, emoji, !had)
+    reactBusy.current--
+    if (!ok) {
+      setReacts((p) => ({ ...p, [m.id]: bump(p[m.id], emoji, had) }))
+      toast('Could not react', 'error')
+    }
+  }
+
+  function jump(id: string) {
+    document.getElementById(`msg-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    setFlash(id)
+    timers.current.push(window.setTimeout(() => setFlash((f) => (f === id ? null : f)), 1400))
+  }
+
+  function startReply(m: CommunityPost) {
+    if (!user) return void signInWithGoogle()
+    setReplyTo(m)
+    inputRef.current?.focus()
+  }
+
+  const onMedia = useCallback(() => { if (stick.current) toBottom() }, [toBottom])
 
   function saveName(e: React.FormEvent) {
     e.preventDefault()
@@ -791,6 +870,10 @@ export default function CommunityPage() {
     setDraftName(name)
     setNameOpen(true)
   }
+
+  const isMine = (m: CommunityPost) =>
+    isTemp(m.id) || Boolean((user?.id && m.user_id && m.user_id === user.id) || (authorHandle && m.username.includes(`@${authorHandle}`)) || mySentIds.has(m.id))
+  const menuMsg = menuId ? byId.get(menuId) : undefined
 
   const rows = useMemo(() => buildRows(messages), [messages])
   const activeVoices = useMemo(() => {
@@ -941,16 +1024,14 @@ export default function CommunityPage() {
                         }
                         const { msg, first, last } = row
                         const pending = isTemp(msg.id)
-                        const isMe = pending
-                          ? true
-                          : Boolean(
-                              (user?.id && msg.user_id && msg.user_id === user.id) ||
-                              (authorHandle && msg.username.includes(`@${authorHandle}`)) ||
-                              mySentIds.has(msg.id)
-                            )
+                        const isMe = isMine(msg)
                         const isLiked = !!liked[msg.id]
                         const editing = editId === msg.id
                         const showLike = msg.likes > 0 || isLiked
+                        const quoted = msg.reply_to ? byId.get(msg.reply_to) : undefined
+                        const quote = msg.reply_to ? { name: quoted ? nameOf(quoted) : msg.reply_snap?.name || 'Message', text: quoted ? previewOf(quoted.content) : msg.reply_snap?.text || 'Original message' } : null
+                        const mediaOnly = !msg.anime_title && !quote && parseContent(msg.content).every((x) => x.t === 'media')
+                        const rlist = [...(reacts[msg.id] ?? [])].sort((a, b) => b.n - a.n || REACTIONS.findIndex((r) => r.e === a.emoji) - REACTIONS.findIndex((r) => r.e === b.emoji))
                         const matchHandle = msg.username.match(/@([a-zA-Z0-9_-]+)/)
                         const authorHandleFromMsg = matchHandle ? matchHandle[1] : (msg.username.startsWith('@') ? msg.username.slice(1) : undefined)
                         const prof = !isMe && msg.user_id ? chatProfiles[msg.user_id] : undefined
@@ -1000,32 +1081,45 @@ export default function CommunityPage() {
                                 </div>
                               )}
 
-                              <div
-                                onDoubleClick={() => void like(msg)}
-                                className={cn(
-                                  'relative w-fit max-w-full rounded-[1.25rem] px-3.5 py-2 text-[0.9rem] leading-relaxed',
-                                  isMe ? 'bg-foreground text-background' : 'border border-border bg-card-2 text-foreground',
-                                  last && (isMe ? 'rounded-br-md' : 'rounded-bl-md'),
-                                )}
-                              >
-                                {msg.anime_title && <ShowCard msg={msg} />}
+                              <div className={cn('flex max-w-full items-center gap-1', isMe && 'flex-row-reverse')}>
+                                <div
+                                  id={`msg-${msg.id}`}
+                                  {...(pending || editing ? {} : holdProps(() => setMenuId(msg.id)))}
+                                  onDoubleClick={() => void like(msg)}
+                                  style={{ WebkitTouchCallout: 'none' }}
+                                  className={cn(
+                                    'relative w-fit min-w-0 max-w-full rounded-[1.25rem] px-3.5 py-2 text-[0.9rem] leading-relaxed transition-shadow pointer-coarse:select-none',
+                                    mediaOnly && 'p-1',
+                                    isMe ? 'bg-foreground text-background' : 'border border-border bg-card-2 text-foreground',
+                                    last && (isMe ? 'rounded-br-md' : 'rounded-bl-md'),
+                                    flash === msg.id && 'ring-2 ring-accent/70',
+                                  )}
+                                >
+                                  {quote && <ReplyQuote name={quote.name} text={quote.text} mine={isMe} onJump={quoted ? () => jump(quoted.id) : undefined} />}
+                                  {msg.anime_title && <ShowCard msg={msg} />}
 
-                                {editing ? (
-                                  <div className="w-[min(18rem,70vw)] space-y-2 py-0.5">
-                                    <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={3} maxLength={MAX_LEN} autoFocus className="w-full resize-none rounded-xl border border-white/30 bg-black/40 p-2 text-sm text-white outline-none focus:border-white" />
-                                    <div className="flex justify-end gap-1.5">
-                                      <button type="button" onClick={() => setEditId(null)} className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold text-white/85 hover:bg-black/50">Cancel</button>
-                                      <button type="button" disabled={savingEdit || !editText.trim()} onClick={() => void saveEdit(msg.id)} className="rounded-lg bg-white px-3 py-1 text-xs font-bold text-black disabled:opacity-50">{savingEdit ? 'Saving…' : 'Save'}</button>
+                                  {editing ? (
+                                    <div className="w-[min(18rem,70vw)] space-y-2 py-0.5">
+                                      <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={3} maxLength={MAX_LEN} autoFocus className="w-full resize-none rounded-xl border border-white/30 bg-black/40 p-2 text-sm text-white outline-none focus:border-white" />
+                                      <div className="flex justify-end gap-1.5">
+                                        <button type="button" onClick={() => setEditId(null)} className="rounded-lg bg-black/30 px-3 py-1 text-xs font-semibold text-white/85 hover:bg-black/50">Cancel</button>
+                                        <button type="button" disabled={savingEdit || !editText.trim()} onClick={() => void saveEdit(msg.id)} className="rounded-lg bg-white px-3 py-1 text-xs font-bold text-black disabled:opacity-50">{savingEdit ? 'Saving…' : 'Save'}</button>
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <RichText text={msg.content} />
+                                  ) : (
+                                    <MessageBody text={msg.content} onMedia={onMedia} />
+                                  )}
+                                </div>
+                                {!pending && !editing && (
+                                  <button type="button" onClick={() => setMenuId(msg.id)} aria-label="Message options" className="hidden size-7 shrink-0 place-items-center rounded-full text-muted opacity-0 transition hover:bg-foreground/10 hover:text-foreground focus-visible:opacity-100 group-hover/msg:opacity-100 pointer-fine:grid">
+                                    <MoreHorizontal className="size-4" />
+                                  </button>
                                 )}
                               </div>
 
                               {/* reactions + own-message actions */}
                               {!editing && !pending && (
-                                <div className={cn('mt-1 flex items-center gap-1 px-1', isMe && 'flex-row-reverse')}>
+                                <div className={cn('mt-1 flex flex-wrap items-center gap-1 px-1', isMe && 'flex-row-reverse')}>
                                   <span className="relative">
                                     {burst === msg.id && <HeartBurst />}
                                     <button
@@ -1043,21 +1137,12 @@ export default function CommunityPage() {
                                       {msg.likes > 0 && <span className="font-semibold tabular-nums">{msg.likes}</span>}
                                     </button>
                                   </span>
-                                  {isMe && (
-                                    <span className="flex items-center gap-0.5 opacity-70 transition sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover/msg:opacity-100">
-                                      {confirmId === msg.id ? (
-                                        <>
-                                          <button type="button" onClick={() => void remove(msg.id)} className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-bold text-red-400 hover:bg-red-500/25">Delete</button>
-                                          <button type="button" onClick={() => setConfirmId(null)} className="rounded-full px-2 py-0.5 text-xs text-muted hover:text-foreground">Keep</button>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <button type="button" onClick={() => { setEditId(msg.id); setEditText(msg.content) }} aria-label="Edit message" className="grid size-6 place-items-center rounded-full text-muted transition hover:bg-foreground/10 hover:text-foreground"><Pencil className="size-3" /></button>
-                                          <button type="button" onClick={() => setConfirmId(msg.id)} aria-label="Delete message" className="grid size-6 place-items-center rounded-full text-muted transition hover:bg-red-500/10 hover:text-red-400"><Trash2 className="size-3" /></button>
-                                        </>
-                                      )}
-                                    </span>
-                                  )}
+                                  {rlist.map((r) => (
+                                    <button key={r.emoji} type="button" onClick={() => void react(msg, r.emoji)} aria-pressed={r.mine} aria-label={`${r.emoji} ${r.n}`} className={cn('flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs transition active:scale-90', r.mine ? 'border-accent/50 bg-accent/10 text-foreground' : 'border-border text-muted hover:text-foreground')}>
+                                      <Emoji e={r.emoji} size={14} />
+                                      <span className="font-semibold tabular-nums">{r.n}</span>
+                                    </button>
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -1090,6 +1175,18 @@ export default function CommunityPage() {
               {/* composer */}
               <div className="border-t border-border bg-background/80 px-2.5 pt-2 backdrop-blur-xl sm:px-4" style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}>
                 <AnimatePresence initial={false}>
+                  {replyTo && (
+                    <motion.div key="reply" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      <div className="mb-2 flex items-center gap-2 rounded-2xl border border-border bg-card-2/70 py-1.5 pl-3 pr-1.5">
+                        <Reply className="size-3.5 shrink-0 text-accent" />
+                        <span className="min-w-0 flex-1 text-xs">
+                          <span className="block truncate font-bold">Replying to {nameOf(replyTo)}</span>
+                          <span className="block truncate text-muted">{previewOf(replyTo.content)}</span>
+                        </span>
+                        <button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply" className="grid size-7 place-items-center rounded-full text-muted hover:bg-foreground/10 hover:text-foreground"><X className="size-3.5" /></button>
+                      </div>
+                    </motion.div>
+                  )}
                   {tagged && (
                     <motion.div key="tag" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                       <div className="mb-2 flex items-center gap-2.5 rounded-2xl border border-accent/30 bg-accent/10 p-1.5 pr-2.5">
@@ -1149,7 +1246,7 @@ export default function CommunityPage() {
                     {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="ml-0.5 size-4" />}
                   </button>
                 </div>
-                <p className="mt-1.5 hidden px-2 text-xs text-muted sm:block">Enter to send, Shift+Enter for a new line. Double-click a message to heart it. Wrap words in ||bars|| to hide spoilers.</p>
+                <p className="mt-1.5 hidden px-2 text-xs text-muted sm:block">Enter to send, Shift+Enter for a new line. Hold (or right-click) a message to reply or react. Wrap words in ||bars|| to hide spoilers.</p>
                 </>)}
               </div>
             </main>
@@ -1165,6 +1262,19 @@ export default function CommunityPage() {
           </LayoutGroup>
         </div>
       </div>
+
+      <MsgMenu
+        open={!!menuMsg}
+        preview={menuMsg ? previewOf(menuMsg.content) : ''}
+        mine={!!menuMsg && isMine(menuMsg) && !isTemp(menuMsg.id)}
+        mineReacts={menuMsg ? (reacts[menuMsg.id] ?? []).filter((r) => r.mine).map((r) => r.emoji) : []}
+        onClose={() => setMenuId(null)}
+        onReact={(e) => menuMsg && void react(menuMsg, e)}
+        onReply={() => menuMsg && startReply(menuMsg)}
+        onCopy={() => menuMsg && void navigator.clipboard?.writeText(menuMsg.content).then(() => toast('Copied', 'info'), () => toast('Could not copy', 'error'))}
+        onEdit={() => { if (menuMsg) { setEditId(menuMsg.id); setEditText(menuMsg.content) } }}
+        onUnsend={() => menuMsg && void remove(menuMsg.id)}
+      />
 
       {/* ----------------------------------------------------------- sheets */}
       <Sheet open={pulseOpen} onClose={() => setPulseOpen(false)} title="Room pulse">

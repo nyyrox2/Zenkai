@@ -1,0 +1,1 @@
+{"version": 1, "include": ["/sw.js", "/api/*", "/proxy", "/anime/*", "/mal/*", "/movies/*", "/manga/*", "/watch/*"], "exclude": []}

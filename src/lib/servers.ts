@@ -66,11 +66,21 @@ export const SERVERS: ServerDef[] = [
   { id: '2embed', name: '2Embed', note: 'Embed · TMDB', kind: 'embed', audio: false, url: (c) => tv(c, (i) => `https://www.2embed.stream/embed/movie/${i}`, (i, s) => `https://www.2embed.stream/embed/tv/${i}/${s}/${c.episode}`) },
 ]
 
-export const serverById = (id: string) =>
-  SERVERS.find((s) => s.id === id) ??
-  (id === 'flixcloud-1' || id === 'flixcloud-2' ? SERVERS.find((s) => s.id === 'flixcloud') : undefined) ??
-  (id === 'recloud' ? SERVERS.find((s) => s.id === 'reanime') : undefined) ??
-  SERVERS[0]
+export const serverById = (id: string) => {
+  const norm = (id || '').toLowerCase().trim()
+  const canonical =
+    norm.includes('flixcloud') || norm === 'hd-1' ? 'flixcloud' :
+    norm.includes('vidstream') || norm === 'hd-3' ? 'vidstream' :
+    norm.includes('megaplay') || norm === 'hd-2' ? 'megaplay' :
+    norm.includes('acdn') || norm.includes('salt') ? 'acdn' :
+    norm
+  return (
+    SERVERS.find((s) => s.id === canonical) ??
+    SERVERS.find((s) => s.id === norm) ??
+    (norm === 'recloud' ? SERVERS.find((s) => s.id === 'reanime') : undefined) ??
+    SERVERS[0]
+  )
+}
 
 /** Direct (Zenkai player) servers; all are offered for both SUB and DUB. */
 export const DIRECT = SERVERS.filter((s) => s.kind === 'direct')

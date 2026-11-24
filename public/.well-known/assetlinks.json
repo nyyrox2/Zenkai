@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.nyyrox.aniverse",
+      "sha256_cert_fingerprint_array": [
+        "24:02:5F:3F:AF:61:C1:5D:66:E7:9E:DA:94:0C:F6:1E:33:4B:E3:3E:C6:17:4C:6C:09:D7:B7:13:CF:3F:DB:FF",
+        "8D:EA:25:2A:B0:B6:87:51:81:7E:06:E1:5C:D9:08:B4:E8:CC:69:03:F0:59:BE:07:5E:8E:19:58:AD:77:21:6D"
+      ]
+    }
+  }
+]

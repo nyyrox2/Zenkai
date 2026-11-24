@@ -140,15 +140,14 @@ function isAllowedDomain(urlStr) {
 function isApkAuthorized(request, env) {
   const barrierToken = env?.ZENKAI_BARRIER || DEFAULT_BARRIER_TOKEN;
   const reqBarrier = request.headers.get("X-Zenkai-Barrier");
-  if (reqBarrier && (reqBarrier === barrierToken || reqBarrier === DEFAULT_BARRIER_TOKEN)) {
-    return true;
-  }
   const clientHeader = request.headers.get("X-Zenkai-Client") || "";
   const ua = request.headers.get("User-Agent") || "";
-  if (clientHeader.startsWith("Zenkai-Android") && (/Zenkai/i.test(ua) || /Aniverse/i.test(ua))) {
-    return true;
-  }
-  return false;
+
+  // Strictly require both the barrier secret token and the Zenkai-Android signature
+  const hasValidBarrier = reqBarrier && (reqBarrier === barrierToken || reqBarrier === DEFAULT_BARRIER_TOKEN);
+  const hasValidClient = clientHeader.startsWith("Zenkai-Android") && (/Zenkai/i.test(ua) || /Aniverse/i.test(ua));
+
+  return Boolean(hasValidBarrier && hasValidClient);
 }
 
 /**

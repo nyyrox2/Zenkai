@@ -1,0 +1,23 @@
+{
+	"appId": "com.nyyrox.aniverse",
+	"appName": "Zenkai",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https",
+		"cleartext": true
+	},
+	"android": {
+		"allowMixedContent": true,
+		"captureInput": true,
+		"webContentsDebuggingEnabled": true,
+		"loggingBehavior": "debug",
+		"backgroundColor": "#0a0a0c",
+		"overrideUserAgent": "Zenkai/1.0.6 (Android; Capacitor)",
+		"appendUserAgent": "Zenkai/1.0.6"
+	},
+	"plugins": {
+		"CapacitorHttp": {
+			"enabled": true
+		}
+	}
+}

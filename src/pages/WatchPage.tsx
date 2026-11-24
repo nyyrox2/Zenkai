@@ -160,6 +160,7 @@ export default function WatchPage() {
   const [isMicActive, setIsMicActive] = useState(false)
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const [chatOpen, setChatOpen] = useState(false)
+  const [showAppBanner, setShowAppBanner] = useState(true)
   // latest page state for the room callbacks: they are created once at join time, so reading render-time values there would be stale
   const goRef = useRef<(p: { ep?: number; server?: string; audio?: string }, replace?: boolean, fromPartySync?: boolean) => void>(() => {})
   const live = useRef({ ep: 0, server: '', audio: 'sub', dubOk: true, track: null as { label: string; lang: string } | null })
@@ -331,15 +332,17 @@ export default function WatchPage() {
         const L = live.current
         if (!newRoom.isHost) {
           // same server / episode / audio as the host? (late joiner, or someone picked a different one by accident)
+          const hostServer = payload.server ? serverById(payload.server).id : undefined
+          const currentServer = serverById(L.server).id
           const wantEp = !!payload.episode && payload.episode !== L.ep
-          const wantServer = !!payload.server && payload.server !== L.server
-          const wantAudio = !wantServer && !!payload.audio && payload.audio !== L.audio && (payload.audio === 'sub' || L.dubOk)
+          const wantServer = !!hostServer && hostServer !== currentServer
+          const wantAudio = !!payload.audio && payload.audio !== L.audio && (payload.audio === 'sub' || L.dubOk)
           const wantTrack = !wantServer && !!payload.audioTrack && !!L.track && !sameTrack(L.track, payload.audioTrack)
-          const sig = [wantEp && `e${payload.episode}`, wantServer && `s${payload.server}`, wantAudio && `a${payload.audio}`, wantTrack && `t${payload.audioTrack?.lang}${payload.audioTrack?.label}`].filter(Boolean).join('|')
+          const sig = [wantEp && `e${payload.episode}`, wantServer && `s${hostServer}`, wantAudio && `a${payload.audio}`, wantTrack && `t${payload.audioTrack?.lang}${payload.audioTrack?.label}`].filter(Boolean).join('|')
           if (drift(sig)) {
             showNotice('Synced with the party host')
             if (wantEp || wantServer || wantAudio) {
-              goRef.current({ ...(wantEp ? { ep: payload.episode } : {}), ...(wantServer ? { server: payload.server } : {}), ...(wantAudio ? { audio: payload.audio } : {}) }, false, true)
+              goRef.current({ ...(wantEp ? { ep: payload.episode } : {}), ...(wantServer ? { server: hostServer } : {}), ...(wantAudio ? { audio: payload.audio } : {}) }, false, true)
             }
             if (wantTrack && payload.audioTrack) setPartyTrack({ ...payload.audioTrack, token: Date.now() })
           }
@@ -373,8 +376,9 @@ export default function WatchPage() {
     })
 
     newRoom.onServerChange((newServer) => {
-      showNotice(`Party host switched server to ${newServer}`)
-      goRef.current({ server: newServer }, false, true)
+      const canonical = serverById(newServer).id
+      showNotice(`Party host switched server to ${serverById(newServer).name}`)
+      goRef.current({ server: canonical }, false, true)
     })
 
     newRoom.onAudioChange((newAudio) => {
@@ -427,6 +431,10 @@ export default function WatchPage() {
             navigate(movieRoomOf(record) ? movieRoomPath(record, urlRoom) : `/watch/${record.anime_id}?room=${urlRoom}&ep=${record.episode}&server=${record.server}&audio=${record.audio}`, { replace: true })
             return
           }
+          if (!amHost) {
+            const canonicalSrv = serverById(record.server).id
+            goRef.current({ ep: record.episode, server: canonicalSrv, audio: record.audio }, true, true)
+          }
           connectToRoom(urlRoom, amHost)
           reopenAfterProfile(urlRoom)
         } else {
@@ -437,6 +445,48 @@ export default function WatchPage() {
       })()
     }
   }, [urlRoom, room, title, id, user?.id, connectToRoom, navigate])
+
+  // Open Zenkai APK prompt on Android
+  const [showAppPrompt, setShowAppPrompt] = useState(false)
+
+  useEffect(() => {
+    if (!urlRoom) return
+    const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent)
+    if (!isAndroid) return
+
+    const sessionKey = `zk:apk_prompt_${urlRoom}`
+    if (!sessionStorage.getItem(sessionKey)) {
+      setShowAppPrompt(true)
+    }
+  }, [urlRoom])
+
+  const handleOpenInApp = () => {
+    setShowAppPrompt(false)
+    sessionStorage.setItem(`zk:apk_prompt_${urlRoom}`, '1')
+    const fallbackUrl = `${window.location.origin}/app`
+    const intentUrl = `intent://watch/${id}?ep=${ep}&room=${encodeURIComponent(urlRoom || '')}#Intent;scheme=zenkai;package=com.nyyrox.aniverse;S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end;`
+
+    const start = Date.now()
+    const timer = setTimeout(() => {
+      if (!document.hidden && Date.now() - start < 3000) {
+        window.location.href = fallbackUrl
+      }
+    }, 1500)
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        clearTimeout(timer)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange, { once: true })
+
+    window.location.href = intentUrl
+  }
+
+  const handleStayOnWeb = () => {
+    setShowAppPrompt(false)
+    sessionStorage.setItem(`zk:apk_prompt_${urlRoom}`, '1')
+  }
 
   // Periodic heartbeat when host + touch Supabase record to refresh 30-min window
   useEffect(() => {
@@ -851,6 +901,38 @@ export default function WatchPage() {
           {/* Player (+ party chat docked at ~24% beside it on desktop) */}
           <div className="lg:flex lg:items-stretch lg:gap-3">
           <div className="min-w-0 flex-1">
+          {urlRoom && typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent) && showAppBanner && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-gradient-to-r from-red-600/90 to-rose-700/90 px-4 py-2.5 text-xs text-white shadow-lg">
+              <div className="flex items-center gap-2">
+                <Film className="size-4 shrink-0" />
+                <span>Watching on Android? Open in Zenkai App for zero-lag Watch Together!</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={`intent://watch/${id}?ep=${ep}&room=${encodeURIComponent(urlRoom)}#Intent;scheme=zenkai;package=com.nyyrox.aniverse;S.browser_fallback_url=${encodeURIComponent(`${window.location.origin}/app`)};end;`}
+                  onClick={() => {
+                    const fallbackUrl = `${window.location.origin}/app`
+                    const start = Date.now()
+                    const timer = setTimeout(() => {
+                      if (!document.hidden && Date.now() - start < 3000) {
+                        window.location.href = fallbackUrl
+                      }
+                    }, 1500)
+                    const onVisibilityChange = () => {
+                      if (document.hidden) clearTimeout(timer)
+                    }
+                    document.addEventListener('visibilitychange', onVisibilityChange, { once: true })
+                  }}
+                  className="rounded-lg bg-white px-3 py-1 text-[11px] font-bold text-black shadow hover:bg-white/90 active:scale-95"
+                >
+                  Open App
+                </a>
+                <button type="button" onClick={() => setShowAppBanner(false)} className="p-1 text-white/70 hover:text-white">
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
           {!sessionVerified && server.kind !== 'embed' ? (
             <Frame>
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
@@ -1836,6 +1918,47 @@ export default function WatchPage() {
         onSelectShow={handleChangeShow}
         currentAnimeId={id}
       />
+      {showAppPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-[#121216] border border-white/10 p-6 shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-full bg-white/10 flex items-center justify-center text-xl">
+              🍿
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Watch Party Detected</h3>
+              <p className="text-xs text-white/60 mt-1">
+                Room <span className="font-mono font-semibold text-white">{urlRoom}</span> is ready. Would you like to watch in the Zenkai Android App or continue on Web?
+              </p>
+            </div>
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={handleOpenInApp}
+                className="w-full py-2.5 px-4 rounded-xl bg-white text-black font-semibold text-sm hover:bg-white/90 active:scale-95 transition cursor-pointer"
+              >
+                Open in Zenkai App
+              </button>
+              <button
+                type="button"
+                onClick={handleStayOnWeb}
+                className="w-full py-2.5 px-4 rounded-xl bg-white/5 border border-white/10 text-white font-medium text-sm hover:bg-white/10 active:scale-95 transition cursor-pointer"
+              >
+                Stay on Web
+              </button>
+              <a
+                href="/app"
+                onClick={() => {
+                  setShowAppPrompt(false)
+                  sessionStorage.setItem(`zk:apk_prompt_${urlRoom}`, '1')
+                }}
+                className="block text-xs text-white/50 hover:text-white/80 pt-1 transition underline underline-offset-4"
+              >
+                Don't have the app? Download APK
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
     <Footer />
     </>

@@ -856,16 +856,21 @@ export interface Quest {
 }
 
 export const DAILY_QUEST_TEMPLATES: Quest[] = [
+  { id: 'daily_login', type: 'daily', title: 'Hunter Check-in', description: 'Visit Zenkai today to maintain your streak', target: 1, xpReward: 20, category: 'login', icon: '🔥' },
   { id: 'daily_watch', type: 'daily', title: 'Daily Screening', description: 'Watch at least 1 anime episode (80%+)', target: 1, xpReward: 25, category: 'watch', icon: '🎬' },
   { id: 'daily_manga', type: 'daily', title: 'Chapter Sprint', description: 'Read 1 complete manga chapter', target: 1, xpReward: 15, category: 'manga', icon: '📖' },
   { id: 'daily_novel', type: 'daily', title: 'Literary Voyage', description: 'Read 2 light novel chapters', target: 2, xpReward: 30, category: 'novel', icon: '📜' },
-  { id: 'daily_login', type: 'daily', title: 'Hunter Check-in', description: 'Visit Zenkai today to maintain your streak', target: 1, xpReward: 20, category: 'login', icon: '🔥' },
+  { id: 'daily_community', type: 'daily', title: 'Lounge Transmission', description: 'Send a message in the Community Lounge', target: 1, xpReward: 15, category: 'social', icon: '💬' },
+  { id: 'daily_watchlist', type: 'daily', title: 'Intel Gathering', description: 'Add a new title to your watchlist or library', target: 1, xpReward: 15, category: 'social', icon: '🔖' },
+  { id: 'daily_party', type: 'daily', title: 'Co-op Raid', description: 'Join or host a Watch Together party session', target: 1, xpReward: 35, category: 'watch', icon: '⚔️' },
 ]
 
 export const WEEKLY_QUEST_TEMPLATES: Quest[] = [
-  { id: 'weekly_watch_10', type: 'weekly', title: 'Binge Marauder', description: 'Watch 10 anime episodes throughout the week', target: 10, xpReward: 150, category: 'watch', icon: '📺' },
-  { id: 'weekly_manga_10', type: 'weekly', title: 'Manga Marathon', description: 'Read 10 manga chapters', target: 10, xpReward: 100, category: 'manga', icon: '📚' },
+  { id: 'weekly_watch_10', type: 'weekly', title: 'Binge Marauder', description: 'Watch 10 anime episodes or movies throughout the week', target: 10, xpReward: 150, category: 'watch', icon: '📺' },
+  { id: 'weekly_manga_10', type: 'weekly', title: 'Manga Marathon', description: 'Read 10 manga or comic chapters', target: 10, xpReward: 100, category: 'manga', icon: '📚' },
   { id: 'weekly_novel_5', type: 'weekly', title: 'Archivist', description: 'Read 5 novel chapters', target: 5, xpReward: 75, category: 'novel', icon: '🖋️' },
+  { id: 'weekly_community_5', type: 'weekly', title: 'Guild Chatter', description: 'Send 5 messages in Community Lounge', target: 5, xpReward: 60, category: 'social', icon: '⚡' },
+  { id: 'weekly_party_3', type: 'weekly', title: 'Squad Syndicate', description: 'Join or host 3 Watch Together sessions', target: 3, xpReward: 120, category: 'watch', icon: '🛡️' },
   { id: 'weekly_quests_10', type: 'weekly', title: 'Mission Vanguard', description: 'Complete 10 daily quest missions', target: 10, xpReward: 200, category: 'social', icon: '⭐' },
 ]
 

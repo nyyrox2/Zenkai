@@ -1,0 +1,1 @@
+var r="Nyyrox/Zenkai",a=`https://github.com/${r}`,t=`${a}/releases/latest`,e=`${a}/releases`,E=`${a}/issues`,s="https://github.com/nyyrox2/Zenkai",R=`${s}.git`,v="https://discord.gg/ndKGCks6v",L="https://t.me/StreamverseOfc";export{a as n,L as r,v as t};

@@ -339,7 +339,7 @@ export async function recordProgressionActivity({
   refId,
   periodKey,
 }: {
-  action: 'watch_episode' | 'watch_movie' | 'send_message' | 'read_manga_chapter' | 'read_novel_chapter' | 'daily_login' | 'streak_milestone'
+  action: 'watch_episode' | 'watch_movie' | 'send_message' | 'read_manga_chapter' | 'read_novel_chapter' | 'daily_login' | 'streak_milestone' | 'add_watchlist' | 'watch_party'
   xp: number
   refId: string
   periodKey?: string
@@ -398,6 +398,14 @@ export async function recordProgressionActivity({
     advanceQuest('weekly_novel_5', 1)
   } else if (action === 'daily_login') {
     advanceQuest('daily_login', 1)
+  } else if (action === 'send_message') {
+    advanceQuest('daily_community', 1)
+    advanceQuest('weekly_community_5', 1)
+  } else if (action === 'add_watchlist') {
+    advanceQuest('daily_watchlist', 1)
+  } else if (action === 'watch_party') {
+    advanceQuest('daily_party', 1)
+    advanceQuest('weekly_party_3', 1)
   }
 
   // 3. Update state in local reactive storage (instant zero-latency UX)
@@ -521,9 +529,22 @@ export async function claimQuestReward(questId: string): Promise<boolean> {
 
   ascensionCell.set(nextState)
 
-  // Keep in localdata; ONLY push to cloud if claiming this quest caused a Level Up
-  if (levelUp !== null || newLevel > state.level) {
-    void pushAscensionToCloud(nextState)
+  // Push authoritative claim to Supabase
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user?.id) {
+      void supabase.rpc('claim_user_quest', {
+        p_quest_id: questId,
+        p_period_key: quest.periodKey,
+        p_xp_reward: xpReward,
+        p_quest_type: template?.type || 'daily',
+        p_title: template?.title || '',
+        p_target: quest.target,
+      })
+      void pushAscensionToCloud(nextState)
+    }
+  } catch (err) {
+    console.warn('[Ascension] Error pushing quest claim to cloud:', err)
   }
 
   return true
@@ -741,6 +762,35 @@ export async function syncAscensionWithCloud(userId: string, force: boolean = fa
         equippedFrame: profile.equipped_frame || null,
         equippedFontStyle: profile.equipped_font_style || state.equippedFontStyle,
       })
+
+      // Pull authoritative quest states for today and current week from user_quests table
+      const today = TODAY()
+      const currentWeek = CURRENT_WEEK()
+      try {
+        const { data: cloudQuests } = await supabase
+          .from('user_quests')
+          .select('*')
+          .eq('user_id', userId)
+          .or(`period_key.eq.${today},period_key.eq.${currentWeek}`)
+
+        if (cloudQuests && cloudQuests.length > 0) {
+          const updatedQuests = { ...merged.quests }
+          for (const cq of cloudQuests) {
+            const existing = updatedQuests[cq.quest_id]
+            updatedQuests[cq.quest_id] = {
+              questId: cq.quest_id,
+              progress: Math.max(existing?.progress || 0, Number(cq.progress) || 0),
+              target: Number(cq.target) || existing?.target || 1,
+              completed: Boolean(cq.completed) || (existing?.completed ?? false),
+              claimed: Boolean(cq.claimed) || (existing?.claimed ?? false),
+              periodKey: cq.period_key,
+            }
+          }
+          merged.quests = updatedQuests
+        }
+      } catch (qErr) {
+        console.warn('[Ascension] Error pulling cloud quests:', qErr)
+      }
 
       ascensionCell.set(merged)
       await checkAchievements(merged, true) // achievements aren't stored in profiles; without this every login re-awarded them all

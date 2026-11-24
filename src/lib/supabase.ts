@@ -28,7 +28,11 @@ export interface CommunityPost {
   likes: number
   pinned: boolean
   edited?: boolean
+  reply_to?: string | null
+  reply_snap?: { name: string; text: string } | null
 }
+
+export type ReactionMap = Record<string, { emoji: string; n: number; mine: boolean }[]>
 
 export interface StreamReport {
   id?: string
@@ -77,6 +81,8 @@ export async function createCommunityPost(post: {
   anime_title?: string
   anime_id?: string
   anime_image?: string
+  reply_to?: string | null
+  reply_snap?: { name: string; text: string } | null
 }): Promise<CommunityPost | null> {
   try {
     // Posting needs an account; RLS (supabase/community_auth.sql) enforces the same on the server.
@@ -101,6 +107,8 @@ export async function createCommunityPost(post: {
           likes: 0,
           pinned: false,
           edited: false,
+          // only sent when replying, so posting still works before community_replies_reactions.sql is run
+          ...(post.reply_to ? { reply_to: post.reply_to, reply_snap: post.reply_snap ?? null } : {}),
         },
       ])
       .select()
@@ -152,6 +160,35 @@ export async function likeCommunityPost(id: string, currentLikes: number): Promi
   } catch (err) {
     console.error('[Supabase] Error liking post:', err)
     return currentLikes
+  }
+}
+
+/** Reaction counts for a channel; null on failure (e.g. SQL not run yet) so the UI keeps what it has. */
+export async function getCommunityReactions(category: string): Promise<ReactionMap | null> {
+  try {
+    const { data, error } = await supabase.rpc('get_community_reactions', { p_category: category })
+    if (error) throw error
+    const out: ReactionMap = {}
+    for (const r of (data || []) as { post_id: string; emoji: string; n: number | string; mine: boolean }[]) (out[r.post_id] ||= []).push({ emoji: r.emoji, n: Number(r.n), mine: r.mine })
+    return out
+  } catch {
+    return null
+  }
+}
+
+export async function toggleCommunityReaction(postId: string, emoji: string, on: boolean): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const uid = session?.user?.id
+    if (!uid) return false
+    const { error } = on
+      ? await supabase.from('community_reactions').insert({ post_id: postId, user_id: uid, emoji })
+      : await supabase.from('community_reactions').delete().eq('post_id', postId).eq('user_id', uid).eq('emoji', emoji)
+    if (error && error.code !== '23505') throw error // 23505 = already reacted: fine
+    return true
+  } catch (err) {
+    console.error('[Supabase] Error toggling reaction:', err)
+    return false
   }
 }
 

@@ -126,7 +126,7 @@ export class WatchTogetherRoom {
     server: string
     user: { id?: string; username: string; displayName: string; avatar: string | null }
   }) {
-    this.roomId = options.roomId
+    this.roomId = options.roomId.trim().toLowerCase()
     this.isHost = options.isHost
     this.animeId = options.animeId
     this.episode = options.episode
@@ -240,6 +240,8 @@ export class WatchTogetherRoom {
         const still = this.channel?.presenceState()?.[key]
         if (still && still.length > 0) return
         if (this.chimed.delete(key)) playLeave()
+        const leaving = this.peers.get(key)
+        const wasHost = leaving?.isHost
         const pc = this.peerConnections.get(key)
         if (pc) {
           pc.close()
@@ -257,10 +259,25 @@ export class WatchTogetherRoom {
         this.peerVoiceStates.delete(key)
         this.peers.delete(key)
         this.notifyPeersChanged()
+
+        if (wasHost) {
+          this.checkAndPromoteNextHost()
+        }
       })
 
     // WebRTC Signaling over Supabase Broadcast
     this.channel
+      .on('broadcast', { event: 'host_promoted' }, ({ payload }) => {
+        if (payload?.peerId) {
+          for (const [id, peer] of this.peers.entries()) {
+            peer.isHost = (id === payload.peerId)
+          }
+          if (payload.peerId === this.peerId) {
+            this.isHost = true
+          }
+          this.notifyPeersChanged()
+        }
+      })
       .on('broadcast', { event: 'signal:offer' }, async ({ payload }) => {
         if (payload.targetPeerId !== this.peerId) return
         await this.handleRemoteOffer(payload.fromPeerId, payload.sdp)
@@ -560,40 +577,47 @@ export class WatchTogetherRoom {
 
   /** Route incoming P2P or Broadcast packets */
   private handleIncomingData(data: any) {
-    if (!data || data.senderId === this.peerId) return
+    if (!data) return
+    const senderId = data.senderId || data.payload?.senderId
+    if (senderId && senderId === this.peerId) return
+
+    // Identify if packet is SYNC (either wrapped { kind: 'SYNC', payload } or direct { type: 'PLAY', ... })
+    const isSync = data.kind === 'SYNC' || (!data.kind && Boolean(data.type))
+    const syncPayload = (data.kind === 'SYNC' ? data.payload : (data.payload || data)) as SyncPayload
 
     // If host-only control is enforced, non-hosts must only accept sync commands originating from the host
-    if (this.hostOnlyControl && !this.isHost && data.kind === 'SYNC') {
-      const sender = this.peers.get(data.senderId)
+    if (this.hostOnlyControl && !this.isHost && isSync) {
+      const sender = senderId ? this.peers.get(senderId) : undefined
       if (sender && !sender.isHost) {
         return // Reject unauthorized sync packet from non-host peer
       }
     }
 
-    switch (data.kind) {
-      case 'SYNC': {
-        const payload = data.payload as SyncPayload
-        if (payload.type === 'CHANGE_SHOW' && payload.animeId) {
-          this.animeId = payload.animeId
-          if (payload.animeTitle) this.animeTitle = payload.animeTitle
-          if (payload.episode) this.episode = payload.episode
-          this.onShowChangeCallback?.(payload.animeId, payload.animeTitle || '', payload.episode || 1)
-        } else if (payload.type === 'CHANGE_EP' && payload.episode) {
-          this.episode = payload.episode
-          this.onEpisodeChangeCallback?.(payload.episode)
-        } else if (payload.type === 'CHANGE_SERVER' && payload.server) {
-          this.server = payload.server
-          this.onServerChangeCallback?.(payload.server)
-        } else if (payload.type === 'CHANGE_AUDIO' && payload.audio) {
-          this.onAudioChangeCallback?.(payload.audio)
-        } else if (payload.type === 'CHANGE_AUDIO_TRACK' && payload.audioTrack) {
-          this.audioTrack = payload.audioTrack
-          this.onAudioTrackChangeCallback?.(payload.audioTrack)
-        } else {
-          this.onSyncCallback?.(payload)
-        }
-        break
+    if (isSync && syncPayload) {
+      const payload = syncPayload
+      if (payload.type === 'CHANGE_SHOW' && payload.animeId) {
+        this.animeId = payload.animeId
+        if (payload.animeTitle) this.animeTitle = payload.animeTitle
+        if (payload.episode) this.episode = payload.episode
+        this.onShowChangeCallback?.(payload.animeId, payload.animeTitle || '', payload.episode || 1)
+      } else if (payload.type === 'CHANGE_EP' && payload.episode) {
+        this.episode = payload.episode
+        this.onEpisodeChangeCallback?.(payload.episode)
+      } else if (payload.type === 'CHANGE_SERVER' && payload.server) {
+        this.server = payload.server
+        this.onServerChangeCallback?.(payload.server)
+      } else if (payload.type === 'CHANGE_AUDIO' && payload.audio) {
+        this.onAudioChangeCallback?.(payload.audio)
+      } else if (payload.type === 'CHANGE_AUDIO_TRACK' && payload.audioTrack) {
+        this.audioTrack = payload.audioTrack
+        this.onAudioTrackChangeCallback?.(payload.audioTrack)
+      } else {
+        this.onSyncCallback?.(payload)
       }
+      return
+    }
+
+    switch (data.kind) {
       case 'CHAT': {
         this.onChatCallback?.(data.payload as WatchChatMessage)
         break
@@ -642,7 +666,7 @@ export class WatchTogetherRoom {
       void this.channel?.send({
         type: 'broadcast',
         event: eventName,
-        payload: data.payload,
+        payload: data.kind === 'SYNC' ? data : data.payload,
       })
     }
   }
@@ -922,6 +946,39 @@ export class WatchTogetherRoom {
 
   private notifyPeersChanged() {
     this.onPeersChangeCallback?.(this.getPeers())
+  }
+
+  private checkAndPromoteNextHost() {
+    const hasHost = Array.from(this.peers.values()).some((p) => p.isHost)
+    if (hasHost) return
+
+    const candidates = Array.from(this.peers.values()).sort((a, b) => a.peerId.localeCompare(b.peerId))
+    const nextHost = candidates[0]
+    if (!nextHost) {
+      import('./watchRooms').then(({ deleteWatchRoom }) => {
+        void deleteWatchRoom(this.roomId)
+      })
+      return
+    }
+
+    if (nextHost.peerId === this.peerId) {
+      this.isHost = true
+      nextHost.isHost = true
+      this.peers.set(this.peerId, nextHost)
+      this.notifyPeersChanged()
+
+      void this.channel?.send({
+        type: 'broadcast',
+        event: 'host_promoted',
+        payload: { peerId: this.peerId },
+      })
+
+      import('./watchRooms').then(({ updateWatchRoom }) => {
+        void updateWatchRoom(this.roomId, {
+          // updates room record
+        })
+      })
+    }
   }
 
   /** Close WebRTC connections and unsubscribe from room */

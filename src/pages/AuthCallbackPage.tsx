@@ -56,10 +56,11 @@ export default function AuthCallbackPage() {
     return ''
   }, [activePayload, activeAccessToken, activeRefreshToken, initialAccessToken, initialRefreshToken])
 
+  const fallbackDownloadUrl = typeof window !== 'undefined' ? `${window.location.origin}/app` : '/app'
   const customSchemeUrl = resolvedPayload ? `zenkai://auth/callback?${resolvedPayload}#${resolvedPayload}` : 'zenkai://auth/callback'
   const androidIntentUrl = resolvedPayload
-    ? `intent://auth/callback?${resolvedPayload}#${resolvedPayload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
-    : 'intent://auth/callback#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;'
+    ? `intent://auth/callback?${resolvedPayload}#${resolvedPayload}#Intent;scheme=zenkai;package=com.nyyrox.aniverse;S.browser_fallback_url=${encodeURIComponent(fallbackDownloadUrl)};end;`
+    : `intent://auth/callback#Intent;scheme=zenkai;package=com.nyyrox.aniverse;S.browser_fallback_url=${encodeURIComponent(fallbackDownloadUrl)};end;`
 
   useEffect(() => {
     let unmounted = false
@@ -68,7 +69,7 @@ export default function AuthCallbackPage() {
       if (!payload) return
       setRedirectAttempted(true)
       const customUrl = `zenkai://auth/callback?${payload}#${payload}`
-      const intentUrl = `intent://auth/callback?${payload}#${payload}#Intent;scheme=zenkai;package=com.nyyrox.zenkai;end;`
+      const intentUrl = `intent://auth/callback?${payload}#${payload}#Intent;scheme=zenkai;package=com.nyyrox.aniverse;S.browser_fallback_url=${encodeURIComponent(fallbackDownloadUrl)};end;`
 
       const isAndroid = /android/i.test(navigator.userAgent)
       if (isAndroid) {
