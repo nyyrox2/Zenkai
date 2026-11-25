@@ -18,14 +18,14 @@ export async function requestMicrophoneStream(): Promise<MediaStream> {
   // 1. Modern standard API
   if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
     try {
-      // First try standard mobile-safe audio constraint
-      return await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Echo cancellation matters here: the movie plays from the same speakers the mic hears
+      return await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      })
     } catch (err: any) {
-      // If error is not a user rejection, try with detailed constraints
+      // Constraints unsupported: fall back to the plain, most compatible request
       if (err?.name === 'OverconstrainedError' || err?.name === 'ConstraintNotSatisfiedError') {
-        return await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true },
-        })
+        return await navigator.mediaDevices.getUserMedia({ audio: true })
       }
       throw err
     }

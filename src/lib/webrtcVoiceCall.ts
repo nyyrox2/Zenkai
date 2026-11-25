@@ -1,17 +1,11 @@
 import { supabase } from './supabase'
 import { requestMicrophoneStream } from './microphone'
 import { allowSendingAudio, sendAudioTrack } from './rtcAudio'
+import { ICE_SERVERS } from './iceServers'
 import { playConnected, playHangup, playMicOff, playMicOn, startRinging, stopRinging } from './sounds'
 
 const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' },
-  ],
+  iceServers: ICE_SERVERS,
   iceCandidatePoolSize: 6,
 }
 

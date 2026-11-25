@@ -2,6 +2,7 @@ import { playJoin, playLeave, playMicOff, playMicOn } from './sounds'
 import { supabase } from './supabase'
 import { requestMicrophoneStream } from './microphone'
 import { allowSendingAudio, sendAudioTrack, silenceAudio } from './rtcAudio'
+import { ICE_SERVERS } from './iceServers'
 
 export interface PeerMember {
   peerId: string
@@ -65,14 +66,9 @@ export interface SyncPayload {
   senderId: string
 }
 
-// STUN configuration using Google's public STUN servers for NAT traversal
+// STUN + TURN (see iceServers.ts): TURN relays voice when a direct link is blocked
 const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-  ],
+  iceServers: ICE_SERVERS,
   iceCandidatePoolSize: 6,
 }
 
@@ -90,6 +86,10 @@ export class WatchTogetherRoom {
   private peerConnections: Map<string, RTCPeerConnection> = new Map()
   private dataChannels: Map<string, RTCDataChannel> = new Map()
   private peers: Map<string, PeerMember> = new Map()
+  /** ICE candidates that arrived before the remote description was set (they used to be dropped) */
+  private pendingIce: Map<string, RTCIceCandidateInit[]> = new Map()
+  private connectTimers: Map<string, number> = new Map()
+  private connectAttempts: Map<string, number> = new Map()
 
   // Voice Chat Mesh Properties
   private localAudioStream: MediaStream | null = null
@@ -357,6 +357,35 @@ export class WatchTogetherRoom {
       this.peerConnections.delete(key)
     }
     this.dataChannels.delete(key)
+    this.pendingIce.delete(key)
+    this.clearConnectTimer(key)
+  }
+
+  private clearConnectTimer(key: string) {
+    const t = this.connectTimers.get(key)
+    if (t !== undefined) window.clearTimeout(t)
+    this.connectTimers.delete(key)
+  }
+
+  /** If the direct link is still not up after a while, the offering side rebuilds it (max 4 tries; broadcast keeps sync alive meanwhile) */
+  private armConnectWatchdog(key: string, pc: RTCPeerConnection, ms = 12000) {
+    this.clearConnectTimer(key)
+    this.connectTimers.set(
+      key,
+      window.setTimeout(() => {
+        if (this.isDestroyed || pc !== this.peerConnections.get(key) || !this.peers.has(key)) return
+        if (pc.connectionState === 'connected') return
+        const n = (this.connectAttempts.get(key) ?? 0) + 1
+        this.connectAttempts.set(key, n)
+        if (n <= 4 && this.shouldInitiate(key)) void this.initiatePeerConnection(key)
+      }, ms)
+    )
+  }
+
+  private async flushIce(key: string, pc: RTCPeerConnection) {
+    const queued = this.pendingIce.get(key)
+    this.pendingIce.delete(key)
+    for (const c of queued ?? []) await pc.addIceCandidate(c).catch(() => {})
   }
 
   /** Host/Initiator creates WebRTC connection & DataChannel to target peer */
@@ -397,6 +426,7 @@ export class WatchTogetherRoom {
           sdp: offer,
         },
       })
+      this.armConnectWatchdog(targetPeerId, pc)
     } catch (err) {
       console.warn('[WebRTC] initiatePeerConnection error:', err)
     }
@@ -423,6 +453,7 @@ export class WatchTogetherRoom {
       }
 
       await pc.setRemoteDescription(new RTCSessionDescription(sdp))
+      await this.flushIce(fromPeerId, pc)
       allowSendingAudio(pc)
       const liveTrack = this.localAudioStream?.getAudioTracks()[0]
       if (liveTrack && this.localAudioStream) await sendAudioTrack(pc, liveTrack, this.localAudioStream)
@@ -449,6 +480,7 @@ export class WatchTogetherRoom {
       const pc = this.peerConnections.get(fromPeerId)
       if (pc && pc.signalingState !== 'stable') {
         await pc.setRemoteDescription(new RTCSessionDescription(sdp))
+        await this.flushIce(fromPeerId, pc)
       }
     } catch (err) {
       console.warn('[WebRTC] handleRemoteAnswer error:', err)
@@ -458,10 +490,16 @@ export class WatchTogetherRoom {
   /** Both peers exchange ICE candidates */
   private async handleRemoteIceCandidate(fromPeerId: string, candidate: RTCIceCandidateInit) {
     try {
+      if (!candidate) return
       const pc = this.peerConnections.get(fromPeerId)
-      if (pc && candidate) {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate))
+      if (!pc || !pc.remoteDescription) {
+        // too early: keep it until the remote description is set
+        const q = this.pendingIce.get(fromPeerId) ?? []
+        q.push(candidate)
+        this.pendingIce.set(fromPeerId, q)
+        return
       }
+      await pc.addIceCandidate(new RTCIceCandidate(candidate))
     } catch (err) {
       console.warn('[WebRTC] handleRemoteIceCandidate error:', err)
     }
@@ -510,6 +548,8 @@ export class WatchTogetherRoom {
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState
       if (state === 'connected') {
+        this.clearConnectTimer(targetPeerId)
+        this.connectAttempts.delete(targetPeerId)
         const peer = this.peers.get(targetPeerId)
         if (peer) {
           peer.p2pConnected = true
@@ -522,6 +562,8 @@ export class WatchTogetherRoom {
           peer.p2pConnected = false
           this.notifyPeersChanged()
         }
+        // 'disconnected' often recovers by itself; if it doesn't, the offering side rebuilds the link
+        if (state === 'disconnected') this.armConnectWatchdog(targetPeerId, pc, 6000)
         // Broadcast fallback keeps sync alive meanwhile; the offering side retries the direct link
         if (state === 'failed' && !this.isDestroyed && this.shouldInitiate(targetPeerId)) {
           window.setTimeout(() => {
@@ -544,6 +586,12 @@ export class WatchTogetherRoom {
         this.notifyPeersChanged()
       }
       this.onConnectionStatusChangeCallback?.('p2p')
+      // a newcomer can't know we're already speaking
+      if (this.isMicActive) {
+        try {
+          dc.send(JSON.stringify({ kind: 'VOICE_STATUS', senderId: this.peerId, payload: { peerId: this.peerId, micActive: true } }))
+        } catch { /* channel not ready */ }
+      }
       // bring a late joiner onto the host's current audio rendition
       if (this.isHost && this.audioTrack) {
         try {
@@ -557,6 +605,7 @@ export class WatchTogetherRoom {
     }
 
     dc.onclose = () => {
+      if (this.dataChannels.get(peerId) !== dc) return // a stale channel closing must not wipe its replacement
       this.dataChannels.delete(peerId)
       const peer = this.peers.get(peerId)
       if (peer) {
@@ -838,6 +887,10 @@ export class WatchTogetherRoom {
         const audioTrack = this.localAudioStream.getAudioTracks()[0]
         if (audioTrack) {
           audioTrack.enabled = true
+          // the OS can end the capture (unplugged headset, app backgrounded): reflect it instead of showing a dead mic as live
+          audioTrack.onended = () => {
+            if (this.isMicActive && this.localAudioStream?.getAudioTracks()[0] === audioTrack) void this.toggleMic().catch(() => {})
+          }
 
           for (const pc of this.peerConnections.values()) {
             await sendAudioTrack(pc, audioTrack, this.localAudioStream).catch((e) => console.warn('[WebRTC] sendAudioTrack', e))
@@ -984,6 +1037,9 @@ export class WatchTogetherRoom {
   /** Close WebRTC connections and unsubscribe from room */
   public destroy() {
     this.isDestroyed = true
+    for (const t of this.connectTimers.values()) window.clearTimeout(t)
+    this.connectTimers.clear()
+    this.pendingIce.clear()
 
     if (this.localAudioStream) {
       this.localAudioStream.getTracks().forEach((t) => t.stop())
