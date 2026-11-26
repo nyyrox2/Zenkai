@@ -98,7 +98,11 @@ export function isHelperApkActive(): boolean {
 }
 
 export function getHelperBaseUrl(): string {
-  return activeBaseUrl || `http://127.0.0.1:${state.port || HELPER_DEFAULT_PORT}`
+  if (activeBaseUrl) return activeBaseUrl
+  if (typeof window !== 'undefined' && window.location.port === String(HELPER_DEFAULT_PORT)) {
+    return window.location.origin
+  }
+  return `http://127.0.0.1:${state.port || HELPER_DEFAULT_PORT}`
 }
 
 export function isLocalHelperUrl(url: string | undefined | null): boolean {
@@ -154,10 +158,15 @@ export async function probeHelperApk(force = false): Promise<boolean> {
     }
     try {
       const custom = getCustomHelperUrl()
+      const sameHostBridge =
+        typeof window !== 'undefined' && window.location.port === String(HELPER_DEFAULT_PORT)
+          ? window.location.origin
+          : null
       const port = state.port || HELPER_DEFAULT_PORT
       const candidates = Array.from(
         new Set(
           [
+            sameHostBridge,
             activeBaseUrl,
             `http://127.0.0.1:${port}`,
             `http://localhost:${port}`,

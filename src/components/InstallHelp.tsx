@@ -34,7 +34,7 @@ export function InstallHelp() {
               </ol>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <a href={HELPER_APK_DOWNLOAD_URL} download="ZenkaiHelper.apk" className="text-xs font-bold text-accent">Download Helper APK →</a>
-                <button type="button" onClick={() => launchHelperApp()} className="text-xs font-semibold text-white/80 underline">Launch Helper</button>
+                <button type="button" onClick={() => launchHelperApp()} className="text-xs font-semibold text-foreground/85 underline hover:text-foreground">Launch Helper</button>
                 <Link to="/extension" className="text-xs font-semibold text-muted hover:text-foreground">Setup page →</Link>
               </div>
             </motion.div>

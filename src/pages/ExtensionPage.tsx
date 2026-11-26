@@ -91,7 +91,7 @@ export default function ExtensionPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-emerald-400">
-                    Zenkai Helper APK Connected (v{companion.apkVersion || '1.0.1'})
+                    Zenkai Helper APK Connected (v{companion.apkVersion || '1.0.2'})
                   </h3>
                   <p className="text-xs text-emerald-300/80">
                     Bridge active at <code className="font-mono">{companion.helperUrl || HELPER_BASE_URL}</code>
@@ -134,7 +134,7 @@ export default function ExtensionPage() {
             <a
               href={HELPER_APK_DOWNLOAD_URL}
               download="ZenkaiHelper.apk"
-              className="inline-flex items-center gap-2.5 rounded-full bg-accent px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-accent/25 transition hover:brightness-110 active:scale-95"
+              className="inline-flex items-center gap-2.5 rounded-full bg-accent px-7 py-3.5 text-sm font-bold text-accent-fg shadow-xl shadow-accent/25 transition hover:brightness-110 active:scale-95"
             >
               <Smartphone className="size-4" /> Download Helper APK
             </a>
@@ -156,7 +156,7 @@ export default function ExtensionPage() {
             </button>
           </div>
           <span className="mt-2.5 block text-[11px] text-muted">
-            Zenkai Helper APK v1.0.1 · Runs on Android 8+ · Localhost &amp; Same-Wi-Fi LAN bridge on port 48912
+            Zenkai Helper APK v1.0.2 · Runs on Android 8+ · Localhost &amp; Same-Wi-Fi LAN bridge on port 48912
           </span>
 
           {/* Same Wi-Fi / LAN Pairing for PC, Laptop, Smart TV or 2nd Phone */}
@@ -165,14 +165,15 @@ export default function ExtensionPage() {
               Use Over Same Wi-Fi (PC / TV / Another Phone)
             </h3>
             <p className="mt-1 text-xs text-muted leading-relaxed">
-              Run Zenkai Helper APK on one Android phone, connect this browser to the same Wi-Fi, and paste the phone&rsquo;s Wi-Fi URL shown in the Helper app (e.g. <code className="font-mono text-white/80">http://192.168.1.42:48912</code>).
+              1) Open <strong>Zenkai Helper APK</strong> on your Android phone and copy its exact <strong>Wi-Fi URL</strong>.<br/>
+              2) On your PC / TV / second phone on the <strong>same Wi-Fi</strong>, open <code className="font-mono text-emerald-300">http://&lt;phone-wifi-ip&gt;:48912</code> directly in your browser and tap <strong>Open Zenkai Movies</strong> (zero HTTPS blocks), or paste the exact Wi-Fi URL below.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <input
                 type="text"
                 value={lanInput}
                 onChange={(e) => setLanInput(e.target.value)}
-                placeholder="http://192.168.x.x:48912"
+                placeholder="Paste exact Wi-Fi URL from Helper app (e.g. http://<phone-ip>:48912)"
                 className="min-w-[200px] flex-1 rounded-xl border border-white/15 bg-black/40 px-3 py-2 font-mono text-xs text-white placeholder:text-white/30 focus:border-accent focus:outline-none"
               />
               <button
@@ -180,14 +181,14 @@ export default function ExtensionPage() {
                 onClick={async () => {
                   const saved = setCustomHelperUrl(lanInput)
                   if (!saved && lanInput.trim()) {
-                    toast('Enter a valid URL like http://192.168.1.42:48912', 'error')
+                    toast('Enter the exact Wi-Fi URL shown in your Helper app', 'error')
                     return
                   }
                   setChecking(true)
                   const ok = await probeHelperApk(true)
                   setChecking(false)
                   toast(
-                    ok ? `Connected to Helper at ${saved || HELPER_BASE_URL}!` : 'Saved URL — allow Insecure Content if browser blocks HTTP on HTTPS site',
+                    ok ? `Connected to Helper at ${saved || HELPER_BASE_URL}!` : 'Could not reach Helper over HTTPS. Open the Wi-Fi URL directly in your browser (http://<phone-ip>:48912/movies) or allow Insecure Content in Site Settings.',
                     ok ? 'success' : 'info',
                   )
                 }}

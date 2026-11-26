@@ -501,7 +501,7 @@ export default function MovieWatchPage() {
                           <a
                             href={HELPER_APK_DOWNLOAD_URL}
                             download="ZenkaiHelper.apk"
-                            className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-bold text-white transition active:scale-95"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-bold text-accent-fg shadow-md shadow-accent/20 transition active:scale-95"
                           >
                             <Download className="size-3.5" /> Download Helper APK
                           </a>
