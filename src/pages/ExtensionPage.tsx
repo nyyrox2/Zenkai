@@ -91,7 +91,7 @@ export default function ExtensionPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-emerald-400">
-                    Zenkai Helper APK Connected (v{companion.apkVersion || '1.0.2'})
+                    Zenkai Helper APK Connected (v{companion.apkVersion || '1.0.3'})
                   </h3>
                   <p className="text-xs text-emerald-300/80">
                     Bridge active at <code className="font-mono">{companion.helperUrl || HELPER_BASE_URL}</code>
@@ -156,7 +156,7 @@ export default function ExtensionPage() {
             </button>
           </div>
           <span className="mt-2.5 block text-[11px] text-muted">
-            Zenkai Helper APK v1.0.2 · Runs on Android 8+ · Localhost &amp; Same-Wi-Fi LAN bridge on port 48912
+            Zenkai Helper APK v1.0.3 · Runs on Android 8+ · Localhost &amp; Same-Wi-Fi LAN bridge on port 48912
           </span>
 
           {/* Same Wi-Fi / LAN Pairing for PC, Laptop, Smart TV or 2nd Phone */}
