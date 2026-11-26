@@ -1,5 +1,6 @@
 import { tmdbDirect, tmdbEpisodesDirect } from './tmdbDirect'
-import { isCompanionActive, companionHas } from '../lib/useCompanion'
+import { isCompanionActive, companionHas, isExtensionActive } from '../lib/useCompanion'
+import { isHelperApkActive, helperProxyUrl } from '../lib/helperClient'
 import { resolveAcdnClient, getResolveTrace, type ClientStream } from '../lib/acdnClient'
 import { toast } from '../lib/toast'
 
@@ -203,15 +204,20 @@ async function resolveInBrowser(p: StreamParams): Promise<StreamResult | null> {
   const c: ClientStream | null = await resolveAcdnClient(q)
   if (!c) return null
   const viaProxy = `/proxy?url=${encodeURIComponent(c.streamUrl)}&referer=${encodeURIComponent(c.referer)}`
+  const useHelper = !isExtensionActive() && isHelperApkActive()
+  const activePlayUrl = useHelper ? helperProxyUrl(c.streamUrl, c.referer) : c.streamUrl
   return {
     server: 'ACDN',
     audio: 'multi',
     multiAudio: true,
-    streamUrl: c.streamUrl,
+    streamUrl: activePlayUrl,
     rawStreamUrl: c.streamUrl,
     fallbackStreamUrl: apiUrl(viaProxy),
     referer: c.referer,
-    subtitles: c.subtitles,
+    subtitles: (c.subtitles || []).map((s) => ({
+      ...s,
+      file: useHelper ? helperProxyUrl(s.file, c.referer) : s.file,
+    })),
     intro: null,
     outro: null,
     clientResolved: true,
@@ -253,7 +259,7 @@ async function fetchStreamFromApi(p: StreamParams): Promise<StreamResult> {
   const isFlixCloud = r.server?.toLowerCase().includes('flixcloud') || r.rawStreamUrl?.includes('parse-flixcloud')
   const isAcdn = r.server?.toLowerCase().includes('acdn') || r.rawStreamUrl?.includes('ravok.buzz') || r.rawStreamUrl?.includes('as-cdn')
 
-  // Only direct CDNs (VidStream / MegaPlay) bypass the proxy when Zenkai Companion is active
+  // Only direct CDNs (VidStream / MegaPlay) bypass the worker proxy when Companion is active
   if (hasCompanion && !isFlixCloud && !isAcdn) {
     let directUrl = r.rawStreamUrl
     if (!directUrl && r.streamUrl && r.streamUrl.includes('url=')) {
@@ -263,7 +269,9 @@ async function fetchStreamFromApi(p: StreamParams): Promise<StreamResult> {
       } catch {}
     }
     if (directUrl && (directUrl.startsWith('http://') || directUrl.startsWith('https://'))) {
-      activeUrl = directUrl
+      activeUrl = (!isExtensionActive() && isHelperApkActive())
+        ? helperProxyUrl(directUrl, r.referer)
+        : directUrl
     }
   }
 

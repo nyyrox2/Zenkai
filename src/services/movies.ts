@@ -1,7 +1,22 @@
 /** Movies + TV: TMDB catalogue (through /api/movies) and the embed servers (through /api/providers). */
 import { apiUrl } from './api'
 import { listProviders, providerUrl } from '../lib/providers'
-import { isCompanionActive } from '../lib/useCompanion'
+import { isExtensionActive } from '../lib/useCompanion'
+import {
+  getHelperBaseUrl,
+  helperProxyUrl,
+  isHelperApkActive,
+  probeHelperApk,
+} from '../lib/helperClient'
+
+export const DIRECT_MOVIE_SERVER_IDS = new Set([
+  'moviebox',
+  'moviebox-regional',
+  'hdhub4u',
+  'moviesdrive',
+  'bollyflix',
+  'rogmovies',
+])
 
 export type MediaType = 'movie' | 'tv'
 
@@ -325,23 +340,58 @@ export async function fetchMovieBoxStream(p: {
   year?: string
   dubId?: string | null
   imdbId?: string | null
+  regional?: boolean
+  serverId?: string | null
 }): Promise<MovieStreamResult> {
+  const rawServer = (p.serverId || 'moviebox').toLowerCase()
+  const helperServer = rawServer === 'moviebox-regional' ? 'moviebox' : rawServer
+  const isMovieBoxVariant = rawServer === 'moviebox' || rawServer === 'moviebox-regional'
+
   const qs = new URLSearchParams({
     id: String(p.id),
     type: p.type,
     s: String(p.season ?? 1),
     e: String(p.episode ?? 1),
+    server: helperServer,
   })
   if (p.title) qs.set('title', p.title)
   if (p.year) qs.set('year', p.year)
   if (p.dubId) qs.set('dub', p.dubId)
   if (p.imdbId) qs.set('imdb', p.imdbId)
+  if (p.regional) qs.set('regional', 'true')
 
   let data: any = null
   let resOk = false
+  let helperAttemptError: string | null = null
 
-  // 1. Primary: Direct Railway midman call (fast, global US MovieBox profile, direct streaming proxy)
-  if (RAILWAY_URL) {
+  // 0. Preferred: On-device Zenkai Helper APK local bridge (bypasses Cloudflare limits completely)
+  const helperReady = isHelperApkActive() || (await probeHelperApk())
+  if (helperReady) {
+    try {
+      const helperRes = await fetch(`${getHelperBaseUrl()}/api/movies/stream?${qs}`, {
+        signal: AbortSignal.timeout(isMovieBoxVariant ? 20000 : 48000),
+        cache: 'no-store',
+      })
+      if (helperRes.ok) {
+        const d = await helperRes.json().catch(() => null)
+        if (d && d.success === true && (d.streams?.length > 0 || d.streamUrl)) {
+          data = d
+          resOk = true
+        } else if (d?.error) {
+          helperAttemptError = d.error
+        }
+      }
+    } catch (e) {
+      helperAttemptError = (e as Error)?.message || null
+    }
+  } else if (!isMovieBoxVariant) {
+    throw new Error(
+      `HELPER_APK_REQUIRED:${rawServer} runs locally through Zenkai Helper APK to bypass Cloudflare limits. Download or open Zenkai Helper APK to play directly.`,
+    )
+  }
+
+  // 1. Primary fallback for MovieBox: Direct Railway midman call
+  if (!resOk && isMovieBoxVariant && RAILWAY_URL) {
     const railwayUrl = `${RAILWAY_URL}/api/movies/stream?${qs}`
     try {
       const res = await fetch(railwayUrl, {
@@ -369,8 +419,8 @@ export async function fetchMovieBoxStream(p: {
     } catch {}
   }
 
-  // 2. Secondary: Cloudflare Pages Worker / local resolver fallback
-  if (!resOk) {
+  // 2. Secondary fallback for MovieBox: Cloudflare Pages Worker
+  if (!resOk && isMovieBoxVariant) {
     try {
       const res = await fetch(apiUrl(`/api/movies/stream?${qs}`))
       if (res.ok) {
@@ -389,7 +439,7 @@ export async function fetchMovieBoxStream(p: {
   }
 
   if (!data?.success || !data?.streams?.length) {
-    throw new Error(data?.error ?? 'MovieBox stream not available for this title')
+    throw new Error(data?.error ?? helperAttemptError ?? `${rawServer} stream not available for this title`)
   }
 
   // Ensure subtitles are populated even if primary midman did not return them
@@ -440,6 +490,12 @@ export async function fetchMovieBoxStream(p: {
 
   const resolveProxyStreamUrl = (u?: string, rawUrl?: string) => {
     if (!u) return u
+    if (u.startsWith('http://127.0.0.1:')) return u
+
+    if (helperReady && rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) && !u.startsWith('http://127.0.0.1:')) {
+      return helperProxyUrl(rawUrl)
+    }
+
     const isWebMirror = (rawUrl && rawUrl.includes('bcdnxw')) || u.includes('bcdnxw')
 
     // On local machine (dev server), ALWAYS use the local domestic proxy for bcdnxw
@@ -465,9 +521,10 @@ export async function fetchMovieBoxStream(p: {
 
   const resolveStreamUrl = (u?: string, rawUrl?: string) => {
     if (!u) return u
+    if (u.startsWith('http://127.0.0.1:')) return u
 
-    // If Zenkai Companion extension is active, use the raw CDN stream DIRECTLY with zero proxies!
-    if (isCompanionActive()) {
+    // Only Chrome Extension injects headers transparently via declarativeNetRequest on raw URLs
+    if (!helperReady && isExtensionActive()) {
       let directUrl = rawUrl
       if (!directUrl && u.includes('url=')) {
         try {
@@ -481,6 +538,15 @@ export async function fetchMovieBoxStream(p: {
     }
 
     return resolveProxyStreamUrl(u, rawUrl)
+  }
+
+  const resolveSubUrl = (u: string) => {
+    if (!u) return u
+    if (u.startsWith('http://127.0.0.1:')) return u
+    if (helperReady && /^https?:\/\//i.test(u) && !u.includes('/proxy?')) {
+      return helperProxyUrl(u, 'https://opensubtitles.org/')
+    }
+    return resolveStreamUrl(u)
   }
 
   return {
@@ -503,10 +569,12 @@ export async function fetchMovieBoxStream(p: {
     }),
     subtitles: (rawSubs || []).map((s: { id: string; label: string; language: string; lang: string; url: string; source: string }) => ({
       ...s,
-      url: resolveStreamUrl(s.url),
+      url: resolveSubUrl(s.url),
     })),
   }
 }
+
+export const fetchDirectMovieStream = fetchMovieBoxStream
 
 export async function resolveProvider(p: { providerId: string; type: MediaType; tmdbId: number; season?: number; episode?: number }): Promise<string> {
   const url = providerUrl(p.providerId, p.type, p.tmdbId, p.season ?? 1, p.episode ?? 1)

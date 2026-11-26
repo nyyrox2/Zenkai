@@ -177,6 +177,7 @@ export default function App() {
               <Route path="/top" element={<CatalogPage preset="top" />} />
               <Route path="/browse" element={<CatalogPage preset="browse" />} />
               <Route path="/list" element={<ListPage />} />
+              <Route path="/watchlist" element={<ListPage />} />
               <Route path="/ranking" element={<RankingPage />} />
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/app" element={<AppPage />} />

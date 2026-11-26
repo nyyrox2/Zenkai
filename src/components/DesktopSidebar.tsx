@@ -1,10 +1,11 @@
 import { MyName } from './MyName'
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   House,
   Clapperboard,
   Compass,
+  Bookmark,
   Trophy,
   CalendarDays,
   BookOpen,
@@ -22,6 +23,7 @@ import { cn } from '../lib/utils'
 import { useSearch } from '../context/SearchContext'
 import { useProfile } from '../lib/profile'
 import { useAuth } from '../context/AuthContext'
+import { useList } from '../lib/library'
 import { Avatar } from './Avatar'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -36,6 +38,7 @@ const MAIN: Item[] = [
   { label: 'Home', to: '/home', icon: House, match: (p) => p === '/' || p === '/home' },
   { label: 'Movies & TV', to: '/movies', icon: Clapperboard, match: (p) => p.startsWith('/movies') },
   { label: 'Browse', to: '/browse', icon: Compass, match: (p) => p.startsWith('/browse') || p === '/trending' || p === '/popular' || p === '/top' },
+  { label: 'Watchlist', to: '/list', icon: Bookmark, match: (p) => p === '/list' || p === '/watchlist' },
   { label: 'Ranking', to: '/ranking', icon: Trophy, match: (p) => p.startsWith('/ranking') },
   { label: 'Schedule', to: '/schedule', icon: CalendarDays, match: (p) => p.startsWith('/schedule') },
   { label: 'Manga', to: '/manga', icon: BookOpen, match: (p) => p.startsWith('/manga') },
@@ -95,6 +98,18 @@ export const DesktopSidebar = memo(function DesktopSidebar({ collapsed, onToggle
   const { openSearch } = useSearch()
   const { user } = useAuth()
   const profile = useProfile()
+  const list = useList()
+
+  const mainItems = useMemo(
+    () =>
+      MAIN.map((item) => {
+        if (item.label === 'Watchlist' && list.length > 0) {
+          return { ...item, badge: list.length }
+        }
+        return item
+      }),
+    [list.length],
+  )
 
   const isLoggedIn = Boolean(user)
   const displayName = isLoggedIn
@@ -120,6 +135,20 @@ export const DesktopSidebar = memo(function DesktopSidebar({ collapsed, onToggle
             <button type="button" onClick={() => openSearch()} title="Search (Ctrl + K)" className={cn(iconBtn, 'size-10 rounded-xl')}>
               <Search className="size-5" />
             </button>
+            <Link
+              to="/list"
+              title="Watchlist"
+              className={cn(
+                iconBtn,
+                'size-10 rounded-xl relative',
+                (pathname === '/list' || pathname === '/watchlist') && 'bg-foreground/[0.10] text-foreground ring-1 ring-foreground/10'
+              )}
+            >
+              <Bookmark className="size-5" />
+              {list.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-emerald-500" />
+              )}
+            </Link>
           </div>
         ) : (
           <div className="flex h-11 items-center justify-between px-2">
@@ -131,6 +160,20 @@ export const DesktopSidebar = memo(function DesktopSidebar({ collapsed, onToggle
               </div>
             </Link>
             <div className="flex shrink-0 items-center gap-0.5">
+              <Link
+                to="/list"
+                title="Watchlist"
+                className={cn(
+                  iconBtn,
+                  'size-8 rounded-lg relative',
+                  (pathname === '/list' || pathname === '/watchlist') && 'text-foreground bg-foreground/[0.08]'
+                )}
+              >
+                <Bookmark className="size-4" />
+                {list.length > 0 && (
+                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-500" />
+                )}
+              </Link>
               <button type="button" onClick={() => openSearch()} title="Search (Ctrl + K)" className={cn(iconBtn, 'size-8 rounded-lg')}>
                 <Search className="size-4" />
               </button>
@@ -142,7 +185,7 @@ export const DesktopSidebar = memo(function DesktopSidebar({ collapsed, onToggle
         )}
 
         <nav className="w-full space-y-1 pt-0.5">
-          {MAIN.map((item) => (
+          {mainItems.map((item) => (
             <NavItem
               key={item.label}
               item={item}

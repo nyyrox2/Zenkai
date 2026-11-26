@@ -836,6 +836,7 @@ export async function handle(request, env) {
     const year = q("year");
     const dubId = q("dub") || null;
     const imdbId = q("imdb");
+    const isRegional = q("regional") === "true";
 
     if (!tmdbId && !title) return json({ error: "Missing id or title" }, 400);
 
@@ -850,7 +851,7 @@ export async function handle(request, env) {
     )?.replace(/\/+$/, "");
 
     try {
-      const cacheKey = `mb:${tmdbId}:${type}:${season}:${episode}:${dubId || "default"}`;
+      const cacheKey = `mb:${tmdbId}:${type}:${season}:${episode}:${dubId || (isRegional ? "regional" : "default")}`;
       const hit = memo.get(cacheKey);
       let res = null;
       let localErrMsg = "";
@@ -860,7 +861,7 @@ export async function handle(request, env) {
       } else {
         // Tier 1: Local edge MovieBox resolver (fast, direct, robust on Cloudflare Pages)
         try {
-          res = await resolveMovieBoxStream({ tmdbId, type, season, episode, title, year, dubId, proxyBase, midmanUrl, env });
+          res = await resolveMovieBoxStream({ tmdbId, type, season, episode, title, year, dubId, proxyBase, midmanUrl, env, preferRegional: isRegional });
         } catch (localErr) {
           localErrMsg = localErr.message || String(localErr);
           console.warn("[MovieBox] Local resolver error, falling back to midman:", localErr.message);
@@ -877,7 +878,8 @@ export async function handle(request, env) {
               ...(title ? { title } : {}),
               ...(year ? { year } : {}),
               ...(dubId ? { dub: dubId } : {}),
-              ...(imdbId ? { imdb: imdbId } : {})
+              ...(imdbId ? { imdb: imdbId } : {}),
+              ...(isRegional ? { regional: "true" } : {})
             });
             const railwayStream = `${midmanUrl}/api/movies/stream?${extQs.toString()}`;
             const proxyStream = `${proxyBase}?url=${encodeURIComponent(railwayStream)}`;

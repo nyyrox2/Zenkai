@@ -4,7 +4,7 @@
 type SearchType  = 'tmdb' | 'anilist';
 type ContentType = 'movie' | 'tv' | 'anime';
 
-type Tag = 'Multi audio' | '4K';
+type Tag = 'Multi audio' | '4K' | 'Direct' | 'Regional';
 
 interface ProviderDef {
   id:             string;
@@ -20,12 +20,80 @@ interface ProviderDef {
 }
 
 const PROVIDER_DEFS: ProviderDef[] = [
-  // ── Top three (multi audio: the audio track is switched inside the player itself) ──
-  // Order shown in the UI: Scarlet Witch, Captain America, Iron Man, then the rest.
-  // ── Videasy (4K, Netflix overlay, built-in episode selector) ──
+  // ── MovieBox (Direct stream player with multi-audio dubs) ──
+  {
+    id: 'moviebox', label: 'MovieBox (Direct HLS)',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 0,
+    tags: ['Direct', 'Multi audio', '4K'],
+    movieUrl: (id) => `/api/movies/stream?id=${id}&type=movie`,
+    tvUrl:    (id, s, e) => `/api/movies/stream?id=${id}&type=tv&s=${s}&e=${e}`,
+  },
+  // ── Regional HLS Server (Direct stream player auto-selecting Indian & Regional dubs) ──
+  {
+    id: 'moviebox-regional', label: 'Regional HLS (Direct)',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 1,
+    tags: ['Direct', 'Regional', 'Multi audio', '4K'],
+    movieUrl: (id) => `/api/movies/stream?id=${id}&type=movie&regional=true`,
+    tvUrl:    (id, s, e) => `/api/movies/stream?id=${id}&type=tv&s=${s}&e=${e}&regional=true`,
+  },
+  // ── Regional Servers (Indian & Pan-Asian Regional Audio Specialists) ──
+  // ── Cineverse / ModiPlay (Shang-Chi: MultiMovies #1 Bollywood & South Indian server) ──
+  {
+    id: 'cineverse', label: 'Shang-Chi (Regional)',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 2,
+    tags: ['Regional', 'Multi audio'],
+    movieUrl: (id) => `https://rozgarlelo.modiplay.xyz/embed/tmdb/movie?id=${id}`,
+    tvUrl:    (id, s, e) => `https://rozgarlelo.modiplay.xyz/embed/tmdb/tv?id=${id}&s=${s}&e=${e}`,
+  },
+  // ── Vidbolt (Quicksilver: Fast Regional & Multi-Audio server) ──
+  {
+    id: 'vidbolt', label: 'Quicksilver (Regional)',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 3,
+    tags: ['Regional', 'Multi audio'],
+    movieUrl: (id) => `https://vidbolt.xyz/movie/${id}`,
+    tvUrl:    (id, s, e) => `https://vidbolt.xyz/tv/${id}/${s}/${e}`,
+  },
+  // ── Vidout (Daredevil: Cloudflare edge regional mirror) ──
+  {
+    id: 'vidout', label: 'Daredevil (Regional)',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 4,
+    tags: ['Regional', 'Multi audio'],
+    movieUrl: (id) => `https://vidout.pages.dev/movie/tmdb_${id}`,
+    tvUrl:    (id, s, e) => `https://vidout.pages.dev/tv/tmdb_${id}_${s}_${e}`,
+  },
+  // ── Top tier: Multi-audio & 4K embeds (no extension required) ──
+  // ── VidLink (Deadpool: 4K, Multi-audio, clean modern UI, customized theme) ──
+  {
+    id: 'vidlink', label: 'Deadpool (4K)',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 5,
+    tags: ['Multi audio', '4K'],
+    movieUrl: (id) =>
+      `https://vidlink.pro/movie/${id}?primaryColor=E50914&secondaryColor=121319&iconColor=ffffff`,
+    tvUrl: (id, s, e) =>
+      `https://vidlink.pro/tv/${id}/${s}/${e}?primaryColor=E50914&secondaryColor=121319&iconColor=ffffff`,
+  },
+  // ── CinemaOS (Scarlet Witch) ──
+  {
+    id: 'cinemaos', label: 'Scarlet Witch',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv', 'anime'], priority: 6,
+    tags: ['Regional', 'Multi audio'],
+    movieUrl: (id, lang = 'en') => `https://cinemaos.tech/player/${id}?lang=${lang}`,
+    tvUrl:    (id, s, e, lang = 'en') => `https://cinemaos.tech/player/${id}/${s}/${e}?lang=${lang}`,
+    animeUrl: (id, ep, lang = 'en') => `https://cinemaos.tech/player/${id}/1/${ep}?lang=${lang}`,
+  },
+  // ── Vidzee (Captain America) ──
+  {
+    id: 'vidzee', label: 'Captain America',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv', 'anime'], priority: 7,
+    tags: ['Regional', 'Multi audio'],
+    movieUrl: (id, lang = 'en') => `https://player.vidzee.wtf/embed/movie/${id}?lang=${lang}`,
+    tvUrl:    (id, s, e, lang = 'en') => `https://player.vidzee.wtf/embed/tv/${id}/${s}/${e}?lang=${lang}`,
+    animeUrl: (id, ep, lang = 'en') => `https://player.vidzee.wtf/embed/tv/${id}/1/${ep}?lang=${lang}`,
+  },
+  // ── Videasy (Iron Man: 4K, Netflix overlay, built-in episode selector) ──
   {
     id: 'videasy', label: 'Iron Man (4K)',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 3,
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 8,
     tags: ['Multi audio', '4K'],
     movieUrl: (id) =>
       `https://player.videasy.to/movie/${id}?color=E50914&overlay=true&nextEpisode=true`,
@@ -38,77 +106,74 @@ const PROVIDER_DEFS: ProviderDef[] = [
     animeUrl: (id, ep) =>
       `https://player.videasy.to/anime/${id}/${ep}?color=E50914&overlay=true&nextEpisode=true&autoplayNextEpisode=true`,
   },
-  // ── Multi-audio ─────────────────────────────────────────────────────────────
+  // ── SmashyStream (Wolverine: multi-server fallback, ultra high uptime) ──
   {
-    id: 'vidzee', label: 'Captain America',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv', 'anime'], priority: 2,
-    tags: ['Multi audio'],
-    movieUrl: (id, lang = 'en') => `https://player.vidzee.wtf/embed/movie/${id}?lang=${lang}`,
-    tvUrl:    (id, s, e, lang = 'en') => `https://player.vidzee.wtf/embed/tv/${id}/${s}/${e}?lang=${lang}`,
-    animeUrl: (id, ep, lang = 'en') => `https://player.vidzee.wtf/embed/tv/${id}/1/${ep}?lang=${lang}`,
+    id: 'smashystream', label: 'Wolverine',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 8,
+    movieUrl: (id) => `https://player.smashystream.com/movie/${id}`,
+    tvUrl:    (id, s, e) => `https://player.smashystream.com/tv/${id}?s=${s}&e=${e}`,
   },
-  // ── General ─────────────────────────────────────────────────────────────────
+  // ── Vidsrc.pm (Loki: high-speed VIP mirror covering entire TMDB catalog) ──
+  {
+    id: 'vidsrc-pm', label: 'Loki',
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 9,
+    movieUrl: (id) => `https://vidsrc.pm/embed/movie/${id}`,
+    tvUrl:    (id, s, e) => `https://vidsrc.pm/embed/tv/${id}/${s}/${e}`,
+  },
+  // ── Additional Movie & TV providers ──────────────────────────────────────────
+  {
+    id: 'nontongo', label: 'Vision',
+    searchType: 'tmdb', contentTypes: ['movie'], priority: 10,
+    movieUrl: (id) => `https://www.NontonGo.win/embed/movie/${id}`,
+  },
   {
     id: 'vidup', label: 'Thor',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 5,
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 11,
     movieUrl: (id) => `https://vidup.to/movie/${id}?server=zenith`,
     tvUrl:    (id, s, e) => `https://vidup.to/tv/${id}/${s}/${e}?server=zenith`,
   },
   {
     id: 'vidcore', label: 'Hulk',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 6,
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 12,
     movieUrl: (id) => `https://vidcore.net/movie/${id}?server=Crystal&autoPlay=true`,
     tvUrl:    (id, s, e) => `https://vidcore.net/tv/${id}/${s}/${e}?server=Crystal&autoPlay=true`,
   },
   {
     id: 'vidsrc-ru', label: 'Black Widow',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 7,
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 13,
     movieUrl: (id) => `https://vidsrcme.ru/embed/movie/${id}`,
     tvUrl:    (id, s, e) => `https://vidsrcme.ru/embed/tv/${id}/${s}/${e}`,
   },
   {
     id: 'vidlove', label: 'Hawkeye',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv', 'anime'], priority: 8,
+    searchType: 'tmdb', contentTypes: ['movie', 'tv', 'anime'], priority: 14,
     movieUrl: (id) => `https://player.vidlove.cc/embed/movie/${id}`,
     tvUrl:    (id, s, e) => `https://player.vidlove.cc/embed/tv/${id}/${s}/${e}`,
     animeUrl: (id, ep) => `https://player.vidlove.cc/embed/tv/${id}/1/${ep}`,
   },
   {
     id: '1embed', label: 'Spider-Man',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv', 'anime'], priority: 9,
+    searchType: 'tmdb', contentTypes: ['movie', 'tv', 'anime'], priority: 15,
     movieUrl: (id) => `https://1embed.cc/embed/movie/${id}`,
     tvUrl:    (id, s, e) => `https://1embed.cc/embed/tv/${id}/${s}/${e}`,
     animeUrl: (id, ep) => `https://1embed.cc/embed/tv/${id}/1/${ep}`,
   },
   {
     id: 'cinesrc', label: 'Doctor Strange',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 10,
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 16,
     movieUrl: (id) => `https://cinesrc.st/embed/movie/${id}`,
     tvUrl:    (id, s, e) => `https://cinesrc.st/embed/tv/${id}/${s}/${e}`,
   },
   {
     id: 'primesrc', label: 'Black Panther',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 11,
+    searchType: 'tmdb', contentTypes: ['movie', 'tv'], priority: 17,
     movieUrl: (id) => `https://primesrc.me/embed/movie?tmdb=${id}`,
     tvUrl:    (id, s, e) =>
       `https://primesrc.me/embed/tv?tmdb=${id}&season=${s}&episode=${e}&fallback=false&serverOrder=PrimeVid,Voe,Dood`,
   },
   {
-    id: 'cinemaos', label: 'Scarlet Witch',
-    searchType: 'tmdb', contentTypes: ['movie', 'tv', 'anime'], priority: 1,
-    tags: ['Multi audio'],
-    movieUrl: (id, lang = 'en') => `https://cinemaos.tech/player/${id}?lang=${lang}`,
-    tvUrl:    (id, s, e, lang = 'en') => `https://cinemaos.tech/player/${id}/${s}/${e}?lang=${lang}`,
-    animeUrl: (id, ep, lang = 'en') => `https://cinemaos.tech/player/${id}/1/${ep}?lang=${lang}`,
-  },
-  {
-    id: 'nontongo', label: 'Vision',
-    searchType: 'tmdb', contentTypes: ['movie'], priority: 4,
-    movieUrl: (id) => `https://www.NontonGo.win/embed/movie/${id}`,
-  },
-  {
     id: 'vidnest-tv', label: 'Ant-Man',
-    searchType: 'tmdb', contentTypes: ['tv'], priority: 12,
+    searchType: 'tmdb', contentTypes: ['tv'], priority: 18,
     tvUrl: (id, s, e) => `https://vidnest.fun/tv/${id}/${s}/${e}`,
   },
   // ── Anime-only (AniList routing) ────────────────────────────────────────────

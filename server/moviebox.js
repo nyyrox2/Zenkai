@@ -614,6 +614,7 @@ export async function resolveMovieBoxStream({
   proxyBase = '/proxy',
   midmanUrl = '',
   env = null,
+  preferRegional = false,
 }) {
   let resolvedTitle = title;
   let resolvedYear = year;
@@ -665,7 +666,7 @@ export async function resolveMovieBoxStream({
   const targetYearNum = parseInt(resolvedYear || '0', 10);
   const subDivider = resolvedTitle.split(/[:\-–]/)[0].trim();
 
-  // 2. Search MovieBox: try primary title, then alternate queries if needed
+  // 2. Search MovieBox: try primary title, alternate queries, and regional variants (Hindi, Tamil, Telugu)
   const searchQueries = [resolvedTitle];
   if (originalTitle && originalTitle !== resolvedTitle) searchQueries.push(originalTitle);
   if (subDivider && subDivider.length >= 3 && subDivider !== resolvedTitle && !searchQueries.includes(subDivider)) {
@@ -675,12 +676,41 @@ export async function resolveMovieBoxStream({
     if (alt && !searchQueries.includes(alt)) searchQueries.push(alt);
   }
 
+  // Also query regional language variants to discover Indian & regional dubs
+  const regionalSuffixes = ['Hindi', 'Tamil', 'Telugu'];
+  for (const lang of regionalSuffixes) {
+    const rq = `${resolvedTitle} ${lang}`;
+    if (!searchQueries.includes(rq)) searchQueries.push(rq);
+  }
+
+  const seenSubIds = new Set();
   let searchResults = [];
-  for (const q of searchQueries) {
-    try {
-      searchResults = await searchMovieBox(q);
-      if (searchResults.length > 0) break;
-    } catch {}
+
+  // Primary search first
+  try {
+    const primaryRes = await searchMovieBox(resolvedTitle);
+    for (const item of primaryRes) {
+      if (!seenSubIds.has(item.subject_id)) {
+        seenSubIds.add(item.subject_id);
+        searchResults.push(item);
+      }
+    }
+  } catch {}
+
+  // In parallel, query alternates and regional suffixes to uncover all sibling dubs
+  const remainingQueries = searchQueries.filter((q) => q !== resolvedTitle);
+  if (remainingQueries.length > 0) {
+    const extraResults = await Promise.allSettled(remainingQueries.map((q) => searchMovieBox(q)));
+    for (const res of extraResults) {
+      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+        for (const item of res.value) {
+          if (!seenSubIds.has(item.subject_id)) {
+            seenSubIds.add(item.subject_id);
+            searchResults.push(item);
+          }
+        }
+      }
+    }
   }
 
   if (!searchResults.length) {
@@ -814,20 +844,24 @@ export async function resolveMovieBoxStream({
   let streams = [];
 
   const cleanDubId = dubId ? String(dubId).replace(/^-/, '').trim() : null;
+  let targetDub = null;
   if (cleanDubId) {
-    const targetDub = formattedDubs.find((d) => d.id === cleanDubId || d.id === dubId || d.id.replace(/^-/, '') === cleanDubId);
-    if (targetDub) {
-      playSubjectId = targetDub.id;
-      let playDetailPath = targetDub.detail_path;
-      streams = await getMovieBoxStreams(playSubjectId, se, ep, playDetailPath, minDuration);
+    targetDub = formattedDubs.find((d) => d.id === cleanDubId || d.id === dubId || d.id.replace(/^-/, '') === cleanDubId);
+  } else if (preferRegional) {
+    targetDub = formattedDubs.find((d) => /hindi|tamil|telugu|kannada|malayalam|bengali|marathi|punjabi/i.test(d.label) && d.label.toLowerCase() !== 'original');
+  }
 
-      // Graceful fallback: if selected dub subject has no streams, fall back to matched streams
-      if (streams.length === 0) {
-        console.warn(`Dub "${targetDub.label}" (ID ${playSubjectId}) had no streams. Falling back to primary stream.`);
-        playSubjectId = matched.subject_id;
-        let cDetailPath = matched.detail_path;
-        streams = await getMovieBoxStreams(matched.subject_id, se, ep, cDetailPath, minDuration, details);
-      }
+  if (targetDub) {
+    playSubjectId = targetDub.id;
+    let playDetailPath = targetDub.detail_path;
+    streams = await getMovieBoxStreams(playSubjectId, se, ep, playDetailPath, minDuration);
+
+    // Graceful fallback: if selected dub subject has no streams, fall back to matched streams
+    if (streams.length === 0) {
+      console.warn(`Dub "${targetDub.label}" (ID ${playSubjectId}) had no streams. Falling back to primary stream.`);
+      playSubjectId = matched.subject_id;
+      let cDetailPath = matched.detail_path;
+      streams = await getMovieBoxStreams(matched.subject_id, se, ep, cDetailPath, minDuration, details);
     }
   } else {
     // Try primary matched candidate first with prefetched details

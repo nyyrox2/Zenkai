@@ -12,8 +12,10 @@ import { Skeleton } from '../components/Skeleton'
 import { Tabs } from '../components/Tabs'
 import { useAsync } from '../hooks/useAsync'
 import { useCompanion, LATEST_EXTENSION_VERSION } from '../lib/useCompanion'
+import { HELPER_APK_DOWNLOAD_URL, launchHelperApp, probeHelperApk } from '../lib/helperClient'
 import { cn } from '../lib/utils'
 import {
+  DIRECT_MOVIE_SERVER_IDS,
   fetchDetails,
   fetchEpisodes,
   fetchProviders,
@@ -75,7 +77,8 @@ export default function MovieWatchPage() {
   const list = providers.data ?? []
   const providerId = list.find((p) => p.id === params.get('p'))?.id ?? list.find((p) => p.id === readPref())?.id ?? list[0]?.id
   const provider = list.find((p) => p.id === providerId)
-  const isMovieBox = providerId === 'moviebox'
+  const isMovieBoxVariant = providerId === 'moviebox' || providerId === 'moviebox-regional'
+  const isMovieBox = isMovieBoxVariant || Boolean(providerId && DIRECT_MOVIE_SERVER_IDS.has(providerId)) || Boolean(provider?.tags?.includes('Direct'))
 
 
   const [selectedDub, setSelectedDub] = useState<string | null>(params.get('dub')?.replace(/^-/, '') || null)
@@ -101,10 +104,11 @@ export default function MovieWatchPage() {
 
   const companion = useCompanion()
 
-  // MovieBox direct stream extraction
+  // Direct stream extraction (MovieBox + Helper APK HDHub4u / MoviesDrive / Bollyflix / RogMovies)
+  const canResolveDirect = sessionVerified || companion.apkConnected
   const mbStream = useAsync(
     () =>
-      sessionVerified && isMovieBox && details.data?.title
+      canResolveDirect && isMovieBox && details.data?.title
         ? fetchMovieBoxStream({
             id,
             type,
@@ -112,17 +116,30 @@ export default function MovieWatchPage() {
             episode,
             title: details.data.title,
             year: details.data.year || undefined,
-            dubId: selectedDub,
+            dubId: isMovieBoxVariant ? selectedDub : null,
             imdbId: details.data.imdbId,
+            regional: providerId === 'moviebox-regional',
+            serverId: providerId,
           })
         : Promise.resolve(null),
-    [sessionVerified, isMovieBox, type, id, season, episode, details.data?.title, details.data?.year, selectedDub, details.data?.imdbId, companion.installed]
+    [canResolveDirect, isMovieBox, isMovieBoxVariant, type, id, season, episode, details.data?.title, details.data?.year, selectedDub, details.data?.imdbId, companion.apkConnected, companion.extensionInstalled, providerId]
   )
 
   const [dubCache, setDubCache] = useState<{ id: number; dubs: MovieDub[] } | null>(null)
   useEffect(() => {
     if (mbStream.data?.dubs?.length) setDubCache({ id, dubs: mbStream.data.dubs })
   }, [mbStream.data, id])
+
+  // Automatically select regional dub when Regional HLS server is selected without explicit dub param
+  useEffect(() => {
+    if (providerId === 'moviebox-regional' && !params.get('dub') && mbStream.data?.dubs?.length) {
+      const reg = mbStream.data.dubs.find((d) => /hindi|tamil|telugu|kannada|malayalam|bengali|marathi|punjabi/i.test(d.label) && d.label.toLowerCase() !== 'original');
+      if (reg && reg.id && reg.id !== selectedDub) {
+        setSelectedDub(reg.id.replace(/^-/, ''));
+      }
+    }
+  }, [providerId, mbStream.data?.dubs, params, selectedDub]);
+
   // audio versions live on MovieBox only; remember them so they stay listed while another server is open
   const dubs = mbStream.data?.dubs ?? (dubCache?.id === id ? dubCache.dubs : [])
   const curDub = dubs.find((d) => d.selected)?.id ?? dubs[0]?.id
@@ -162,9 +179,11 @@ export default function MovieWatchPage() {
   // real intro / credits times (TheIntroDB); asked once the stream's length is known so the right release matches
   const skipTimes = useMovieSkipTimes({ tmdbId: id, type, season, episode, duration: activeStream?.duration, on: isMovieBox && !!mbStream.data })
 
-  const activeStreamUrl = companion.installed
-    ? (activeStream?.rawStreamUrl || activeStream?.url || activeStream?.streamUrl || '')
-    : (activeStream?.proxyStreamUrl || activeStream?.streamUrl || mbStream.data?.streamUrl || '')
+  const activeStreamUrl = companion.apkConnected
+    ? (activeStream?.streamUrl || activeStream?.proxyStreamUrl || mbStream.data?.streamUrl || '')
+    : companion.extensionInstalled
+      ? (activeStream?.rawStreamUrl || activeStream?.url || activeStream?.streamUrl || '')
+      : (activeStream?.proxyStreamUrl || activeStream?.streamUrl || mbStream.data?.streamUrl || '')
   const fallbackStreamUrl = activeStream?.proxyStreamUrl || mbStream.data?.proxyStreamUrl || ''
   
   const isMovie = type === 'movie'
@@ -242,7 +261,7 @@ export default function MovieWatchPage() {
     if (party.guestLocked()) return toast('Only the party host can change the server', 'info')
     if (!sid.startsWith(DUB)) return pick(sid)
     const dub = sid.slice(DUB.length)
-    if (providerId === 'moviebox') return pickDub(dub)
+    if (isMovieBox) return pickDub(dub)
     try {
       localStorage.setItem(PREF, 'moviebox')
     } catch {
@@ -250,7 +269,7 @@ export default function MovieWatchPage() {
     }
     setSelectedDub(dub)
     go({ p: 'moviebox', dub })
-    toast(`Switched to MovieBox · ${dubs.find((d) => d.id === dub)?.label ?? 'audio'}`)
+    toast(`Switched to Direct HLS · ${dubs.find((d) => d.id === dub)?.label ?? 'audio'}`)
   }
 
   const seasons = details.data?.seasons ?? []
@@ -273,14 +292,16 @@ export default function MovieWatchPage() {
 
   const title = details.data?.title ?? 'Loading…'
   const expand = (p: (typeof list)[number]) =>
-    p.id === 'moviebox' && dubs.length > 1
+    (p.id === 'moviebox' || p.id === 'moviebox-regional') && dubs.length > 1
       ? dubs.map((d) => ({ id: DUB + d.id, name: `${p.label} · ${d.label}`, label: '', note: '', tags: [] as string[] }))
       : [{ id: p.id, name: p.label, label: '', note: '', tags: [] as string[] }]
-  const serverValue = providerId === 'moviebox' && dubs.length > 1 && curDub ? DUB + curDub : providerId ?? ''
+  const serverValue = isMovieBoxVariant && dubs.length > 1 && curDub ? DUB + curDub : providerId ?? ''
   const direct = list.filter((p) => p.tags.includes('Direct'))
   const groups = [
-    { label: 'Multi audio', items: list.filter((p) => !p.tags.includes('Direct') && p.tags.includes('Multi audio')) },
-    { label: 'Embeds', items: list.filter((p) => !p.tags.includes('Direct') && !p.tags.includes('Multi audio')) },
+    { label: 'Direct HLS Player (Native)', items: list.filter((p) => p.tags.includes('Direct')) },
+    { label: 'Regional Servers', items: list.filter((p) => !p.tags.includes('Direct') && p.tags.includes('Regional')) },
+    { label: 'Multi audio & 4K', items: list.filter((p) => !p.tags.includes('Direct') && !p.tags.includes('Regional') && p.tags.includes('Multi audio')) },
+    { label: 'Embeds', items: list.filter((p) => !p.tags.includes('Direct') && !p.tags.includes('Regional') && !p.tags.includes('Multi audio')) },
   ].filter((g) => g.items.length > 0)
   const hrefFor = (n: number) => {
     const q = new URLSearchParams(params)
@@ -338,20 +359,25 @@ export default function MovieWatchPage() {
       <div className="lg:flex lg:items-stretch lg:gap-3">
       <div className="min-w-0 flex-1">
       <div className="relative aspect-video w-full overflow-hidden bg-black lg:shadow-2xl lg:shadow-black/40 lg:ring-1 lg:ring-white/10">
-        {!sessionVerified && isMovieBox ? (
+        {!canResolveDirect && isMovieBox ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/95 p-6 text-center select-none">
             <div className="relative mb-3 grid size-16 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-xl shadow-black/50">
               <Lock className="size-8 animate-pulse" />
             </div>
             <h3 className="font-display text-lg font-bold text-foreground">Media Playback Locked</h3>
             <p className="mt-1.5 max-w-sm text-xs text-muted leading-relaxed">
-              Verification challenge in progress. Complete the challenge to unlock high-speed streaming. Embed servers below still work.
+              Verification challenge in progress. Start Zenkai Helper APK for instant direct playback without waiting, or wait for verification.
             </p>
-            {shieldFailed && (
-              <button onClick={() => void getToken()} className="mt-4 rounded-full bg-white px-5 py-2 text-xs font-bold text-black active:scale-95">
-                Retry
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {shieldFailed && (
+                <button onClick={() => void getToken()} className="rounded-full bg-white px-5 py-2 text-xs font-bold text-black active:scale-95">
+                  Retry
+                </button>
+              )}
+              <button onClick={() => launchHelperApp()} className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-white active:scale-95">
+                Launch Helper APK
               </button>
-            )}
+            </div>
           </div>
         ) : isMovieBox ? (
           <>
@@ -376,7 +402,11 @@ export default function MovieWatchPage() {
                 }))}
                 qualities={availableStreams.map((s) => ({
                   label: s.quality,
-                  url: companion.installed ? (s.rawStreamUrl || s.url || s.streamUrl) : (s.proxyStreamUrl || s.streamUrl),
+                  url: (companion.apkConnected
+                    ? (s.streamUrl || s.proxyStreamUrl)
+                    : companion.extensionInstalled
+                      ? (s.rawStreamUrl || s.url || s.streamUrl)
+                      : (s.proxyStreamUrl || s.streamUrl)) || '',
                   size: s.size,
                   sizeLabel: s.sizeLabel,
                   downloadUrl: s.downloadUrl,
@@ -392,7 +422,7 @@ export default function MovieWatchPage() {
                 servers={list.flatMap(expand)}
                 serverId={serverValue}
                 onServer={pickAny}
-                dubs={dubs}
+                dubs={isMovieBoxVariant ? dubs : []}
                 onDub={pickDub}
                 hasNextEpisode={!!nextTarget}
                 hasPrevEpisode={!!prevTarget}
@@ -426,27 +456,55 @@ export default function MovieWatchPage() {
             {(details.loading || mbStream.loading) && !mbStream.data && !mbStream.error && (
               <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black text-white/80">
                 <span className="flex items-center gap-3 text-sm">
-                  <Loader2 className="size-5 animate-spin" /> Resolving MovieBox stream…
+                  <Loader2 className="size-5 animate-spin" /> Resolving {provider?.label ?? 'Direct'} stream…
                 </span>
               </div>
             )}
-            {(mbStream.error || (mbStream.data && (!mbStream.data.success || !mbStream.data.streams?.length))) && !mbStream.loading && (
-              <div role="alert" className="absolute inset-0 grid place-items-center bg-black p-6 text-center text-white">
-                <div className="flex max-w-sm flex-col items-center gap-3">
-                  <TriangleAlert className="size-7 text-amber-400" />
-                  <p className="text-sm text-white/80">{mbStream.error?.message || mbStream.data?.error || 'MovieBox stream not available for this title.'}</p>
-                  {nextServer && nextServer.id !== providerId ? (
-                    <button type="button" onClick={() => pick(nextServer.id)} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition active:scale-95">
-                      Try {nextServer.label}
-                    </button>
-                  ) : (
-                    <button type="button" onClick={() => mbStream.reload()} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition active:scale-95">
-                      Try again
-                    </button>
-                  )}
+            {(mbStream.error || (mbStream.data && (!mbStream.data.success || !mbStream.data.streams?.length))) && !mbStream.loading && (() => {
+              const rawMsg = mbStream.error?.message || mbStream.data?.error || `${provider?.label ?? 'Server'} stream not available for this title.`
+              const needsHelper = rawMsg.startsWith('HELPER_APK_REQUIRED:')
+              const cleanMsg = needsHelper ? rawMsg.replace('HELPER_APK_REQUIRED:', '') : rawMsg
+              return (
+                <div role="alert" className="absolute inset-0 grid place-items-center bg-black p-6 text-center text-white">
+                  <div className="flex max-w-md flex-col items-center gap-3">
+                    <TriangleAlert className="size-7 text-amber-400" />
+                    <p className="text-sm text-white/80">{cleanMsg}</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {needsHelper && (
+                        <>
+                          <a
+                            href={HELPER_APK_DOWNLOAD_URL}
+                            download="ZenkaiHelper.apk"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-bold text-white transition active:scale-95"
+                          >
+                            <Download className="size-3.5" /> Download Helper APK
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              launchHelperApp()
+                              window.setTimeout(() => { void probeHelperApk(true); mbStream.reload() }, 1400)
+                            }}
+                            className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition active:scale-95"
+                          >
+                            Launch Helper &amp; Retry
+                          </button>
+                        </>
+                      )}
+                      {nextServer && nextServer.id !== providerId ? (
+                        <button type="button" onClick={() => pick(nextServer.id)} className="rounded-full bg-white px-5 py-2 text-xs font-semibold text-black transition active:scale-95">
+                          Try {nextServer.label}
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => mbStream.reload()} className="rounded-full bg-white px-5 py-2 text-xs font-semibold text-black transition active:scale-95">
+                          Try again
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </>
         ) : (
           <>
@@ -515,7 +573,19 @@ export default function MovieWatchPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {companion.installed ? (
+          {companion.apkConnected ? (
+            <Link
+              to="/extension"
+              className="group inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 backdrop-blur-sm transition-all hover:border-emerald-500/40 hover:bg-emerald-500/15 hover:text-white"
+              title={`Zenkai Helper APK v${companion.apkVersion || '1.0.0'} running at ${companion.helperUrl}`}
+            >
+              <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+              <span>Helper APK Active</span>
+              {companion.apkVersion && (
+                <span className="text-[10px] text-emerald-200/60 font-mono">v{companion.apkVersion}</span>
+              )}
+            </Link>
+          ) : companion.installed ? (
             companion.isOutdated ? (
               <Link
                 to="/extension"
@@ -545,7 +615,7 @@ export default function MovieWatchPage() {
               className="group inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/60 backdrop-blur-sm transition-all hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
             >
               <Zap className="size-3 text-white/40 transition-colors group-hover:text-white" />
-              <span>Get Extension</span>
+              <span>Get Helper APK</span>
             </Link>
           )}
           {!companion.installed && <InstallHelp />}
@@ -600,6 +670,31 @@ export default function MovieWatchPage() {
           </button>
         )}
       </section>
+
+      {/* Regional Dub / Audio switcher for MovieBox Direct HLS streams */}
+      {isMovieBoxVariant && dubs.length > 1 && (
+        <div className="mt-3.5 flex flex-wrap items-center gap-2 px-3 sm:px-6 lg:px-0">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted mr-1">Audio Dub:</span>
+          {dubs.map((d) => {
+            const isSelected = selectedDub === d.id || (!selectedDub && d.selected) || (!selectedDub && d.id === curDub);
+            return (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => pickDub(d.id)}
+                className={cn(
+                  pill,
+                  isSelected
+                    ? 'border-transparent bg-accent text-accent-fg shadow-md shadow-accent/25'
+                    : 'border-border bg-card hover:bg-card-2 text-xs'
+                )}
+              >
+                {d.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mt-5 px-3 sm:px-6 lg:px-0">
       </div>

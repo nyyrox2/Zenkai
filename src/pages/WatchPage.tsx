@@ -1089,7 +1089,19 @@ export default function WatchPage() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {companion.installed ? (
+              {companion.apkConnected ? (
+                <Link
+                  to="/extension"
+                  className="group inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300 transition-all hover:border-emerald-500/40 hover:text-white"
+                  title={`Zenkai Helper APK v${companion.apkVersion || '1.0.0'} active.`}
+                >
+                  <span className="size-1.5 rounded-full bg-emerald-400" />
+                  <span>Helper APK Active</span>
+                  {companion.apkVersion && (
+                    <span className="text-[10px] text-emerald-200/60 font-mono">v{companion.apkVersion}</span>
+                  )}
+                </Link>
+              ) : companion.installed ? (
                 companion.isOutdated ? (
                   <Link
                     to="/extension"
@@ -1118,7 +1130,7 @@ export default function WatchPage() {
                   to="/extension"
                   className="group inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-transparent px-3 py-1 text-xs font-semibold text-white/60 transition-all hover:border-white/20 hover:bg-transparent hover:text-white"
                 >
-                  <span>Get Extension</span>
+                  <span>Get Helper / Extension</span>
                 </Link>
               )}
               <button

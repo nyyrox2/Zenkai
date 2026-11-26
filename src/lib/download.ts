@@ -1,4 +1,5 @@
-import { isCompanionActive, companionHas } from './useCompanion'
+import { isCompanionActive, companionHas, isExtensionActive } from './useCompanion'
+import { isHelperApkActive, helperProxyUrl } from './helperClient'
 import { toast } from './toast'
 
 export interface DownloadMediaOptions {
@@ -36,8 +37,17 @@ export function downloadMedia({ url, rawUrl, filename }: DownloadMediaOptions): 
 
   // 1. Resolve effective proxy download URL
   let targetUrl = url
+  if (isHelperApkActive()) {
+    if (url && url.startsWith('http://127.0.0.1:')) {
+      targetUrl = url
+    } else if (rawUrl && /^https?:\/\//i.test(rawUrl)) {
+      targetUrl = helperProxyUrl(rawUrl, undefined, true, cleanName)
+    }
+  }
   if (!targetUrl && rawUrl) {
-    targetUrl = `/proxy?url=${encodeURIComponent(rawUrl)}&dl=1&fn=${encodeURIComponent(cleanName)}`
+    targetUrl = isHelperApkActive()
+      ? helperProxyUrl(rawUrl, undefined, true, cleanName)
+      : `/proxy?url=${encodeURIComponent(rawUrl)}&dl=1&fn=${encodeURIComponent(cleanName)}`
   }
 
   if (targetUrl) {
@@ -74,8 +84,8 @@ export function downloadMedia({ url, rawUrl, filename }: DownloadMediaOptions): 
     }, 2000)
   }
 
-  // 3. If Zenkai Companion extension is installed with direct-download capability:
-  if (isCompanionActive() && companionHas('direct-download')) {
+  // 3. If Chrome Extension is installed with direct-download capability (skip for Helper APK HTTP downloads):
+  if (isExtensionActive() && isCompanionActive() && companionHas('direct-download')) {
     toast(`Downloading: ${cleanName}`, 'info')
     
     // Listen for extension response; fall back to anchor if extension encounters an issue

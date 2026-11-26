@@ -20,7 +20,8 @@ import { SECURITY_DISABLED } from '../lib/securityToggle'
 import {
   airplayPicker, airplaySupported, castLoad, castRequest, castSeek, castSetVolume, castStop, castToggleMute, castTogglePlay, castUrl, getCast, initCast, onCastFinished, useCast,
 } from '../lib/cast'
-import { isCompanionActive } from '../lib/useCompanion'
+import { isCompanionActive, isExtensionActive } from '../lib/useCompanion'
+import { isHelperApkActive, helperProxyUrl } from '../lib/helperClient'
 import { downloadMedia } from '../lib/download'
 import { forFetch } from '../lib/acdnClient'
 import { ACCESS_CLASS, ACCESS_TEXT, type ServerAccess } from '../lib/servers'
@@ -1554,10 +1555,14 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       const proxied = `${proxyBase}?url=${encodeURIComponent(url)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`
       candidates.push(proxied, url)
     }
-    // ponytail: with the extension, fetch the caption straight from its host (it adds Referer + CORS); the proxy can't do it
-    if (isCompanionActive()) {
+    if (url.startsWith('http://127.0.0.1:')) {
+      candidates.unshift(url)
+    } else if (isExtensionActive()) {
       const raw = candidates.find((c) => /^https?:/i.test(c) && !c.includes('/proxy?'))
       if (raw) candidates.unshift(forFetch(raw))
+    } else if (isHelperApkActive()) {
+      const raw = candidates.find((c) => /^https?:/i.test(c) && !c.includes('/proxy?'))
+      if (raw) candidates.unshift(helperProxyUrl(raw, referer))
     }
     for (const u of candidates) {
       try {
@@ -3165,7 +3170,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
             <p className="text-sm font-medium">This stream could not be loaded directly on this network.</p>
             <div className="zp-two" style={{ pointerEvents: 'auto', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
               {(() => {
-                const best = servers?.find((s) => s.id === 'vidzee' || s.id === 'videasy' || s.id === 'vidup');
+                const best = servers?.find((s) => s.id === 'cineverse' || s.id === 'vidlink' || s.id === 'vidzee' || s.id === 'videasy' || s.id === 'vidbolt' || s.id === 'smashystream' || s.id === 'vidup');
                 if (best && onServer) {
                   return (
                     <button
@@ -3192,7 +3197,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                   className="zp-b pill"
                   style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}
                 >
-                  ⚡ Get Extension
+                  ⚡ Get Helper APK
                 </a>
               )}
               {!isCompanionActive() && (

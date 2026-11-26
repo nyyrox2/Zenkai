@@ -249,7 +249,7 @@ export function NavDrawer({
                   <div className="mt-1.5 space-y-0.5">
                     {sec.items.map((item) => {
                       const Icon = item.icon
-                      const isActive = pathname === item.to
+                      const isActive = pathname === item.to || (item.to === '/list' && pathname === '/watchlist')
                       return (
                         <Link
                           key={item.to}

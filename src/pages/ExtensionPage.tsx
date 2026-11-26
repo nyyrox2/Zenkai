@@ -12,14 +12,23 @@ import {
   Check,
   Sparkles,
   Layers,
-  CircleHelp
+  CircleHelp,
+  Smartphone,
+  RefreshCw,
 } from 'lucide-react'
 import { useCompanion, LATEST_EXTENSION_VERSION } from '../lib/useCompanion'
+import {
+  HELPER_APK_DOWNLOAD_URL,
+  HELPER_BASE_URL,
+  launchHelperApp,
+  probeHelperApk,
+} from '../lib/helperClient'
 import { toast } from '../lib/toast'
 
 export default function ExtensionPage() {
   const companion = useCompanion()
   const [copied, setCopied] = useState(false)
+  const [checking, setChecking] = useState(false)
 
   const copyExtensionsUrl = () => {
     navigator.clipboard.writeText('chrome://extensions')
@@ -28,19 +37,29 @@ export default function ExtensionPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const checkHelperNow = async () => {
+    setChecking(true)
+    const ok = await probeHelperApk(true)
+    setChecking(false)
+    toast(
+      ok
+        ? 'Zenkai Helper APK connected!'
+        : 'Helper APK not reachable on 127.0.0.1:48912. Open Zenkai Helper and start server.',
+      ok ? 'success' : 'info',
+    )
+  }
+
   return (
     <div className="relative min-h-screen bg-[#08090d] text-foreground">
-      {/* Background glow effects */}
       <div className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-accent/15 blur-[120px]" />
       <div className="pointer-events-none absolute top-1/3 left-1/4 -z-10 h-[400px] w-[500px] rounded-full bg-emerald-500/10 blur-[130px]" />
 
       <main className="mx-auto max-w-4xl px-4 pb-28 pt-24 sm:px-6 sm:pt-28">
-        {/* Navigation */}
         <Link
           to="/movies"
           className="mb-8 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted transition hover:text-foreground"
         >
-          <ArrowLeft className="size-4" /> Back to Movies & TV
+          <ArrowLeft className="size-4" /> Back to Movies &amp; TV
         </Link>
 
         {/* Hero */}
@@ -50,178 +69,204 @@ export default function ExtensionPage() {
           </div>
 
           <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3.5 py-1.5 text-xs font-bold text-accent">
-            <Sparkles className="size-3.5" /> Manifest V3 • Zero Proxy P2P Engine
+            <Sparkles className="size-3.5" /> Local Helper APK + Extension Bridge
           </div>
 
           <h1 className="mt-5 font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-5xl">
-            Zenkai Stream Companion
+            Zenkai Stream Bridge
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-            Unlock authentic 4K and 1080p high-bitrate streaming with zero proxy latency. Stream directly from original Anime (MegaPlay, FlixCloud, AnimeSalt, ACDN) and Movies (MovieBox, Hakunaymatata, BCDNXW) CDNs from your residential IP. ACDN requires the extension; MegaPlay and Vidstream work with or without it.
+            Stream MovieBox, HDHub4u, MoviesDrive, Bollyflix, RogMovies, and direct anime servers on Android &amp; Desktop without Cloudflare IP blocks or proxy buffering. Use the standalone <strong>Zenkai Helper APK</strong> on Android browsers, or the Manifest V3 Extension on Desktop.
           </p>
 
           {/* Live status banner */}
           <div className="mx-auto mt-8 max-w-lg">
-            {companion.installed ? (
-              companion.isOutdated ? (
-                <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-left shadow-lg shadow-amber-950/20">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-500/20 text-amber-400">
-                    <AlertCircle className="size-6 animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-amber-300">
-                      Update Available (v{companion.version || '1.0.0'} → v{LATEST_EXTENSION_VERSION})
-                    </h3>
-                    <p className="text-xs text-amber-200/80">
-                      A newer version of the companion is ready with updated CDN rules and streaming fixes. Download the new zip below and click reload in chrome://extensions.
-                    </p>
-                  </div>
+            {companion.apkConnected ? (
+              <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-left shadow-lg shadow-emerald-950/20">
+                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <CheckCircle2 className="size-6" />
                 </div>
-              ) : (
-                <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-left shadow-lg shadow-emerald-950/20">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-500/20 text-emerald-400">
-                    <CheckCircle2 className="size-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-emerald-400">Extension Active & Up to Date (v{companion.version || LATEST_EXTENSION_VERSION})</h3>
-                    <p className="text-xs text-emerald-300/80">
-                      Direct residential CDN connection is fully operational. Streams run directly from original CDNs with zero proxy delay.
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-sm font-bold text-emerald-400">
+                    Zenkai Helper APK Connected (v{companion.apkVersion || '1.0.0'})
+                  </h3>
+                  <p className="text-xs text-emerald-300/80">
+                    Local server active at <code className="font-mono">{companion.helperUrl || HELPER_BASE_URL}</code>. MovieBox, HDHub4u, MoviesDrive, Bollyflix, RogMovies &amp; direct proxy are live!
+                  </p>
                 </div>
-              )
+              </div>
+            ) : companion.installed ? (
+              <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-left shadow-lg shadow-emerald-950/20">
+                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <CheckCircle2 className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-emerald-400">Browser Extension Active (v{companion.version || LATEST_EXTENSION_VERSION})</h3>
+                  <p className="text-xs text-emerald-300/80">
+                    Direct residential CDN connection operational. Install Zenkai Helper APK on Android for full local HDHub4u, MoviesDrive, Bollyflix &amp; MovieBox token fetching.
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left shadow-lg shadow-black/40">
                 <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/20 text-accent">
                   <AlertCircle className="size-6" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-foreground">Companion Extension Not Detected</h3>
+                  <h3 className="text-sm font-bold text-foreground">No Local Bridge Connected</h3>
                   <p className="text-xs text-muted">
-                    Download and load the extension below to eliminate buffering and unlock TV series and multi-audio dubs.
+                    Download and launch <strong>Zenkai Helper APK</strong> on Android (works in Chrome/Brave — no Kiwi needed) or load the Desktop Extension below.
                   </p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Download Button */}
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-4">
+          {/* Primary Helper APK Controls */}
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <a
-              href="/zenkai-companion.zip"
-              download="zenkai-companion.zip"
+              href={HELPER_APK_DOWNLOAD_URL}
+              download="ZenkaiHelper.apk"
               className="inline-flex items-center gap-2.5 rounded-full bg-accent px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-accent/25 transition hover:brightness-110 active:scale-95"
             >
-              <Download className="size-4" /> Download Extension (.ZIP)
+              <Smartphone className="size-4" /> Download Helper APK
             </a>
             <button
-              onClick={copyExtensionsUrl}
+              type="button"
+              onClick={() => launchHelperApp()}
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-5 py-3.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 active:scale-95"
+            >
+              <Zap className="size-4" /> Launch Helper App
+            </button>
+            <button
+              type="button"
+              onClick={() => void checkHelperNow()}
+              disabled={checking}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-5 py-3.5 text-xs font-semibold text-muted backdrop-blur transition hover:text-foreground active:scale-95"
             >
-              {copied ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
-              Copy chrome://extensions
+              <RefreshCw className={`size-4 ${checking ? 'animate-spin' : ''}`} />
+              {checking ? 'Checking…' : 'Test 127.0.0.1:48912'}
             </button>
-            <Link to="/extension/how-to" className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-5 py-3.5 text-xs font-semibold text-muted backdrop-blur transition hover:text-foreground active:scale-95">
-              <CircleHelp className="size-4" /> How to install
-            </Link>
           </div>
           <span className="mt-2.5 block text-[11px] text-muted">
-            Version {LATEST_EXTENSION_VERSION} • Size ~43 KB • Compatible with Chrome, Edge, Brave, Opera & Vivaldi
+            Zenkai Helper APK v1.0.0 · Runs on Android 8+ · Local loopback bridge on 127.0.0.1:48912
           </span>
         </div>
 
-        {/* 3-Step Installation Guide */}
-        <div className="mt-16">
+        {/* Android Helper Steps */}
+        <div className="mt-14">
           <h2 className="text-center font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Quick 30-Second Setup
+            Android Browser Setup (No Extension Needed)
           </h2>
           <p className="mt-1 text-center text-xs text-muted">
-            No Chrome Web Store account needed. Unpacked Manifest V3 developer extension.
+            Works in Chrome, Brave, Samsung Internet &amp; Edge on Android.
           </p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            {/* Step 1 */}
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <div className="relative rounded-2xl border border-border bg-card/50 p-6 backdrop-blur">
               <span className="inline-block text-xs font-black uppercase tracking-wider text-accent">Step 01</span>
-              <h3 className="mt-2 text-base font-bold text-foreground">Download & Extract</h3>
+              <h3 className="mt-2 text-base font-bold text-foreground">Install Helper APK</h3>
               <p className="mt-2 text-xs leading-relaxed text-muted">
-                Click the download button above to get <code className="rounded bg-white/10 px-1 py-0.5 text-accent">zenkai-companion.zip</code>. Extract it to any folder on your computer.
+                Tap <strong>Download Helper APK</strong> above and install <code className="rounded bg-white/10 px-1 py-0.5 text-accent">ZenkaiHelper.apk</code> on your Android device.
               </p>
             </div>
 
-            {/* Step 2 */}
             <div className="relative rounded-2xl border border-border bg-card/50 p-6 backdrop-blur">
               <span className="inline-block text-xs font-black uppercase tracking-wider text-accent">Step 02</span>
-              <h3 className="mt-2 text-base font-bold text-foreground">Open Extensions</h3>
+              <h3 className="mt-2 text-base font-bold text-foreground">Start Local Bridge</h3>
               <p className="mt-2 text-xs leading-relaxed text-muted">
-                Navigate to <code className="rounded bg-white/10 px-1 py-0.5 text-accent">chrome://extensions</code> in your browser and enable the <strong className="text-foreground">Developer mode</strong> toggle in the top-right corner.
+                Open <strong>Zenkai Helper</strong> (or tap Launch Helper App) so the notification confirms <code className="rounded bg-white/10 px-1 py-0.5 text-emerald-400">127.0.0.1:48912</code> is running.
               </p>
             </div>
 
-            {/* Step 3 */}
             <div className="relative rounded-2xl border border-border bg-card/50 p-6 backdrop-blur">
               <span className="inline-block text-xs font-black uppercase tracking-wider text-accent">Step 03</span>
-              <h3 className="mt-2 text-base font-bold text-foreground">Load Unpacked</h3>
+              <h3 className="mt-2 text-base font-bold text-foreground">Play Any Server</h3>
               <p className="mt-2 text-xs leading-relaxed text-muted">
-                Click <strong className="text-foreground">"Load unpacked"</strong> and select the extracted folder. Return to Zenkai Web and enjoy instant direct streaming!
+                Return here — Zenkai Web auto-detects the Helper APK and routes MovieBox, HDHub4u, MoviesDrive, Bollyflix &amp; RogMovies straight through your phone!
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Extension Fallback */}
+        <div className="mt-14 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="font-display text-lg font-bold text-foreground">Desktop Chrome / Brave Extension</h2>
+              <p className="mt-1 text-xs text-muted">
+                On Windows/Mac/Linux desktop browsers, load the Manifest V3 zip in <code className="text-accent">chrome://extensions</code>.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <a
+                href="/zenkai-companion.zip"
+                download="zenkai-companion.zip"
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/20"
+              >
+                <Download className="size-3.5" /> Extension (.ZIP) v{LATEST_EXTENSION_VERSION}
+              </a>
+              <button
+                onClick={copyExtensionsUrl}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/60 px-4 py-2 text-xs font-semibold text-muted transition hover:text-foreground"
+              >
+                {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                Copy chrome://extensions
+              </button>
+              <Link to="/extension/how-to" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/60 px-4 py-2 text-xs font-semibold text-muted transition hover:text-foreground">
+                <CircleHelp className="size-3.5" /> Guide
+              </Link>
             </div>
           </div>
         </div>
 
         {/* Technical Highlights */}
-        <div className="mt-16">
-          <h2 className="text-center font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Why Use Zenkai Companion?
-          </h2>
-
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <div className="flex gap-4 rounded-2xl border border-border bg-card/30 p-5">
-              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
-                <Zap className="size-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-foreground">Zero Proxy Latency</h4>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  Connects directly from your home network to the video CDN edge servers without routing through overseas cloud midman servers.
-                </p>
-              </div>
+        <div className="mt-12 grid gap-4 sm:grid-cols-2">
+          <div className="flex gap-4 rounded-2xl border border-border bg-card/30 p-5">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
+              <Zap className="size-5" />
             </div>
-
-            <div className="flex gap-4 rounded-2xl border border-border bg-card/30 p-5">
-              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
-                <Layers className="size-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-foreground">Unlocks BCDNXW TV Series & Dubs</h4>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  Automatically rewrites the Referer header to <code className="text-accent">https://123moviesfree.club/</code>, allowing seamless playback of multi-audio dubs and full TV series.
-                </p>
-              </div>
+            <div>
+              <h4 className="text-sm font-bold text-foreground">Direct Phone Resolution</h4>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Bootstraps MovieBox auth tokens and resolves HDHub4u, MoviesDrive, Bollyflix &amp; RogMovies links right on your phone so Cloudflare Worker IP bans can&rsquo;t touch your playback.
+              </p>
             </div>
+          </div>
 
-            <div className="flex gap-4 rounded-2xl border border-border bg-card/30 p-5">
-              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
-                <Shield className="size-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-foreground">Bypasses HTTP 428 / 429 Blocks</h4>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  Injects the trusted ExoPlayer media headers and strips tracking headers so CDNs deliver continuous, unthrottled video segments.
-                </p>
-              </div>
+          <div className="flex gap-4 rounded-2xl border border-border bg-card/30 p-5">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
+              <Layers className="size-5" />
             </div>
+            <div>
+              <h4 className="text-sm font-bold text-foreground">In-App Local Header &amp; HLS Proxy</h4>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Serves HTTP 206 byte ranges, injects CDN Referer &amp; ExoPlayer User-Agent headers, and rewrites HLS playlists locally on <code className="text-accent">127.0.0.1:48912</code>.
+              </p>
+            </div>
+          </div>
 
-            <div className="flex gap-4 rounded-2xl border border-border bg-card/30 p-5">
-              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
-                <Lock className="size-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-foreground">100% Private & Open Source</h4>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  No tracking, telemetry, or external API calls. All declarativeNetRequest rules execute locally inside your browser engine.
-                </p>
-              </div>
+          <div className="flex gap-4 rounded-2xl border border-border bg-card/30 p-5">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
+              <Shield className="size-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-foreground">Zero Shield / Rate-Limit Waiting</h4>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Movie &amp; TV playback starts directly from the Helper APK without waiting on remote Worker quota or cloud midman latency.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-4 rounded-2xl border border-border bg-card/30 p-5">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
+              <Lock className="size-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-foreground">Loopback Only (127.0.0.1)</h4>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Binds strictly to local device loopback with zero telemetry, external tracking, or LAN exposure.
+              </p>
             </div>
           </div>
         </div>

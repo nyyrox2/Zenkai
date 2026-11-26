@@ -31,7 +31,7 @@ const ROUTES: [RegExp, () => Promise<unknown>][] = [
   [/^\/$/, () => Promise.resolve()], // the opening page ships in the main bundle
   [/^\/home\/?$/, () => import('../pages/HomePage')],
   [/^\/(trending|popular|top|browse)\/?$/, () => import('../pages/CatalogPage')],
-  [/^\/list\/?$/, () => import('../pages/ListPage')],
+  [/^\/(list|watchlist)\/?$/, () => import('../pages/ListPage')],
   [/^\/schedule\/?$/, () => import('../pages/SchedulePage')],
   [/^\/app\/?$/, () => import('../pages/AppPage')],
   [/^\/profile\/?$/, () => import('../pages/ProfilePage')],

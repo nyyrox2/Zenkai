@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, Search, MessagesSquare } from 'lucide-react'
+import { Menu, Search, MessagesSquare, Bookmark } from 'lucide-react'
 import { Logo } from './Logo'
 import { Avatar } from './Avatar'
 import { ThemeToggle } from './ThemeToggle'
@@ -47,6 +47,13 @@ export function MobileHeader({ onOpenDrawer }: MobileHeaderProps) {
       </div>
 
       <div className="flex items-center gap-1.5">
+        <Link
+          to="/list"
+          aria-label="Watchlist"
+          className={chip}
+        >
+          <Bookmark className="size-4" />
+        </Link>
         <Link
           to="/community"
           aria-label="Community"

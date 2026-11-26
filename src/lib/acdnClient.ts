@@ -13,6 +13,9 @@
  * Everything here returns null on failure, the caller then falls back to the server-side resolver.
  */
 
+import { helperFetchUrl, isHelperApkActive } from './helperClient'
+import { isExtensionActive } from './useCompanion'
+
 const DEKHO = 'https://animedekho.app'
 const SALT_MIRRORS = ['https://animesalt.cx', 'https://animesalt.ac', 'https://animesalt.ro']
 const MAX_DEPTH = 3
@@ -162,7 +165,7 @@ function createResolver(budgetMs: number) {
     if (trace.length < 14 && !trace.includes(m)) trace.push(m)
   }
 
-  /** GET / POST text with a timeout; null on any failure. Never sends cookies (the extension sets what is needed). */
+  /** GET / POST text with a timeout; null on any failure. Uses Helper APK local bridge when extension is absent. */
   async function fetchText(url: string, init: RequestInit = {}, ms = 14000): Promise<string | null> {
     if (expired()) {
       note('time budget used up')
@@ -171,7 +174,36 @@ function createResolver(budgetMs: number) {
     const ctl = new AbortController()
     const t = window.setTimeout(() => ctl.abort(), Math.max(1, Math.min(ms, left())))
     try {
-      const r = await fetch(url, { redirect: 'follow', ...init, credentials: 'omit', signal: ctl.signal })
+      const useHelper = !isExtensionActive() && isHelperApkActive()
+      let fetchTarget = url
+      let fetchInit: RequestInit = { redirect: 'follow', ...init, credentials: 'omit', signal: ctl.signal }
+      if (useHelper) {
+        let origin = 'https://animesalt.cx'
+        let referer = 'https://animesalt.cx/'
+        try {
+          const parsed = new URL(url)
+          if (parsed.pathname.includes('do=getVideo') || parsed.pathname.includes('player/index.php')) {
+            origin = parsed.origin
+            referer = `${parsed.origin}/`
+          }
+        } catch {}
+        const initHeaders: Record<string, string> = {}
+        if (init.headers && !(init.headers instanceof Headers) && !Array.isArray(init.headers)) {
+          Object.assign(initHeaders, init.headers as Record<string, string>)
+        }
+        if (url.includes('do=getVideo')) {
+          initHeaders['X-Requested-With'] = 'XMLHttpRequest'
+        }
+        fetchTarget = helperFetchUrl(url, { referer, origin, headers: initHeaders })
+        fetchInit = {
+          method: init.method || 'GET',
+          body: init.body,
+          headers: initHeaders['Content-Type'] ? { 'Content-Type': initHeaders['Content-Type'] } : undefined,
+          credentials: 'omit',
+          signal: ctl.signal,
+        }
+      }
+      const r = await fetch(fetchTarget, fetchInit)
       if (!r.ok) {
         note(`${short(url)} HTTP ${r.status}`)
         return null
@@ -179,7 +211,7 @@ function createResolver(budgetMs: number) {
       return await r.text()
     } catch (e) {
       // a CORS / blocked request shows up as a bare TypeError: usually the extension rules did not apply
-      note(`${short(url)} ${(e as Error)?.name === 'AbortError' ? 'timeout' : 'blocked (CORS / extension rules?)'}`)
+      note(`${short(url)} ${(e as Error)?.name === 'AbortError' ? 'timeout' : 'blocked (CORS / helper?)'}`)
       return null
     } finally {
       window.clearTimeout(t)
