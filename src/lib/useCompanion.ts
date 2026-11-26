@@ -18,6 +18,7 @@ export interface CompanionInfo {
   apkVersion?: string
   extensionInstalled: boolean
   helperUrl?: string
+  lanUrl?: string | null
   version?: string
   isOutdated: boolean
   capabilities?: string[]
@@ -121,7 +122,8 @@ export function useCompanion(): CompanionInfo {
     apkConnected,
     apkVersion: helper.version,
     extensionInstalled,
-    helperUrl: apkConnected ? getHelperBaseUrl() : undefined,
+    helperUrl: apkConnected ? (helper.baseUrl || getHelperBaseUrl()) : undefined,
+    lanUrl: apkConnected ? helper.lanUrl : null,
     version: apkConnected ? helper.version : extState.version,
     isOutdated: !apkConnected && extensionInstalled ? isVersionOlder(extState.version) : false,
     capabilities: mergedCaps,

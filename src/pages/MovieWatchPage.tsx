@@ -1,6 +1,6 @@
 import { toast } from '../lib/toast'
 import { recordProgressionActivity } from '../lib/ascension/ascensionStore'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useBackToDetails } from '../lib/backToDetails'
 import { ChevronLeft, ChevronRight, Loader2, Lock, MessageSquare, TriangleAlert, Download, Users, Zap } from 'lucide-react'
@@ -103,6 +103,13 @@ export default function MovieWatchPage() {
   }, [sessionVerified])
 
   const companion = useCompanion()
+  const [mbReload, setMbReload] = useState(0)
+  const autoRetriedKeyRef = useRef<string | null>(null)
+  const [playerAudio, setPlayerAudio] = useState<{ tracks: { i: number; label: string; lang: string }[]; active: number }>({
+    tracks: [],
+    active: 0,
+  })
+  const [audioSel, setAudioSel] = useState<{ i: number } | null>(null)
 
   // Direct stream extraction (MovieBox + Helper APK HDHub4u / MoviesDrive / Bollyflix / RogMovies)
   const canResolveDirect = sessionVerified || companion.apkConnected
@@ -120,10 +127,26 @@ export default function MovieWatchPage() {
             imdbId: details.data.imdbId,
             regional: providerId === 'moviebox-regional',
             serverId: providerId,
+            fresh: mbReload > 0,
           })
         : Promise.resolve(null),
-    [canResolveDirect, isMovieBox, isMovieBoxVariant, type, id, season, episode, details.data?.title, details.data?.year, selectedDub, details.data?.imdbId, companion.apkConnected, companion.extensionInstalled, providerId]
+    [canResolveDirect, isMovieBox, isMovieBoxVariant, type, id, season, episode, details.data?.title, details.data?.year, selectedDub, details.data?.imdbId, companion.apkConnected, companion.extensionInstalled, providerId, mbReload]
   )
+
+  // Automatically retry once when Helper APK is active and hits a transient empty/error response
+  useEffect(() => {
+    if (!isMovieBox || !companion.apkConnected || mbStream.loading) return
+    const failed = Boolean(mbStream.error) || Boolean(mbStream.data && (!mbStream.data.success || !mbStream.data.streams?.length))
+    if (!failed) return
+    const reqKey = `${providerId}:${type}:${id}:${season}:${episode}:${selectedDub || ''}`
+    if (autoRetriedKeyRef.current === reqKey) return
+    autoRetriedKeyRef.current = reqKey
+    const t = window.setTimeout(() => {
+      void probeHelperApk(true)
+      setMbReload((n) => n + 1)
+    }, 650)
+    return () => window.clearTimeout(t)
+  }, [isMovieBox, companion.apkConnected, mbStream.loading, mbStream.error, mbStream.data, providerId, type, id, season, episode, selectedDub])
 
   const [dubCache, setDubCache] = useState<{ id: number; dubs: MovieDub[] } | null>(null)
   useEffect(() => {
@@ -394,6 +417,9 @@ export default function MovieWatchPage() {
                 isTmdb
                 onProgress={(pos, dur) => { if (dur > 0 && pos / dur >= 0.8) awardWatch() }}
                 format={type === 'movie' ? 'MOVIE' : 'TV'}
+                streamFormat={activeStream?.format || mbStream.data?.format}
+                onAudioTracks={(tracks, active) => setPlayerAudio({ tracks, active })}
+                audioSel={audioSel}
                 directSubtitles={(mbStream.data.subtitles || []).map((s, idx) => ({
                   id: s.id || `sub-${idx}`,
                   label: s.label,
@@ -496,7 +522,14 @@ export default function MovieWatchPage() {
                           Try {nextServer.label}
                         </button>
                       ) : (
-                        <button type="button" onClick={() => mbStream.reload()} className="rounded-full bg-white px-5 py-2 text-xs font-semibold text-black transition active:scale-95">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void probeHelperApk(true)
+                            setMbReload((n) => n + 1)
+                          }}
+                          className="rounded-full bg-white px-5 py-2 text-xs font-semibold text-black transition active:scale-95"
+                        >
                           Try again
                         </button>
                       )}
@@ -671,28 +704,46 @@ export default function MovieWatchPage() {
         )}
       </section>
 
-      {/* Regional Dub / Audio switcher for MovieBox Direct HLS streams */}
-      {isMovieBoxVariant && dubs.length > 1 && (
+      {/* Audio Channels / Dub switcher */}
+      {(playerAudio.tracks.length > 0 || (isMovieBoxVariant && dubs.length > 0)) && (
         <div className="mt-3.5 flex flex-wrap items-center gap-2 px-3 sm:px-6 lg:px-0">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted mr-1">Audio Dub:</span>
-          {dubs.map((d) => {
-            const isSelected = selectedDub === d.id || (!selectedDub && d.selected) || (!selectedDub && d.id === curDub);
-            return (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => pickDub(d.id)}
-                className={cn(
-                  pill,
-                  isSelected
-                    ? 'border-transparent bg-accent text-accent-fg shadow-md shadow-accent/25'
-                    : 'border-border bg-card hover:bg-card-2 text-xs'
-                )}
-              >
-                {d.label}
-              </button>
-            );
-          })}
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted mr-1">
+            {playerAudio.tracks.length > 0 ? 'Audio Channels:' : 'Audio Dub:'}
+          </span>
+          {playerAudio.tracks.length > 0
+            ? playerAudio.tracks.map((t) => (
+                <button
+                  key={t.i}
+                  type="button"
+                  onClick={() => setAudioSel({ i: t.i })}
+                  className={cn(
+                    pill,
+                    playerAudio.active === t.i
+                      ? 'border-transparent bg-accent text-accent-fg shadow-md shadow-accent/25'
+                      : 'border-border bg-card hover:bg-card-2 text-xs'
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))
+            : dubs.map((d) => {
+                const isSelected = selectedDub === d.id || (!selectedDub && d.selected) || (!selectedDub && d.id === curDub);
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => pickDub(d.id)}
+                    className={cn(
+                      pill,
+                      isSelected
+                        ? 'border-transparent bg-accent text-accent-fg shadow-md shadow-accent/25'
+                        : 'border-border bg-card hover:bg-card-2 text-xs'
+                    )}
+                  >
+                    {d.label}
+                  </button>
+                );
+              })}
         </div>
       )}
 

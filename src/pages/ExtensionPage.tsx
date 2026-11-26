@@ -20,8 +20,10 @@ import { useCompanion, LATEST_EXTENSION_VERSION } from '../lib/useCompanion'
 import {
   HELPER_APK_DOWNLOAD_URL,
   HELPER_BASE_URL,
+  getCustomHelperUrl,
   launchHelperApp,
   probeHelperApk,
+  setCustomHelperUrl,
 } from '../lib/helperClient'
 import { toast } from '../lib/toast'
 
@@ -29,6 +31,7 @@ export default function ExtensionPage() {
   const companion = useCompanion()
   const [copied, setCopied] = useState(false)
   const [checking, setChecking] = useState(false)
+  const [lanInput, setLanInput] = useState(() => getCustomHelperUrl() || '')
 
   const copyExtensionsUrl = () => {
     navigator.clipboard.writeText('chrome://extensions')
@@ -88,10 +91,14 @@ export default function ExtensionPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-emerald-400">
-                    Zenkai Helper APK Connected (v{companion.apkVersion || '1.0.0'})
+                    Zenkai Helper APK Connected (v{companion.apkVersion || '1.0.1'})
                   </h3>
                   <p className="text-xs text-emerald-300/80">
-                    Local server active at <code className="font-mono">{companion.helperUrl || HELPER_BASE_URL}</code>. MovieBox, HDHub4u, MoviesDrive, Bollyflix, RogMovies &amp; direct proxy are live!
+                    Bridge active at <code className="font-mono">{companion.helperUrl || HELPER_BASE_URL}</code>
+                    {companion.lanUrl ? (
+                      <> · Wi-Fi LAN: <code className="font-mono">{companion.lanUrl}</code></>
+                    ) : null}
+                    . MovieBox, HDHub4u, MoviesDrive, Bollyflix &amp; RogMovies are live!
                   </p>
                 </div>
               </div>
@@ -149,8 +156,60 @@ export default function ExtensionPage() {
             </button>
           </div>
           <span className="mt-2.5 block text-[11px] text-muted">
-            Zenkai Helper APK v1.0.0 · Runs on Android 8+ · Local loopback bridge on 127.0.0.1:48912
+            Zenkai Helper APK v1.0.1 · Runs on Android 8+ · Localhost &amp; Same-Wi-Fi LAN bridge on port 48912
           </span>
+
+          {/* Same Wi-Fi / LAN Pairing for PC, Laptop, Smart TV or 2nd Phone */}
+          <div className="mx-auto mt-6 max-w-lg rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+              Use Over Same Wi-Fi (PC / TV / Another Phone)
+            </h3>
+            <p className="mt-1 text-xs text-muted leading-relaxed">
+              Run Zenkai Helper APK on one Android phone, connect this browser to the same Wi-Fi, and paste the phone&rsquo;s Wi-Fi URL shown in the Helper app (e.g. <code className="font-mono text-white/80">http://192.168.1.42:48912</code>).
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <input
+                type="text"
+                value={lanInput}
+                onChange={(e) => setLanInput(e.target.value)}
+                placeholder="http://192.168.x.x:48912"
+                className="min-w-[200px] flex-1 rounded-xl border border-white/15 bg-black/40 px-3 py-2 font-mono text-xs text-white placeholder:text-white/30 focus:border-accent focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  const saved = setCustomHelperUrl(lanInput)
+                  if (!saved && lanInput.trim()) {
+                    toast('Enter a valid URL like http://192.168.1.42:48912', 'error')
+                    return
+                  }
+                  setChecking(true)
+                  const ok = await probeHelperApk(true)
+                  setChecking(false)
+                  toast(
+                    ok ? `Connected to Helper at ${saved || HELPER_BASE_URL}!` : 'Saved URL — allow Insecure Content if browser blocks HTTP on HTTPS site',
+                    ok ? 'success' : 'info',
+                  )
+                }}
+                className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black transition active:scale-95"
+              >
+                Connect
+              </button>
+              {lanInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLanInput('')
+                    setCustomHelperUrl(null)
+                    toast('Cleared custom Wi-Fi URL (using localhost)', 'info')
+                  }}
+                  className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white/75 transition hover:text-white"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Android Helper Steps */}

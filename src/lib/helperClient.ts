@@ -4,6 +4,7 @@ export const HELPER_DEFAULT_PORT = 48912
 export const HELPER_BASE_URL = `http://127.0.0.1:${HELPER_DEFAULT_PORT}`
 export const HELPER_APK_DOWNLOAD_URL = '/ZenkaiHelper.apk'
 export const HELPER_DEEP_LINK = 'zenkaihelper://start'
+const CUSTOM_HELPER_KEY = 'zenkai_helper_lan_url'
 
 export interface HelperHealthState {
   connected: boolean
@@ -13,6 +14,8 @@ export interface HelperHealthState {
   capabilities: string[]
   tokenCached?: boolean
   requests?: number
+  lanUrl?: string | null
+  baseUrl?: string
 }
 
 let state: HelperHealthState = {
@@ -32,15 +35,79 @@ const subscribe = (fn: () => void) => {
 }
 
 let lastProbeAt = 0
+let missCount = 0
+let activeBaseUrl = HELPER_BASE_URL
 let activeProbe: Promise<boolean> | null = null
 let loopStarted = false
+
+function normalizeHelperOrigin(raw: string): string | null {
+  const s = raw.trim().replace(/\/+$/, '')
+  if (!s) return null
+  const withScheme = /^https?:\/\//i.test(s) ? s : `http://${s}`
+  try {
+    const u = new URL(withScheme)
+    if (!u.port && u.protocol === 'http:') u.port = String(HELPER_DEFAULT_PORT)
+    return u.origin
+  } catch {
+    return null
+  }
+}
+
+export function getCustomHelperUrl(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const param = new URLSearchParams(window.location.search).get('helper')
+    if (param) {
+      const norm = normalizeHelperOrigin(param)
+      if (norm) {
+        window.localStorage.setItem(CUSTOM_HELPER_KEY, norm)
+        return norm
+      }
+    }
+    const saved = window.localStorage.getItem(CUSTOM_HELPER_KEY)
+    return saved ? normalizeHelperOrigin(saved) : null
+  } catch {
+    return null
+  }
+}
+
+export function setCustomHelperUrl(raw: string | null): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    if (!raw || !raw.trim()) {
+      window.localStorage.removeItem(CUSTOM_HELPER_KEY)
+      activeBaseUrl = HELPER_BASE_URL
+      void probeHelperApk(true)
+      return null
+    }
+    const norm = normalizeHelperOrigin(raw)
+    if (norm) {
+      window.localStorage.setItem(CUSTOM_HELPER_KEY, norm)
+      activeBaseUrl = norm
+      void probeHelperApk(true)
+      return norm
+    }
+  } catch {
+    /* ignore storage failures */
+  }
+  return null
+}
 
 export function isHelperApkActive(): boolean {
   return state.connected
 }
 
 export function getHelperBaseUrl(): string {
-  return `http://127.0.0.1:${state.port || HELPER_DEFAULT_PORT}`
+  return activeBaseUrl || `http://127.0.0.1:${state.port || HELPER_DEFAULT_PORT}`
+}
+
+export function isLocalHelperUrl(url: string | undefined | null): boolean {
+  if (!url) return false
+  if (url.startsWith('http://127.0.0.1:') || url.startsWith('http://localhost:')) return true
+  const base = getHelperBaseUrl()
+  if (base && url.startsWith(base)) return true
+  const custom = getCustomHelperUrl()
+  return Boolean(custom && url.startsWith(custom))
 }
 
 export function getHelperState(): HelperHealthState {
@@ -51,10 +118,30 @@ export function helperHas(cap: string): boolean {
   return state.connected && state.capabilities.includes(cap)
 }
 
+async function tryProbeOrigin(base: string, timeoutMs = 2000): Promise<any | null> {
+  const ctl = new AbortController()
+  const timer = window.setTimeout(() => ctl.abort(), timeoutMs)
+  try {
+    const res = await fetch(`${base}/health`, {
+      method: 'GET',
+      signal: ctl.signal,
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    const data = await res.json().catch(() => null)
+    if (data?.ok && data.service === 'zenkai-helper') return data
+    return null
+  } catch {
+    return null
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
+
 export async function probeHelperApk(force = false): Promise<boolean> {
   if (typeof window === 'undefined') return false
   const now = Date.now()
-  if (!force && now - lastProbeAt < (state.connected ? 6000 : 1200)) {
+  if (!force && now - lastProbeAt < (state.connected ? 5500 : 1000)) {
     return state.connected
   }
   if (activeProbe) return activeProbe
@@ -65,48 +152,66 @@ export async function probeHelperApk(force = false): Promise<boolean> {
       state = { ...state, checking: true }
       emit()
     }
-    const ctl = new AbortController()
-    const timer = window.setTimeout(() => ctl.abort(), 900)
     try {
-      const res = await fetch(`${getHelperBaseUrl()}/health`, {
-        method: 'GET',
-        signal: ctl.signal,
-        cache: 'no-store',
-      })
-      if (!res.ok) throw new Error(String(res.status))
-      const data = (await res.json().catch(() => null)) as {
-        ok?: boolean
-        service?: string
-        version?: string
-        port?: number
-        capabilities?: string[]
-        stats?: { tokenCached?: boolean; requests?: number }
-      } | null
-      if (data?.ok && data.service === 'zenkai-helper') {
+      const custom = getCustomHelperUrl()
+      const port = state.port || HELPER_DEFAULT_PORT
+      const candidates = Array.from(
+        new Set(
+          [
+            activeBaseUrl,
+            `http://127.0.0.1:${port}`,
+            `http://localhost:${port}`,
+            custom,
+          ].filter((x): x is string => Boolean(x)),
+        ),
+      )
+
+      let hitBase: string | null = null
+      let hitData: any = null
+      for (const candidate of candidates) {
+        const d = await tryProbeOrigin(candidate, 2000)
+        if (d) {
+          hitBase = candidate
+          hitData = d
+          break
+        }
+      }
+
+      if (hitBase && hitData) {
+        missCount = 0
+        activeBaseUrl = hitBase
         state = {
           connected: true,
           checking: false,
-          version: data.version || '1.0.0',
-          port: data.port || HELPER_DEFAULT_PORT,
-          capabilities: Array.isArray(data.capabilities) ? data.capabilities : [],
-          tokenCached: data.stats?.tokenCached,
-          requests: data.stats?.requests,
+          version: hitData.version || '1.0.1',
+          port: hitData.port || HELPER_DEFAULT_PORT,
+          capabilities: Array.isArray(hitData.capabilities) ? hitData.capabilities : [],
+          tokenCached: hitData.stats?.tokenCached,
+          requests: hitData.stats?.requests,
+          lanUrl: hitData.lanUrl || null,
+          baseUrl: hitBase,
         }
         emit()
         return true
       }
-    } catch {
-      /* helper not running */
+
+      missCount += 1
+      // Require 2 consecutive probe failures before flipping connected -> false so transient pauses don't flash offline
+      if (state.connected && missCount < 2 && !force) {
+        return true
+      }
     } finally {
-      window.clearTimeout(timer)
       activeProbe = null
     }
+
     if (state.connected || state.checking) {
       state = {
         connected: false,
         checking: false,
         port: HELPER_DEFAULT_PORT,
         capabilities: [],
+        lanUrl: null,
+        baseUrl: undefined,
       }
       emit()
     }
@@ -147,7 +252,7 @@ export function helperProxyUrl(
   filename?: string,
 ): string {
   if (!targetUrl) return targetUrl
-  if (targetUrl.startsWith('http://127.0.0.1:')) return targetUrl
+  if (isLocalHelperUrl(targetUrl)) return targetUrl
   const qs = new URLSearchParams({ url: targetUrl })
   if (typeof headersOrReferer === 'string' && headersOrReferer) {
     qs.set('referer', headersOrReferer)

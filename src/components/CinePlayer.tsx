@@ -21,7 +21,7 @@ import {
   airplayPicker, airplaySupported, castLoad, castRequest, castSeek, castSetVolume, castStop, castToggleMute, castTogglePlay, castUrl, getCast, initCast, onCastFinished, useCast,
 } from '../lib/cast'
 import { isCompanionActive, isExtensionActive } from '../lib/useCompanion'
-import { isHelperApkActive, helperProxyUrl } from '../lib/helperClient'
+import { isHelperApkActive, helperProxyUrl, isLocalHelperUrl } from '../lib/helperClient'
 import { downloadMedia } from '../lib/download'
 import { forFetch } from '../lib/acdnClient'
 import { ACCESS_CLASS, ACCESS_TEXT, type ServerAccess } from '../lib/servers'
@@ -299,6 +299,8 @@ export interface CinePlayerProps {
   availableEpisodes?: number
   animeId: number
   format?: string | null
+  /** container/stream format when known (e.g. 'mp4', 'mkv', 'hls') so extensionless CDN links don't hit hls.js */
+  streamFormat?: string | null
   directSubtitles?: { id: string; label: string; lang?: string; url: string }[]
   audioMode?: 'sub' | 'dub'
   hasDub?: boolean
@@ -704,13 +706,16 @@ function Episodes({
 }
 
 /** Plain files (mp4 / webm / mkv) bypass hls.js; the proxied url keeps the real one in ?url= */
-const isFileSrc = (u: string) => {
+const isFileSrc = (u: string, formatHint?: string | null) => {
   if (!u) return false
   try {
+    const fmt = (formatHint || '').trim().toLowerCase()
+    let outerFmt = ''
     let curr = u
     for (let i = 0; i < 5; i++) {
       try {
         const parsed = new URL(curr, window.location.href)
+        if (!outerFmt) outerFmt = (parsed.searchParams.get('fmt') || '').toLowerCase()
         const inner = parsed.searchParams.get('url')
         if (inner) curr = inner
         else break
@@ -719,8 +724,16 @@ const isFileSrc = (u: string) => {
       }
     }
     const decoded = decodeURIComponent(curr)
-    if (/\.m3u8(\?|&|$)/i.test(decoded)) return false
-    return /\.(mp4|webm|mkv)(\?|&|$)/i.test(decoded) || /\.(mp4|webm|mkv)/i.test(decoded) || /\/sora\//i.test(decoded)
+    if (/\.m3u8(\?|&|$)/i.test(decoded) || fmt === 'hls' || outerFmt === 'hls') return false
+    if (outerFmt === 'mp4' || outerFmt === 'mkv' || outerFmt === 'webm' || fmt === 'mp4' || fmt === 'mkv' || fmt === 'webm') return true
+    return (
+      /\.(mp4|webm|mkv)(\?|&|$)/i.test(decoded) ||
+      /\.(mp4|webm|mkv)/i.test(decoded) ||
+      /\/sora\//i.test(decoded) ||
+      /pixeldrain\.|\/api\/file\//i.test(decoded) ||
+      /video-downloads\.googleusercontent\.com/i.test(decoded) ||
+      /\.r2\.(?:dev|cloudflarestorage\.com)\//i.test(decoded)
+    )
   } catch { return false }
 }
 let noSeg = false
@@ -809,7 +822,7 @@ const readPos = (id: number, ep: number) => {
 }
 
 export default function CinePlayer({
-  streamUrl, intro, outro, title, episode, episodeTitle = '', totalEpisodes, availableEpisodes, animeId, format,
+  streamUrl, intro, outro, title, episode, episodeTitle = '', totalEpisodes, availableEpisodes, animeId, format, streamFormat,
   directSubtitles = [], audioMode = 'sub', hasDub = true, hasSub = true, preview = false, onAudio, dubs, onDub, onAudioTracks, audioSel, tourReady = true, servers, serverId, onServer,
   hasNextEpisode = false, hasPrevEpisode = false, onNextEpisode, onPrevEpisode, onSelectEpisode, onPlay, onEnded, onProgress,
   autoNext = true, onAutoNext, autoSkip = false, onAutoSkip,
@@ -1203,7 +1216,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     if (!pvOn || !p || !streamUrl) return
     const url = noSeg ? streamUrl.replace('&seg=1', '') : streamUrl
     let h: Hls | null = null
-    if (!isFileSrc(streamUrl) && Hls.isSupported()) {
+    if (!isFileSrc(streamUrl, streamFormat) && Hls.isSupported()) {
       h = new Hls({ enableWorker: false, startLevel: 0, maxBufferLength: 2, maxMaxBufferLength: 4, backBufferLength: 0, capLevelToPlayerSize: false })
       h.loadSource(url)
       h.attachMedia(p)
@@ -1248,11 +1261,32 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     skipped.current = -1
     const saved = readPos(animeId, episode)
     const resumeTime = lastTimeRef.current > 10 ? lastTimeRef.current : saved
+    const syncNativeAudioTracks = () => {
+      const nat = (v as any).audioTracks as
+        | { length: number; [k: number]: { id?: string; label?: string; language?: string; enabled?: boolean } }
+        | undefined
+      if (!nat || nat.length === 0) return
+      const list: { i: number; label: string; lang: string }[] = []
+      let enabledIdx = 0
+      for (let k = 0; k < nat.length; k++) {
+        const tr = nat[k]
+        const rawLang = (tr?.language || '').trim()
+        const prettyLang = ISO[rawLang.toLowerCase()] || rawLang
+        const rawLabel = (tr?.label || '').trim()
+        const label = rawLabel || prettyLang || `Channel ${k + 1}`
+        list.push({ i: k, label, lang: rawLang })
+        if (tr?.enabled) enabledIdx = k
+      }
+      setAudioTracks(list)
+      setAudioIdx(enabledIdx)
+    }
+
     const onMeta = () => {
       if (v.duration && isFinite(v.duration) && v.duration > 0) setDur(v.duration)
       else if (defaultRuntime && defaultRuntime > 0) setDur(defaultRuntime * 60)
       const effectiveDur = (v.duration && isFinite(v.duration) && v.duration > 0) ? v.duration : (defaultRuntime ? defaultRuntime * 60 : 0)
       if (resumeTime > 10 && effectiveDur > 0 && resumeTime < effectiveDur - 45) v.currentTime = resumeTime
+      syncNativeAudioTracks()
       setBusy(false)
       if (!castOn.current) {
         v.play().catch(() => {
@@ -1261,7 +1295,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       }
     }
 
-    if (isFileSrc(streamUrl) && qualities && qualities.length > 0) {
+    if (isFileSrc(streamUrl, streamFormat) && qualities && qualities.length > 0) {
       const qLevels = qualities.map((q, idx) => ({
         i: idx,
         label: q.label,
@@ -1277,7 +1311,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
     let h: Hls | null = null
     let fails = 0
 
-    if (!isFileSrc(streamUrl) && Hls.isSupported()) {
+    if (!isFileSrc(streamUrl, streamFormat) && Hls.isSupported()) {
       h = new Hls({ enableWorker: true, backBufferLength: 90, maxBufferLength: 45, startPosition: saved > 10 ? saved : -1 })
       hls.current = h
       h.loadSource(noSeg ? streamUrl.replace('&seg=1', '') : streamUrl)
@@ -1341,8 +1375,8 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
           onStreamError?.()
         }
       })
-    } else if (isFileSrc(streamUrl) || v.canPlayType('application/vnd.apple.mpegurl')) {
-      const cleanUrl = isFileSrc(streamUrl) ? streamUrl.replace(/([?&])seg=1(&|$)/, (_m, a, b) => (b ? a : '')) : streamUrl
+    } else if (isFileSrc(streamUrl, streamFormat) || v.canPlayType('application/vnd.apple.mpegurl')) {
+      const cleanUrl = isFileSrc(streamUrl, streamFormat) ? streamUrl.replace(/([?&])seg=1(&|$)/, (_m, a, b) => (b ? a : '')) : streamUrl
       setFileSrc(v, cleanUrl)
       v.addEventListener('loadedmetadata', onMeta)
       v.addEventListener('error', onVideoError)
@@ -1463,7 +1497,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       image: fallbackImg,
       time: start > 3 ? start : 0,
       autoplay: true,
-      file: isFileSrc(streamUrl),
+      file: isFileSrc(streamUrl, streamFormat),
     }).then((ok) => {
       if (!ok) {
         setBusy(false)
@@ -1555,7 +1589,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
       const proxied = `${proxyBase}?url=${encodeURIComponent(url)}${referer ? `&referer=${encodeURIComponent(referer)}` : ''}`
       candidates.push(proxied, url)
     }
-    if (url.startsWith('http://127.0.0.1:')) {
+    if (isLocalHelperUrl(url)) {
       candidates.unshift(url)
     } else if (isExtensionActive()) {
       const raw = candidates.find((c) => /^https?:/i.test(c) && !c.includes('/proxy?'))
@@ -1943,6 +1977,18 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
   const setAudioTrack = (t: { i: number; lang: string; label: string }) => {
     flash('ok', `Audio: ${t.label}`)
     if (hls.current) hls.current.audioTrack = t.i
+    const nat = (vid.current as any)?.audioTracks as
+      | { length: number; [k: number]: { enabled?: boolean } }
+      | undefined
+    if (nat && nat.length > 0) {
+      for (let k = 0; k < nat.length; k++) {
+        try {
+          if (nat[k]) nat[k].enabled = k === t.i
+        } catch {
+          /* ignore read-only audioTracks implementations */
+        }
+      }
+    }
     setAudioIdx(t.i)
     const l = t.label.toLowerCase()
     const g = t.lang.toLowerCase()
@@ -2471,10 +2517,10 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
               )}
             </div>
             <div className="zp-ac">
-              {dubs && dubs.length > 1 && audioTracks.length < 2 && (
+              {dubs && dubs.length > 0 && audioTracks.length < 2 && (
                 <button className="zp-b pill" data-tour="p-audio" onClick={(e) => setPop('aud', e.currentTarget)} title="Audio" aria-label="Audio">
                   <Languages />
-                  <em>{dubs.find((d) => d.selected)?.label ?? 'Audio'}</em>
+                  <em>{dubs.find((d) => d.selected)?.label ?? dubs[0]?.label ?? 'Audio'}</em>
                 </button>
               )}
               {audioTracks.length > 1 && (
@@ -2843,7 +2889,7 @@ const slider = (label: string, key: 'opacity' | 'lh' | 'width' | 'blur' | 'scale
                 <>
                   <p className="zp-ph">Audio</p>
                   <div className="flex flex-col gap-0.5">
-                    {audioTracks.length < 2 && dubs?.map((d, i) => (
+                  {!loadingSubs && audioTracks.length < 2 && dubs?.map((d, i) => (
                       <motion.button
                         key={d.id}
                         type="button"

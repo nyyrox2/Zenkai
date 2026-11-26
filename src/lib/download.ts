@@ -1,5 +1,5 @@
 import { isCompanionActive, companionHas, isExtensionActive } from './useCompanion'
-import { isHelperApkActive, helperProxyUrl } from './helperClient'
+import { isHelperApkActive, helperProxyUrl, isLocalHelperUrl } from './helperClient'
 import { toast } from './toast'
 
 export interface DownloadMediaOptions {
@@ -38,7 +38,7 @@ export function downloadMedia({ url, rawUrl, filename }: DownloadMediaOptions): 
   // 1. Resolve effective proxy download URL
   let targetUrl = url
   if (isHelperApkActive()) {
-    if (url && url.startsWith('http://127.0.0.1:')) {
+    if (isLocalHelperUrl(url)) {
       targetUrl = url
     } else if (rawUrl && /^https?:\/\//i.test(rawUrl)) {
       targetUrl = helperProxyUrl(rawUrl, undefined, true, cleanName)

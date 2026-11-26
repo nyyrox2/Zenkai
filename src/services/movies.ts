@@ -342,6 +342,7 @@ export async function fetchMovieBoxStream(p: {
   imdbId?: string | null
   regional?: boolean
   serverId?: string | null
+  fresh?: boolean
 }): Promise<MovieStreamResult> {
   const rawServer = (p.serverId || 'moviebox').toLowerCase()
   const helperServer = rawServer === 'moviebox-regional' ? 'moviebox' : rawServer
@@ -359,30 +360,39 @@ export async function fetchMovieBoxStream(p: {
   if (p.dubId) qs.set('dub', p.dubId)
   if (p.imdbId) qs.set('imdb', p.imdbId)
   if (p.regional) qs.set('regional', 'true')
+  if (p.fresh) qs.set('fresh', '1')
 
   let data: any = null
   let resOk = false
   let helperAttemptError: string | null = null
 
-  // 0. Preferred: On-device Zenkai Helper APK local bridge (bypasses Cloudflare limits completely)
-  const helperReady = isHelperApkActive() || (await probeHelperApk())
+  // 0. Preferred: On-device / Same-Wi-Fi Zenkai Helper APK bridge (bypasses Cloudflare limits completely)
+  const helperReady = isHelperApkActive() || (await probeHelperApk(true))
   if (helperReady) {
-    try {
-      const helperRes = await fetch(`${getHelperBaseUrl()}/api/movies/stream?${qs}`, {
-        signal: AbortSignal.timeout(isMovieBoxVariant ? 20000 : 48000),
-        cache: 'no-store',
-      })
-      if (helperRes.ok) {
-        const d = await helperRes.json().catch(() => null)
-        if (d && d.success === true && (d.streams?.length > 0 || d.streamUrl)) {
-          data = d
-          resOk = true
-        } else if (d?.error) {
-          helperAttemptError = d.error
+    for (let attempt = 0; attempt < 2 && !resOk; attempt++) {
+      try {
+        const attemptQs = new URLSearchParams(qs)
+        if (attempt > 0) attemptQs.set('fresh', '1')
+        const helperRes = await fetch(`${getHelperBaseUrl()}/api/movies/stream?${attemptQs}`, {
+          signal: AbortSignal.timeout(isMovieBoxVariant ? 22000 : 48000),
+          cache: 'no-store',
+        })
+        if (helperRes.ok) {
+          const d = await helperRes.json().catch(() => null)
+          if (d && d.success === true && (d.streams?.length > 0 || d.streamUrl)) {
+            data = d
+            resOk = true
+            break
+          } else if (d?.error) {
+            helperAttemptError = d.error
+          }
         }
+      } catch (e) {
+        helperAttemptError = (e as Error)?.message || null
       }
-    } catch (e) {
-      helperAttemptError = (e as Error)?.message || null
+      if (!resOk && attempt === 0) {
+        await new Promise((r) => setTimeout(r, 350))
+      }
     }
   } else if (!isMovieBoxVariant) {
     throw new Error(
